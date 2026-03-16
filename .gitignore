@@ -1,0 +1,14 @@
+# Editor / OS
+.DS_Store
+
+# Node / build
+node_modules/
+dist/
+
+# Local scratch
+.tmp/
+.tmp-hook-probe/
+.tmp-install-home/
+
+# Install backups
+*.chedex.bak-*

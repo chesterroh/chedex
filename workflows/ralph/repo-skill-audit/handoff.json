@@ -1,0 +1,22 @@
+{
+  "task": "Audit whether the current repo's skills are duly described and duly implemented",
+  "acceptance_criteria": [
+    "Inspect skill contracts, docs, install surfaces, and generated artifacts",
+    "Verify repo checks still pass",
+    "Record the final audit verdict with explicit risks"
+  ],
+  "verification_targets": [
+    "npm run verify",
+    "npm run install:user:dry"
+  ],
+  "delegation_roster": [
+    "explore",
+    "verifier"
+  ],
+  "execution_lane": "repo-audit",
+  "source_artifacts": [
+    "/Users/chester/work/chedex/README.md",
+    "/Users/chester/work/chedex/docs/install.md"
+  ],
+  "approved_at": "2026-03-16T03:00:00Z"
+}

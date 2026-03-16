@@ -1,0 +1,20 @@
+{
+  "name": "chedex",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Native-first agentic harness scaffold for Codex",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "generate:agents": "node scripts/generate-agents.mjs",
+    "install:user": "node scripts/install-user.mjs",
+    "install:user:dry": "node scripts/install-user.mjs --dry-run",
+    "uninstall:user": "node scripts/uninstall-user.mjs",
+    "verify": "node scripts/verify-repo.mjs && node scripts/verify-governor.mjs && npx tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
