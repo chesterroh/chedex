@@ -9,6 +9,13 @@ dist/
 .tmp/
 .tmp-hook-probe/
 .tmp-install-home/
+workflows/
+
+# Repo-local .codex mirror byproducts
+.codex/CHEDEX_UNINSTALL.md
+.codex/config.toml
+.codex/hooks.json
+.codex/workflows/
 
 # Install backups
 *.chedex.bak-*

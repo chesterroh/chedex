@@ -16,7 +16,7 @@ Use this when the user explicitly wants a plan, or when the task is broad enough
 - Include risks and verification.
 - If the plan is meant to flow into `ralph` or `autopilot`, treat it as a governed plan.
 - Governed plans must produce both `plan.md` and `handoff.json`.
-- Governed plans should not be execution-ready until an `architect` pass and a `verifier` pass agree the plan is grounded enough to run.
+- Governed plans should not be execution-ready until an `architect` pass and a `verifier` pass agree the plan is grounded enough to run, including when `autopilot` owns the lifecycle.
 
 ## Output
 

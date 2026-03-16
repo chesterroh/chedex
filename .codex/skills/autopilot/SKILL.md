@@ -33,8 +33,9 @@ Recommended files:
    - Build an actionable plan in `plan.md`.
    - Produce or refresh `handoff.json`.
    - Note risks, dependencies, and proof steps before execution starts.
+   - Run an `architect` pass and a `verifier` pass before handoff to confirm the governed plan is grounded enough to execute.
 4. Execute
-   - Hand off implementation to `ralph` using the current artifacts.
+   - Hand off implementation to `ralph` only after the plan-hardening pass agrees the work is execution-ready.
    - Let `ralph` use `ultrawork` for parallel execution only when the work splits cleanly.
    - Reuse the same facts, plan, and verification targets instead of re-deriving them.
 5. Verify
@@ -50,6 +51,7 @@ Recommended files:
 - Prefer native roles already present in Chedex: `explore`, `planner`, `executor`, `architect`, `verifier`, `debugger`, and `test-engineer`.
 - `autopilot` owns the lifecycle, `ralph` owns persistence and verification, and `ultrawork` owns parallel fan-out.
 - `autopilot` is a governed workflow owner; assume native `SessionStart` and `Stop` hooks will restore and gate it.
+- Governed execution is not admitted until the `architect` and `verifier` plan-hardening passes both agree the work is ready to run.
 - Use parallel delegation only inside a grounded phase.
 - Do not depend on `.omx`, tmux workers, custom state servers, or OMX-only commands.
 - If execution becomes a single focused change, drop down to `ralph` or `execute`.
@@ -71,6 +73,8 @@ Recommended files:
 - `verification`
 - `blocker`
 - `risks`
+
+`phase` and `risks` are required fields, not optional hints.
 
 ## Output
 

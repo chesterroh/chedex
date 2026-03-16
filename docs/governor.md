@@ -46,7 +46,7 @@ Each entry records:
 - `workflow_root`
 - `progress_path`
 - `verify_path`
-- `handoff_path`
+- `handoff_path` (`null` is allowed for direct top-level `ultrawork`)
 - `status`
 - `phase`
 - `next_step`
@@ -68,6 +68,10 @@ Required fields:
 - `artifacts`
 - `verification`
 - `blocker`
+- `risks`
+
+`phase` must be a non-empty string.
+`risks` must be an array of strings and may be empty.
 
 Status vocabulary:
 
@@ -82,7 +86,7 @@ Stop-gate rules:
 
 ## `handoff.json`
 
-Governed plans should produce `handoff.json` with:
+Governed plans and richer governed workflows such as `ralph` and `autopilot` should produce `handoff.json` with:
 
 - `task`
 - `acceptance_criteria`
@@ -91,6 +95,8 @@ Governed plans should produce `handoff.json` with:
 - `execution_lane`
 - `source_artifacts`
 - `approved_at`
+
+Direct top-level `ultrawork` may omit `handoff.json` when no governed plan admitted the work. Its minimum governed state is `progress.json`, `verify.md`, and active index sync.
 
 ## Helper Commands
 

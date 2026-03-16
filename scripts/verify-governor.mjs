@@ -21,23 +21,37 @@ async function writeJson(path, value) {
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-async function makeWorkflow({ home, slug, mode = 'ralph', status = 'active', phase = 'execute', verificationState = 'pending', evidence = [], nextStep = 'Continue implementation', blocker = null }) {
+async function makeWorkflow({
+  home,
+  slug,
+  mode = 'ralph',
+  status = 'active',
+  phase = 'execute',
+  verificationState = 'pending',
+  evidence = [],
+  nextStep = 'Continue implementation',
+  blocker = null,
+  risks = ['Pending verification'],
+  includeHandoff = true,
+}) {
   const workflowRoot = join(home, 'workflows', mode, slug);
   await mkdir(workflowRoot, { recursive: true });
   const progressPath = join(workflowRoot, 'progress.json');
   const verifyPath = join(workflowRoot, 'verify.md');
-  const handoffPath = join(workflowRoot, 'handoff.json');
+  const handoffPath = includeHandoff ? join(workflowRoot, 'handoff.json') : null;
 
   await writeFile(verifyPath, '# verify\n');
-  await writeJson(handoffPath, {
-    task: `${slug} task`,
-    acceptance_criteria: ['done'],
-    verification_targets: ['npm run verify'],
-    delegation_roster: ['executor', 'verifier'],
-    execution_lane: 'default',
-    source_artifacts: [],
-    approved_at: '2026-03-16T00:00:00Z',
-  });
+  if (handoffPath) {
+    await writeJson(handoffPath, {
+      task: `${slug} task`,
+      acceptance_criteria: ['done'],
+      verification_targets: ['npm run verify'],
+      delegation_roster: ['executor', 'verifier'],
+      execution_lane: 'default',
+      source_artifacts: [],
+      approved_at: '2026-03-16T00:00:00Z',
+    });
+  }
 
   const progress = {
     schema_version: GOVERNOR_SCHEMA_VERSION,
@@ -51,7 +65,6 @@ async function makeWorkflow({ home, slug, mode = 'ralph', status = 'active', pha
     next_step: nextStep,
     artifacts: {
       plan: join(workflowRoot, 'plan.md'),
-      handoff: handoffPath,
       verify: verifyPath,
     },
     verification: {
@@ -59,7 +72,12 @@ async function makeWorkflow({ home, slug, mode = 'ralph', status = 'active', pha
       evidence,
     },
     blocker,
+    risks,
   };
+
+  if (handoffPath) {
+    progress.artifacts.handoff = handoffPath;
+  }
 
   await writeJson(progressPath, progress);
   await writeFile(join(workflowRoot, 'plan.md'), '# plan\n');
@@ -74,32 +92,46 @@ const home = await mkdtemp(join(tmpdir(), 'chedex-governor-'));
 const cwd = join(home, 'workspace');
 await mkdir(cwd, { recursive: true });
 
-const activeWorkflow = await makeWorkflow({
-  home,
-  slug: 'active-run',
-});
+for (const mode of ['ralph', 'autopilot', 'ultrawork']) {
+  const activeWorkflow = await makeWorkflow({
+    home,
+    slug: `${mode}-active-run`,
+    mode,
+    includeHandoff: mode !== 'ultrawork',
+  });
 
-await syncWorkflow({
-  codexHome: home,
-  cwd,
-  progressPath: activeWorkflow.progressPath,
-});
+  await syncWorkflow({
+    codexHome: home,
+    cwd,
+    progressPath: activeWorkflow.progressPath,
+  });
 
-const sessionContext = await sessionStartHook({
-  codexHome: home,
-  cwd,
-});
-assert(sessionContext.includes('Chedex governor restored a governed workflow'), 'session-start did not inject governed context');
+  const sessionContext = await sessionStartHook({
+    codexHome: home,
+    cwd,
+  });
+  assert(sessionContext.includes(`mode: ${mode}`), `session-start did not inject governed context for ${mode}`);
 
-const activeStop = await stopHook({
-  codexHome: home,
-  cwd,
-});
-assert(activeStop.action === 'block', 'active workflow stop should block');
+  const activeStop = await stopHook({
+    codexHome: home,
+    cwd,
+  });
+  assert(activeStop.action === 'block', `active workflow stop should block for ${mode}`);
+
+  const index = JSON.parse(await readFile(activeIndexPath(home), 'utf8'));
+  const entry = index.entries[cwd];
+  assert(entry.mode === mode, `active index mode mismatch for ${mode}`);
+  if (mode === 'ultrawork') {
+    assert(entry.handoff_path === null, 'top-level ultrawork should not require a handoff path');
+  } else {
+    assert(typeof entry.handoff_path === 'string' && entry.handoff_path.endsWith('handoff.json'), `expected handoff path for ${mode}`);
+  }
+}
 
 const completedWorkflow = await makeWorkflow({
   home,
   slug: 'completed-missing-proof',
+  mode: 'autopilot',
   status: 'active',
   phase: 'execute',
 });
@@ -112,7 +144,7 @@ await syncWorkflow({
 
 await writeJson(completedWorkflow.progressPath, {
   schema_version: GOVERNOR_SCHEMA_VERSION,
-  mode: 'ralph',
+  mode: 'autopilot',
   task: 'completed-missing-proof task',
   active: false,
   status: 'completed',
@@ -130,6 +162,7 @@ await writeJson(completedWorkflow.progressPath, {
     evidence: [],
   },
   blocker: null,
+  risks: ['Need independent validation'],
 });
 
 const completedBlocked = await stopHook({
@@ -141,11 +174,14 @@ assert(completedBlocked.action === 'block', 'completed workflow without satisfie
 const completedValid = await makeWorkflow({
   home,
   slug: 'completed-verified',
+  mode: 'ultrawork',
   status: 'completed',
   phase: 'validate',
   verificationState: 'satisfied',
   evidence: ['npm run verify'],
   nextStep: 'Report results',
+  risks: [],
+  includeHandoff: false,
 });
 
 await syncWorkflow({
@@ -166,11 +202,13 @@ assert(!(cwd in indexAfterCompleted.entries), 'completed workflow should be clea
 const pausedWorkflow = await makeWorkflow({
   home,
   slug: 'paused-resume',
+  mode: 'ralph',
   status: 'paused',
   phase: 'execute',
   verificationState: 'pending',
   evidence: [],
   nextStep: 'Resume after dependency lands',
+  risks: ['Waiting on dependency'],
 });
 
 await syncWorkflow({
@@ -196,5 +234,43 @@ const cleared = await clearWorkflow({
   cwd,
 });
 assert(cleared, 'workflow-clear should remove the indexed workflow');
+
+const invalidMissingPhase = await makeWorkflow({
+  home,
+  slug: 'invalid-missing-phase',
+});
+const invalidMissingPhaseProgress = JSON.parse(await readFile(invalidMissingPhase.progressPath, 'utf8'));
+delete invalidMissingPhaseProgress.phase;
+await writeJson(invalidMissingPhase.progressPath, invalidMissingPhaseProgress);
+let missingPhaseFailed = false;
+try {
+  await syncWorkflow({
+    codexHome: home,
+    cwd,
+    progressPath: invalidMissingPhase.progressPath,
+  });
+} catch (error) {
+  missingPhaseFailed = error.message.includes('missing field: phase');
+}
+assert(missingPhaseFailed, 'missing phase should fail governed validation');
+
+const invalidMissingRisks = await makeWorkflow({
+  home,
+  slug: 'invalid-missing-risks',
+});
+const invalidMissingRisksProgress = JSON.parse(await readFile(invalidMissingRisks.progressPath, 'utf8'));
+delete invalidMissingRisksProgress.risks;
+await writeJson(invalidMissingRisks.progressPath, invalidMissingRisksProgress);
+let missingRisksFailed = false;
+try {
+  await syncWorkflow({
+    codexHome: home,
+    cwd,
+    progressPath: invalidMissingRisks.progressPath,
+  });
+} catch (error) {
+  missingRisksFailed = error.message.includes('missing field: risks');
+}
+assert(missingRisksFailed, 'missing risks should fail governed validation');
 
 process.stdout.write('verify-governor-ok\n');

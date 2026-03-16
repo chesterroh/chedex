@@ -31,14 +31,15 @@ This installs:
 
 Chedex writes native agent files only under `~/.codex` unless `CODEX_HOME` is set.
 Long-running workflow skills such as `ralph` and `autopilot` keep their artifacts under `~/.codex/workflows/`.
-Direct top-level `ultrawork` uses a minimal workflow root under `~/.codex/workflows/ultrawork/`.
+Direct top-level `ultrawork` uses a minimal workflow root under `~/.codex/workflows/ultrawork/` with `progress.json`, `verify.md`, and active index sync; it may omit `handoff.json`.
 
 Governed workflow state now includes:
 
 - `~/.codex/workflows/_active.json`
 - `progress.json`
-- `handoff.json`
 - `verify.md`
+
+`handoff.json` is required for governed plans and the richer `ralph` / `autopilot` workflows, but direct top-level `ultrawork` may omit it.
 
 ## Dry Run
 
@@ -54,3 +55,5 @@ npm run uninstall:user
 
 If you want exact rollback, restore the config backup created during install.
 If an existing `hooks.json` was present, install also creates a timestamped backup beside it.
+If no pre-existing `config.toml` or `hooks.json` was present, no backup is created for that file.
+`~/.codex/workflows/_active.json` is created later by the first governed workflow sync, not by install itself.

@@ -61,6 +61,8 @@ Recommended files:
 - `blocker`
 - `risks`
 
+`phase` and `risks` are required fields, not optional hints.
+
 Status vocabulary:
 - non-terminal: `active`
 - safe-stop terminal: `completed`, `paused`, `blocked`, `failed`, `cancelled`

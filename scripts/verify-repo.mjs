@@ -1,4 +1,5 @@
 import { readFile, readdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import { ROLE_DEFINITIONS } from '../registry/agent-definitions.mjs';
 import {
   anyMissing,
@@ -10,6 +11,50 @@ import {
   roleNames,
   rolePromptPath,
 } from './lib.mjs';
+
+async function listRelativeFiles(root, prefix = '') {
+  const entries = await readdir(join(root, prefix), { withFileTypes: true });
+  const files = [];
+
+  for (const entry of entries) {
+    const relativePath = join(prefix, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...await listRelativeFiles(root, relativePath));
+    } else if (entry.isFile()) {
+      files.push(relativePath);
+    }
+  }
+
+  return files.sort();
+}
+
+async function assertFileEqual(left, right, label) {
+  const [leftContent, rightContent] = await Promise.all([
+    readFile(left, 'utf8'),
+    readFile(right, 'utf8'),
+  ]);
+
+  if (leftContent !== rightContent) {
+    throw new Error(`${label} differs:\n${left}\n${right}`);
+  }
+}
+
+async function assertTreeEqual(leftRoot, rightRoot, label) {
+  const [leftFiles, rightFiles] = await Promise.all([
+    listRelativeFiles(leftRoot),
+    listRelativeFiles(rightRoot),
+  ]);
+
+  if (JSON.stringify(leftFiles) !== JSON.stringify(rightFiles)) {
+    throw new Error(
+      `${label} file list differs:\nleft=${leftFiles.join(', ')}\nright=${rightFiles.join(', ')}`,
+    );
+  }
+
+  for (const relativePath of leftFiles) {
+    await assertFileEqual(join(leftRoot, relativePath), join(rightRoot, relativePath), `${label}:${relativePath}`);
+  }
+}
 
 const hookProbe = probeCodexHooksSupport();
 if (!hookProbe.ok) {
@@ -105,11 +150,11 @@ for (const path of skillDocSurfaces) {
 const governorSurfaceChecks = [
   [repoPath('README.md'), ['codex_hooks', 'hooks.json', '_active.json', 'handoff.json']],
   [repoPath('docs', 'install.md'), ['codex_hooks', 'hooks.json', '0.114.0']],
-  [repoPath('docs', 'governor.md'), ['workflow-sync', 'SessionStart', 'Stop', 'handoff.json']],
+  [repoPath('docs', 'governor.md'), ['workflow-sync', 'SessionStart', 'Stop', 'handoff.json', 'risks']],
   [repoPath('skills', 'plan', 'SKILL.md'), ['handoff.json', 'architect', 'verifier']],
-  [repoPath('skills', 'ralph', 'SKILL.md'), ['schema_version', 'workflow_root', 'verification']],
-  [repoPath('skills', 'autopilot', 'SKILL.md'), ['handoff.json', 'Validate', 'verification']],
-  [repoPath('skills', 'ultrawork', 'SKILL.md'), ['$CODEX_HOME/workflows/ultrawork']],
+  [repoPath('skills', 'ralph', 'SKILL.md'), ['schema_version', 'workflow_root', 'verification', 'risks']],
+  [repoPath('skills', 'autopilot', 'SKILL.md'), ['handoff.json', 'architect', 'verifier', 'verification']],
+  [repoPath('skills', 'ultrawork', 'SKILL.md'), ['$CODEX_HOME/workflows/ultrawork', 'verify.md', 'handoff.json']],
   [repoPath('AGENTS.template.md'), ['SessionStart', 'Stop', 'terminal']],
 ];
 
@@ -132,8 +177,15 @@ if (!uninstallScript.includes('stripManagedHooksConfig')) {
   throw new Error('uninstall-user.mjs is missing managed hook cleanup');
 }
 
+const mirrorScript = await readFile(repoPath('scripts', 'refresh-repo-mirror.mjs'), 'utf8');
+for (const snippet of ['copyTree', '.codex', 'mirrorHookAssetsDir']) {
+  if (!mirrorScript.includes(snippet)) {
+    throw new Error(`refresh-repo-mirror.mjs missing "${snippet}"`);
+  }
+}
+
 const governorRuntime = await readFile(repoPath('hooks', 'chedex-governor.mjs'), 'utf8');
-for (const snippet of ['session-start', 'workflow-sync', 'workflow-clear', 'decision: \'block\'']) {
+for (const snippet of ['session-start', 'workflow-sync', 'workflow-clear', 'risks must be an array']) {
   if (!governorRuntime.includes(snippet)) {
     throw new Error(`governor runtime missing "${snippet}"`);
   }
@@ -151,11 +203,27 @@ for (const snippet of ['chedexMinimumCodexVersion', 'mergeManagedHooksConfig', '
 
 const installedAgentsPath = repoPath('.codex', 'AGENTS.md');
 if (!anyMissing([installedAgentsPath]).length) {
-  const expectedAgents = await readFile(manifest.templateAgents, 'utf8');
-  const installedAgents = await readFile(installedAgentsPath, 'utf8');
-  if (expectedAgents !== installedAgents) {
-    throw new Error('.codex/AGENTS.md is stale relative to AGENTS.template.md');
+  const mirrorRequiredPaths = [
+    installedAgentsPath,
+    repoPath('.codex', 'prompts'),
+    repoPath('.codex', 'skills'),
+    repoPath('.codex', 'agents'),
+    repoPath('.codex', 'hooks', 'chedex', 'chedex-governor.mjs'),
+  ];
+  const missingMirrorPaths = anyMissing(mirrorRequiredPaths);
+  if (missingMirrorPaths.length) {
+    throw new Error(`.codex mirror is incomplete: ${missingMirrorPaths.join(', ')}`);
   }
+
+  await assertFileEqual(manifest.templateAgents, installedAgentsPath, '.codex/AGENTS.md');
+  await assertTreeEqual(manifest.promptsDir, repoPath('.codex', 'prompts'), '.codex/prompts');
+  await assertTreeEqual(manifest.skillsDir, repoPath('.codex', 'skills'), '.codex/skills');
+  await assertTreeEqual(manifest.agentsDir, repoPath('.codex', 'agents'), '.codex/agents');
+  await assertFileEqual(
+    repoPath('hooks', 'chedex-governor.mjs'),
+    repoPath('.codex', 'hooks', 'chedex', 'chedex-governor.mjs'),
+    '.codex/hooks/chedex/chedex-governor.mjs',
+  );
 }
 
 process.stdout.write(`verify-ok roles=${Object.keys(ROLE_DEFINITIONS).length} skills=${repoSkillDirs.length}\n`);

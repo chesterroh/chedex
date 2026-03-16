@@ -1,6 +1,6 @@
 {
   "name": "chedex",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Native-first agentic harness scaffold for Codex",
@@ -9,6 +9,7 @@
   },
   "scripts": {
     "generate:agents": "node scripts/generate-agents.mjs",
+    "refresh:mirror": "node scripts/refresh-repo-mirror.mjs",
     "install:user": "node scripts/install-user.mjs",
     "install:user:dry": "node scripts/install-user.mjs --dry-run",
     "uninstall:user": "node scripts/uninstall-user.mjs",

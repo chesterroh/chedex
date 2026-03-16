@@ -9,8 +9,12 @@
 
 ```bash
 npm run generate:agents
+npm run refresh:mirror
 npm run verify
 ```
+
+The checked-in mirror is limited to `.codex/AGENTS.md`, `.codex/prompts/`, `.codex/skills/`, `.codex/agents/`, and `.codex/hooks/chedex/chedex-governor.mjs`.
+Do not commit repo-local install byproducts such as `.codex/config.toml`, `.codex/hooks.json`, `.codex/CHEDEX_UNINSTALL.md`, or workflow state.
 
 ## Add a New Skill
 
@@ -19,6 +23,7 @@ npm run verify
 3. Update docs if the skill should be part of the default install set
 4. If the skill creates persistent artifacts, document the `$CODEX_HOME` path it owns
 5. If the skill is a governed workflow, document its `progress.json` and `handoff.json` expectations
+6. If the skill is mirrored under `.codex/`, refresh the mirror before verifying
 
 ## Change Install Paths
 
@@ -27,8 +32,11 @@ Update:
 - `README.md`
 - `docs/install.md`
 - `docs/governor.md`
+- `scripts/refresh-repo-mirror.mjs`
 - `scripts/verify-repo.mjs`
 - any uninstall guidance produced by the install script
+
+If the changed paths are mirrored under `.codex/`, run `npm run refresh:mirror` before `npm run verify`.
 
 ## Change Governor Behavior
 
@@ -41,4 +49,6 @@ Update together:
 - `skills/plan/SKILL.md`
 - `skills/ralph/SKILL.md`
 - `skills/autopilot/SKILL.md`
+- `skills/ultrawork/SKILL.md`
 - `scripts/verify-governor.mjs`
+- `scripts/refresh-repo-mirror.mjs`

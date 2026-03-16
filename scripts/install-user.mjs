@@ -40,6 +40,7 @@ const legacyOmxHomePresentBefore = await fileExists(legacyOmxHomePath);
 const legacyOmxAgentsPresentBefore = await fileExists(legacyOmxAgentsPath);
 const hooksConfigPresentBefore = await fileExists(targets.hooksConfigPath);
 const hookProbe = probeCodexHooksSupport();
+const uninstallBackups = [];
 
 if (!hookProbe.ok) {
   throw new Error(`Chedex requires Codex native hooks support: ${hookProbe.reason}`);
@@ -63,10 +64,12 @@ if (!dryRun) {
   const existingConfig = await readTextIfExists(targets.configPath);
   if (existingConfig) {
     await copyFile(targets.configPath, backupPath);
+    uninstallBackups.push(backupPath);
   }
 
   if (hooksConfigPresentBefore) {
     await copyFile(targets.hooksConfigPath, hooksBackupPath);
+    uninstallBackups.push(hooksBackupPath);
   }
 }
 
@@ -92,8 +95,7 @@ const nextHooksConfig = mergeManagedHooksConfig(currentHooksConfig, targets);
 if (!dryRun) {
   await writeFileIfChanged(targets.configPath, nextConfig);
   await writeJsonIfChanged(targets.hooksConfigPath, nextHooksConfig);
-  const uninstallBackups = hooksConfigPresentBefore ? [backupPath, hooksBackupPath] : [backupPath];
-  const uninstall = renderUninstallNote(targets, uninstallBackups);
+  const uninstall = renderUninstallNote(targets, { backups: uninstallBackups });
   await writeFileIfChanged(targets.uninstallPath, uninstall);
 }
 

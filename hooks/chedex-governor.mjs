@@ -88,6 +88,7 @@ export function validateGovernedProgress(progress) {
     'mode',
     'task',
     'active',
+    'phase',
     'status',
     'updated_at',
     'workflow_root',
@@ -95,6 +96,7 @@ export function validateGovernedProgress(progress) {
     'artifacts',
     'verification',
     'blocker',
+    'risks',
   ];
 
   for (const field of baseFields) {
@@ -136,8 +138,8 @@ export function validateGovernedProgress(progress) {
     errors.push('workflow_root must be a non-empty string');
   }
 
-  if (progress.phase != null && typeof progress.phase !== 'string') {
-    errors.push('phase must be a string or null');
+  if (typeof progress.phase !== 'string' || !progress.phase.trim()) {
+    errors.push('phase must be a non-empty string');
   }
 
   if (progress.next_step != null && typeof progress.next_step !== 'string') {
@@ -154,6 +156,12 @@ export function validateGovernedProgress(progress) {
 
   if (!progress.verification || typeof progress.verification !== 'object' || Array.isArray(progress.verification)) {
     errors.push('verification must be an object');
+  }
+
+  if (!Array.isArray(progress.risks)) {
+    errors.push('risks must be an array');
+  } else if (progress.risks.some((item) => typeof item !== 'string' || !item.trim())) {
+    errors.push('risks entries must be non-empty strings');
   }
 
   const evidence = progress.verification?.evidence;
@@ -198,7 +206,7 @@ export function deriveActiveEntry({ cwd, progressPath, progress }) {
   const progressDir = dirname(progressPath);
   const workflowRoot = resolvePathFrom(progressDir, progress.workflow_root);
   const verifyPath = resolvePathFrom(progressDir, progress.artifacts?.verify || join(workflowRoot, 'verify.md'));
-  const handoffPath = resolvePathFrom(progressDir, progress.artifacts?.handoff || join(workflowRoot, 'handoff.json'));
+  const handoffPath = resolvePathFrom(progressDir, progress.artifacts?.handoff || null);
 
   return {
     mode: progress.mode,

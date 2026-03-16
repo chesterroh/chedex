@@ -213,13 +213,12 @@ export function stripChedexBlock(config) {
   return config.replace(pattern, '').replace(/\n{3,}/g, '\n\n');
 }
 
-export function renderUninstallNote(targets, backupPath) {
-  const backupPaths = Array.isArray(backupPath) ? backupPath : [backupPath];
+export function renderUninstallNote(targets, options = {}) {
+  const backupPaths = Array.isArray(options.backups) ? options.backups : [];
   const promptFiles = roleNames().map((name) => `${targets.promptsDir}/${name}.md`);
   const agentFiles = roleNames().map((name) => `${targets.agentsDir}/${name}.toml`);
   const skillDirs = listSkills().map((name) => `${targets.skillsDir}/${name}`);
-
-  return [
+  const sections = [
     '# Chedex Uninstall Notes',
     '',
     'This installation was created by the Chedex repo install script.',
@@ -232,24 +231,33 @@ export function renderUninstallNote(targets, backupPath) {
     ...agentFiles.map((path) => `- ${path}`),
     `- ${targets.hookRuntimePath}`,
     `- ${targets.hooksConfigPath}`,
-    `- ${targets.activeWorkflowIndexPath}`,
     '',
     '## Config Changes',
     '',
     `- ${targets.configPath}`,
     `- managed block markers: ${chedexMarkerStart} / ${chedexMarkerEnd}`,
     '- features enforced: `multi_agent = true`, `child_agents_md = true`, `codex_hooks = true`',
+  ];
+
+  if (backupPaths.length > 0) {
+    sections.push('', '## Backup', '', ...backupPaths.map((path) => `- ${path}`));
+  }
+
+  sections.push(
     '',
-    '## Backup',
+    '## Workflow State',
     '',
-    ...backupPaths.map((path) => `- ${path}`),
+    `- ${targets.activeWorkflowIndexPath} is created later, on the first governed workflow sync`,
     '',
     '## Clean Uninstall',
     '',
-    '1. Restore the config backup or remove the managed Chedex block from config.toml',
+    '1. Restore any listed config backups or remove the managed Chedex block from config.toml',
     '2. Remove the installed prompt, skill, agent, and AGENTS files if you no longer want them',
-    '3. Remove any leftover legacy agent files from older installs if they still exist',
-  ].join('\n');
+    '3. Remove any later-created workflow state such as workflows/_active.json if you no longer want it',
+    '4. Remove any leftover legacy agent files from older installs if they still exist',
+  );
+
+  return sections.join('\n');
 }
 
 export function timestampSlug(date = new Date()) {
@@ -349,7 +357,8 @@ export function shellQuote(value) {
 }
 
 export function buildManagedHooksConfig(targets) {
-  const governorCommand = shellQuote(targets.hookRuntimePath);
+  const nodeCommand = process.execPath;
+  const governorCommand = targets.hookRuntimePath;
   return {
     hooks: {
       SessionStart: [
@@ -358,7 +367,7 @@ export function buildManagedHooksConfig(targets) {
           hooks: [
             {
               type: 'command',
-              command: `${governorCommand} session-start`,
+              command: `${nodeCommand} ${governorCommand} session-start`,
               timeout: 5,
               statusMessage: `${chedexHookStatusPrefix} restore governed workflow context`,
             },
@@ -370,7 +379,7 @@ export function buildManagedHooksConfig(targets) {
           hooks: [
             {
               type: 'command',
-              command: `${governorCommand} stop`,
+              command: `${nodeCommand} ${governorCommand} stop`,
               timeout: 5,
               statusMessage: `${chedexHookStatusPrefix} enforce terminal workflow state`,
             },
@@ -431,12 +440,16 @@ export function parseCodexFeatures(output) {
   for (const line of output.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed) continue;
-    const parts = trimmed.split(/\s{2,}/).filter(Boolean);
-    if (parts.length !== 3) continue;
-    if (!/^(true|false)$/i.test(parts[2])) continue;
-    features[parts[0]] = {
-      stage: parts[1],
-      enabled: parts[2] === 'true',
+    const parts = trimmed.split(/\s+/).filter(Boolean);
+    if (parts.length < 3) continue;
+    const enabled = parts.at(-1);
+    if (!/^(true|false)$/i.test(enabled)) continue;
+    const name = parts[0];
+    const stage = parts.slice(1, -1).join(' ');
+    if (!stage) continue;
+    features[name] = {
+      stage,
+      enabled: enabled === 'true',
     };
   }
   return features;
