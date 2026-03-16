@@ -20,6 +20,7 @@ const mirrorHookAssetsDir = join(mirrorRoot, 'hooks', 'chedex');
 const mirrorConfigPath = join(mirrorRoot, 'config.toml');
 const mirrorHooksConfigPath = join(mirrorRoot, 'hooks.json');
 const mirrorUninstallPath = join(mirrorRoot, 'CHEDEX_UNINSTALL.md');
+const mirrorUninstallStatePath = join(mirrorRoot, 'CHEDEX_UNINSTALL.json');
 const mirrorWorkflowsDir = join(mirrorRoot, 'workflows');
 
 await ensureDir(mirrorRoot);
@@ -32,6 +33,7 @@ await removeTree(mirrorHookAssetsDir);
 await removeTree(mirrorConfigPath);
 await removeTree(mirrorHooksConfigPath);
 await removeTree(mirrorUninstallPath);
+await removeTree(mirrorUninstallStatePath);
 await removeTree(mirrorWorkflowsDir);
 
 await copyTree(manifest.promptsDir, mirrorPromptsDir);

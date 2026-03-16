@@ -95,7 +95,7 @@ Use skills as workflow contracts, not as runtime assumptions:
 - `autopilot` for end-to-end clarify/spec/plan/execute/verify flow
 
 Long-running workflow skills are governed workflows.
-Persist their artifacts under `$CODEX_HOME/workflows/` rather than `.omx`, keep `progress.json` authoritative, and assume the native `SessionStart` and `Stop` hooks will enforce resume and closeout behavior when Chedex is installed.
+Persist their artifacts under `$CODEX_HOME/workflows/`, keep `progress.json` authoritative, and assume the native `SessionStart` and `Stop` hooks will enforce resume and closeout behavior when Chedex is installed.
 
 ## Execution Rules
 

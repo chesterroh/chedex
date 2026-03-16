@@ -33,8 +33,8 @@ It intentionally excludes external orchestration machinery such as:
 
 - `AGENTS.template.md` — global/project template for orchestration policy
 - `AGENTS.md` — repo-local instructions for developing this harness
-- `registry/agent-definitions.ts` — small typed role registry
 - `registry/agent-definitions.mjs` — install/runtime source registry for scripts
+- `registry/agent-definitions.ts` — typed wrapper over the runtime registry
 - `prompts/` — installable role prompts
 - `skills/` — installable workflow skills
 - `agents/` — generated native agent TOMLs
@@ -48,7 +48,7 @@ It intentionally excludes external orchestration machinery such as:
 Use this repo as your own harness base:
 
 1. Evolve the prompts under `prompts/`
-2. Add more roles to `registry/agent-definitions.ts`
+2. Add more roles to `registry/agent-definitions.mjs`
 3. Add more skills under `skills/`
 4. Install selected files into `~/.codex/` as needed
 5. Regenerate and sync native agent configs when the registry or prompts change
@@ -63,7 +63,6 @@ Use this repo as your own harness base:
 - `~/.codex/hooks.json`
 - `[agents.*]` entries in `~/.codex/config.toml`
 - `[features] codex_hooks = true` in `~/.codex/config.toml`
-- installer cleanup of legacy managed agent TOML files from older user-level installs when present
 
 ## Current Core Roles
 
@@ -88,8 +87,7 @@ Use this repo as your own harness base:
 
 ## Workflow Artifacts
 
-The long-running workflow skills are native-Codex variants, not OMX compatibility layers.
-They persist artifacts under `~/.codex/workflows/` (or `$CODEX_HOME/workflows/`) instead of `.omx/`.
+The long-running workflow skills persist artifacts under `~/.codex/workflows/` (or `$CODEX_HOME/workflows/`).
 
 Governed workflow state now centers on:
 
@@ -101,13 +99,11 @@ Governed workflow state now centers on:
 
 ## Workflow Alignment
 
-Compared with the original `oh-my-codex` workflow stack, Chedex keeps the same high-level execution chain in native-only form:
+Chedex keeps a clear native-only execution chain:
 
 - `ultrawork` handles parallel fan-out for independent work, and direct top-level use keeps only the minimum governed state it needs: `progress.json`, `verify.md`, and active index sync.
 - `ralph` wraps `ultrawork` with resumable artifacts, active workflow registration, and a hard verification loop.
 - `autopilot` owns the full clarify/spec/plan/execute/verify/validate lifecycle, requires `architect` and `verifier` plan admission before Execute, and hands execution to `ralph`.
-
-These native variants intentionally exclude OMX runtime machinery such as tmux orchestration, HUD state, mailboxing, MCP-only state servers, and `.omx` persistence.
 
 ## Notes
 
@@ -126,6 +122,6 @@ npm run uninstall:user
 
 - This repo reflects the stronger delegation policy currently installed in your global `~/.codex/AGENTS.md`.
 - The prompts are the primary role surfaces. The registry is the structured metadata layer.
-- `agents/*.toml` are generated artifacts. Re-run `npm run generate:agents` after changing role metadata or prompts.
+- `agents/*.toml` are generated artifacts. Re-run `npm run generate:agents` after changing `registry/agent-definitions.mjs` or any prompt.
 - `.codex/` is a checked-in mirror of deterministic installable surfaces only. Refresh it with `npm run refresh:mirror` after changing mirrored source files.
 - The governor runtime lives in [`hooks/chedex-governor.mjs`](hooks/chedex-governor.mjs). See [`docs/governor.md`](docs/governor.md) for the governed workflow contract.

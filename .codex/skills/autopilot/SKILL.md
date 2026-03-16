@@ -53,7 +53,7 @@ Recommended files:
 - `autopilot` is a governed workflow owner; assume native `SessionStart` and `Stop` hooks will restore and gate it.
 - Governed execution is not admitted until the `architect` and `verifier` plan-hardening passes both agree the work is ready to run.
 - Use parallel delegation only inside a grounded phase.
-- Do not depend on `.omx`, tmux workers, custom state servers, or OMX-only commands.
+- Do not depend on tmux workers, custom state servers, or non-native orchestration commands.
 - If execution becomes a single focused change, drop down to `ralph` or `execute`.
 - If repeated verification failures indicate a real blocker, stop and report it instead of looping blindly.
 

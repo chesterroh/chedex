@@ -13,20 +13,13 @@ export const repoRoot = resolve(__dirname, '..');
 export const chedexMarkerStart = '# BEGIN CHEDEX NATIVE AGENTS';
 export const chedexMarkerEnd = '# END CHEDEX NATIVE AGENTS';
 export const uninstallFileName = 'CHEDEX_UNINSTALL.md';
+export const uninstallStateFileName = 'CHEDEX_UNINSTALL.json';
 export const chedexHooksFeature = 'codex_hooks';
 export const chedexMinimumCodexVersion = '0.114.0';
 export const chedexHookStatusPrefix = 'Chedex governor:';
 
 export function codexHome() {
   return process.env.CODEX_HOME || join(homedir(), '.codex');
-}
-
-export function legacyOmxHome() {
-  return join(homedir(), '.omx');
-}
-
-export function legacyOmxAgentsDir() {
-  return join(legacyOmxHome(), 'agents');
 }
 
 export function installTargets() {
@@ -46,6 +39,7 @@ export function installTargets() {
     agentsMdPath: join(home, 'AGENTS.md'),
     configPath: join(home, 'config.toml'),
     uninstallPath: join(home, uninstallFileName),
+    uninstallStatePath: join(home, uninstallStateFileName),
   };
 }
 
@@ -97,6 +91,18 @@ export async function copyTree(sourceDir, destDir) {
   }
 }
 
+export async function copyPath(sourcePath, destPath) {
+  const sourceStat = await stat(sourcePath);
+  if (sourceStat.isDirectory()) {
+    await copyTree(sourcePath, destPath);
+    return 'directory';
+  }
+
+  await ensureDir(dirname(destPath));
+  await copyFile(sourcePath, destPath);
+  return 'file';
+}
+
 export async function ensureExecutable(path) {
   await chmod(path, 0o755);
 }
@@ -114,28 +120,6 @@ export async function removeDirIfEmpty(path) {
   } catch {
     return false;
   }
-}
-
-export async function cleanupLegacyOmxAgents() {
-  const legacyAgentsDir = legacyOmxAgentsDir();
-  let removedFiles = 0;
-
-  for (const name of roleNames()) {
-    const path = join(legacyAgentsDir, `${name}.toml`);
-    if (await fileExists(path)) {
-      await rm(path, { force: true });
-      removedFiles += 1;
-    }
-  }
-
-  const removedAgentsDir = await removeDirIfEmpty(legacyAgentsDir);
-  const removedOmxHome = await removeDirIfEmpty(legacyOmxHome());
-
-  return {
-    removedFiles,
-    removedAgentsDir,
-    removedOmxHome,
-  };
 }
 
 export function buildAgentConfigBlock(agentsDir) {
@@ -213,6 +197,35 @@ export function stripChedexBlock(config) {
   return config.replace(pattern, '').replace(/\n{3,}/g, '\n\n');
 }
 
+export function stripManagedFeaturesSection(config) {
+  const lines = config.split(/\r?\n/);
+  const featuresStart = lines.findIndex((line) => /^\s*\[features\]\s*$/.test(line));
+
+  if (featuresStart < 0) {
+    return config;
+  }
+
+  let sectionEnd = lines.length;
+  for (let i = featuresStart + 1; i < lines.length; i += 1) {
+    if (/^\s*\[/.test(lines[i]) || lines[i].includes(chedexMarkerStart)) {
+      sectionEnd = i;
+      break;
+    }
+  }
+
+  const featurePattern = new RegExp(`^\\s*(multi_agent|child_agents_md|${chedexHooksFeature})\\s*=`);
+  const nextSectionLines = lines.slice(featuresStart + 1, sectionEnd).filter((line) => !featurePattern.test(line));
+  const hasMeaningfulFeatureLines = nextSectionLines.some((line) => line.trim().length > 0);
+
+  if (hasMeaningfulFeatureLines) {
+    lines.splice(featuresStart + 1, sectionEnd - featuresStart - 1, ...nextSectionLines);
+  } else {
+    lines.splice(featuresStart, sectionEnd - featuresStart);
+  }
+
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n');
+}
+
 export function renderUninstallNote(targets, options = {}) {
   const backupPaths = Array.isArray(options.backups) ? options.backups : [];
   const promptFiles = roleNames().map((name) => `${targets.promptsDir}/${name}.md`);
@@ -231,6 +244,7 @@ export function renderUninstallNote(targets, options = {}) {
     ...agentFiles.map((path) => `- ${path}`),
     `- ${targets.hookRuntimePath}`,
     `- ${targets.hooksConfigPath}`,
+    `- ${targets.uninstallStatePath}`,
     '',
     '## Config Changes',
     '',
@@ -251,10 +265,9 @@ export function renderUninstallNote(targets, options = {}) {
     '',
     '## Clean Uninstall',
     '',
-    '1. Restore any listed config backups or remove the managed Chedex block from config.toml',
-    '2. Remove the installed prompt, skill, agent, and AGENTS files if you no longer want them',
-    '3. Remove any later-created workflow state such as workflows/_active.json if you no longer want it',
-    '4. Remove any leftover legacy agent files from older installs if they still exist',
+    '1. Run `npm run uninstall:user` to restore backed-up managed files and remove install-created ones',
+    '2. Remove any later-created workflow state such as workflows/_active.json if you no longer want it',
+    '3. Remove any additional user-managed files you no longer want',
   );
 
   return sections.join('\n');
@@ -352,13 +365,19 @@ export function stripManagedHooksConfig(raw) {
   };
 }
 
+export function isEffectivelyEmptyHooksConfig(raw) {
+  const config = normalizeManagedHooksConfig(raw);
+  const nonHookKeys = Object.keys(config).filter((key) => key !== 'hooks' && config[key] != null);
+  return nonHookKeys.length === 0 && Object.keys(config.hooks).length === 0;
+}
+
 export function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\"'\"'`)}'`;
 }
 
 export function buildManagedHooksConfig(targets) {
-  const nodeCommand = process.execPath;
-  const governorCommand = targets.hookRuntimePath;
+  const nodeCommand = shellQuote(process.execPath);
+  const governorCommand = shellQuote(targets.hookRuntimePath);
   return {
     hooks: {
       SessionStart: [

@@ -36,7 +36,7 @@ Recommended files:
 ## Rules
 
 - Use native Codex agents and repo-local commands only.
-- Do not depend on `.omx`, tmux, HUD state, notify hooks, or custom state servers.
+- Do not depend on tmux, HUD state, notify hooks, or custom state servers.
 - Ralph owns persistence and verification; `ultrawork` owns parallel fan-out inside the execution slice.
 - Ralph is a governed workflow owner; assume native `SessionStart` and `Stop` hooks will restore and gate it.
 - Prefer the smallest execution slice that produces fresh evidence.

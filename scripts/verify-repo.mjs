@@ -1,8 +1,11 @@
-import { readFile, readdir } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { mkdtemp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ROLE_DEFINITIONS } from '../registry/agent-definitions.mjs';
 import {
   anyMissing,
+  buildManagedHooksConfig,
   generatedAgentPath,
   installManifestPaths,
   listSkills,
@@ -11,6 +14,12 @@ import {
   roleNames,
   rolePromptPath,
 } from './lib.mjs';
+
+function assert(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
 
 async function listRelativeFiles(root, prefix = '') {
   const entries = await readdir(join(root, prefix), { withFileTypes: true });
@@ -125,13 +134,6 @@ const codexOnlySurfaces = [
   repoPath('hooks', 'chedex-governor.mjs'),
 ];
 
-for (const path of codexOnlySurfaces) {
-  const content = await readFile(path, 'utf8');
-  if (content.includes('~/.omx') || content.includes('$HOME/.omx') || content.includes('.omx/agents')) {
-    throw new Error(`install surface still references ~/.omx: ${path}`);
-  }
-}
-
 const skillDocSurfaces = [
   repoPath('README.md'),
   repoPath('docs', 'install.md'),
@@ -201,29 +203,85 @@ for (const snippet of ['chedexMinimumCodexVersion', 'mergeManagedHooksConfig', '
   }
 }
 
-const installedAgentsPath = repoPath('.codex', 'AGENTS.md');
-if (!anyMissing([installedAgentsPath]).length) {
-  const mirrorRequiredPaths = [
-    installedAgentsPath,
-    repoPath('.codex', 'prompts'),
-    repoPath('.codex', 'skills'),
-    repoPath('.codex', 'agents'),
-    repoPath('.codex', 'hooks', 'chedex', 'chedex-governor.mjs'),
-  ];
-  const missingMirrorPaths = anyMissing(mirrorRequiredPaths);
-  if (missingMirrorPaths.length) {
-    throw new Error(`.codex mirror is incomplete: ${missingMirrorPaths.join(', ')}`);
-  }
-
-  await assertFileEqual(manifest.templateAgents, installedAgentsPath, '.codex/AGENTS.md');
-  await assertTreeEqual(manifest.promptsDir, repoPath('.codex', 'prompts'), '.codex/prompts');
-  await assertTreeEqual(manifest.skillsDir, repoPath('.codex', 'skills'), '.codex/skills');
-  await assertTreeEqual(manifest.agentsDir, repoPath('.codex', 'agents'), '.codex/agents');
-  await assertFileEqual(
-    repoPath('hooks', 'chedex-governor.mjs'),
-    repoPath('.codex', 'hooks', 'chedex', 'chedex-governor.mjs'),
-    '.codex/hooks/chedex/chedex-governor.mjs',
-  );
+const mirrorRequiredPaths = [
+  repoPath('.codex', 'AGENTS.md'),
+  repoPath('.codex', 'prompts'),
+  repoPath('.codex', 'skills'),
+  repoPath('.codex', 'agents'),
+  repoPath('.codex', 'hooks', 'chedex', 'chedex-governor.mjs'),
+];
+const missingMirrorPaths = anyMissing(mirrorRequiredPaths);
+if (missingMirrorPaths.length) {
+  throw new Error(`.codex mirror is incomplete: ${missingMirrorPaths.join(', ')}`);
 }
+
+await assertFileEqual(manifest.templateAgents, repoPath('.codex', 'AGENTS.md'), '.codex/AGENTS.md');
+await assertTreeEqual(manifest.promptsDir, repoPath('.codex', 'prompts'), '.codex/prompts');
+await assertTreeEqual(manifest.skillsDir, repoPath('.codex', 'skills'), '.codex/skills');
+await assertTreeEqual(manifest.agentsDir, repoPath('.codex', 'agents'), '.codex/agents');
+await assertFileEqual(
+  repoPath('hooks', 'chedex-governor.mjs'),
+  repoPath('.codex', 'hooks', 'chedex', 'chedex-governor.mjs'),
+  '.codex/hooks/chedex/chedex-governor.mjs',
+);
+
+const quotedHookCommand = buildManagedHooksConfig({
+  hookRuntimePath: '/tmp/Codex Home/hooks/chedex/chedex-governor.mjs',
+}).hooks.SessionStart[0].hooks[0].command;
+assert(quotedHookCommand.startsWith("'"), 'managed hook commands must shell-quote the node executable');
+assert(quotedHookCommand.includes("'/tmp/Codex Home/hooks/chedex/chedex-governor.mjs'"), 'managed hook commands must shell-quote governor paths');
+
+for (const path of [repoPath('README.md'), repoPath('docs', 'customizing.md')]) {
+  const content = await readFile(path, 'utf8');
+  if (!content.includes('registry/agent-definitions.mjs')) {
+    throw new Error(`doc surface missing registry/agent-definitions.mjs guidance: ${path}`);
+  }
+}
+
+const architectAgentBeforeDryRun = await readFile(repoPath('agents', 'architect.toml'), 'utf8');
+execFileSync(process.execPath, [repoPath('scripts', 'install-user.mjs'), '--dry-run'], {
+  cwd: repoPath(),
+  env: process.env,
+  encoding: 'utf8',
+});
+const architectAgentAfterDryRun = await readFile(repoPath('agents', 'architect.toml'), 'utf8');
+assert(architectAgentBeforeDryRun === architectAgentAfterDryRun, 'install-user --dry-run must not rewrite generated agents');
+
+const installHomeRoot = await mkdtemp(join(tmpdir(), 'chedex verify '));
+const installHome = join(installHomeRoot, 'Codex Home');
+const customAgents = '# custom user agents\n';
+const customHook = '#!/usr/bin/env node\nprocess.stdout.write("custom hook\\n");\n';
+const siblingHookAsset = join(installHome, 'hooks', 'chedex', 'custom-helper.txt');
+await mkdir(join(installHome, 'hooks', 'chedex'), { recursive: true });
+await writeFile(join(installHome, 'AGENTS.md'), customAgents);
+await writeFile(join(installHome, 'hooks', 'chedex', 'chedex-governor.mjs'), customHook);
+await writeFile(siblingHookAsset, 'keep me\n');
+
+const installEnv = {
+  ...process.env,
+  CODEX_HOME: installHome,
+};
+
+execFileSync(process.execPath, [repoPath('scripts', 'install-user.mjs')], {
+  cwd: repoPath(),
+  env: installEnv,
+  encoding: 'utf8',
+});
+
+const installedHooksConfig = JSON.parse(await readFile(join(installHome, 'hooks.json'), 'utf8'));
+const sessionStartCommand = installedHooksConfig.hooks.SessionStart[0].hooks[0].command;
+assert(sessionStartCommand.includes(`'${join(installHome, 'hooks', 'chedex', 'chedex-governor.mjs')}'`), 'install-user should quote managed hook runtime paths');
+
+execFileSync(process.execPath, [repoPath('scripts', 'uninstall-user.mjs')], {
+  cwd: repoPath(),
+  env: installEnv,
+  encoding: 'utf8',
+});
+
+assert((await readFile(join(installHome, 'AGENTS.md'), 'utf8')) === customAgents, 'uninstall-user should restore a pre-existing AGENTS.md');
+assert((await readFile(join(installHome, 'hooks', 'chedex', 'chedex-governor.mjs'), 'utf8')) === customHook, 'uninstall-user should restore a pre-existing hook runtime');
+assert((await readFile(siblingHookAsset, 'utf8')) === 'keep me\n', 'uninstall-user should not remove sibling hook assets');
+assert(anyMissing([join(installHome, 'config.toml')]).length === 1, 'uninstall-user should remove config.toml when install created it and no user config remains');
+assert(anyMissing([join(installHome, 'hooks.json')]).length === 1, 'uninstall-user should remove hooks.json when install created it and no user hooks remain');
 
 process.stdout.write(`verify-ok roles=${Object.keys(ROLE_DEFINITIONS).length} skills=${repoSkillDirs.length}\n`);

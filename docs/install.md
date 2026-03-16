@@ -26,8 +26,8 @@ This installs:
 - `hooks/chedex-governor.mjs` into `~/.codex/hooks/chedex/`
 - a managed `hooks.json` into `~/.codex/hooks.json`
 - a managed Chedex agent block into `~/.codex/config.toml`
+- `CHEDEX_UNINSTALL.md` and `CHEDEX_UNINSTALL.json` into `~/.codex/` for reversible uninstall metadata
 - `codex_hooks = true` inside the `~/.codex/config.toml` `[features]` section
-- removes legacy managed agent TOMLs from the previous user-level agent location when present, then deletes empty legacy directories
 
 Chedex writes native agent files only under `~/.codex` unless `CODEX_HOME` is set.
 Long-running workflow skills such as `ralph` and `autopilot` keep their artifacts under `~/.codex/workflows/`.
@@ -47,13 +47,15 @@ Governed workflow state now includes:
 npm run install:user:dry
 ```
 
+Dry run validates prerequisites and prints the install summary without writing install artifacts or regenerating tracked repo outputs.
+
 ## Uninstall
 
 ```bash
 npm run uninstall:user
 ```
 
-If you want exact rollback, restore the config backup created during install.
-If an existing `hooks.json` was present, install also creates a timestamped backup beside it.
-If no pre-existing `config.toml` or `hooks.json` was present, no backup is created for that file.
+Uninstall uses `CHEDEX_UNINSTALL.json` to restore backed-up managed files and remove files created by install.
+If an existing `config.toml`, `hooks.json`, `AGENTS.md`, managed hook runtime, managed prompt, managed agent TOML, or managed skill directory was present, install also creates a timestamped backup beside it.
+If no pre-existing file was present for one of those paths, uninstall removes the file that install created.
 `~/.codex/workflows/_active.json` is created later by the first governed workflow sync, not by install itself.

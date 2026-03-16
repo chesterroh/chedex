@@ -128,6 +128,27 @@ for (const mode of ['ralph', 'autopilot', 'ultrawork']) {
   }
 }
 
+for (const mode of ['ralph', 'autopilot']) {
+  const missingHandoffWorkflow = await makeWorkflow({
+    home,
+    slug: `${mode}-missing-handoff`,
+    mode,
+    includeHandoff: false,
+  });
+
+  let missingHandoffFailed = false;
+  try {
+    await syncWorkflow({
+      codexHome: home,
+      cwd,
+      progressPath: missingHandoffWorkflow.progressPath,
+    });
+  } catch (error) {
+    missingHandoffFailed = error.message.includes(`${mode} workflows require artifacts.handoff`);
+  }
+  assert(missingHandoffFailed, `${mode} should require a handoff artifact`);
+}
+
 const completedWorkflow = await makeWorkflow({
   home,
   slug: 'completed-missing-proof',
@@ -234,6 +255,29 @@ const cleared = await clearWorkflow({
   cwd,
 });
 assert(cleared, 'workflow-clear should remove the indexed workflow');
+
+const invalidResumeWorkflow = await makeWorkflow({
+  home,
+  slug: 'invalid-resume',
+  mode: 'autopilot',
+});
+await syncWorkflow({
+  codexHome: home,
+  cwd,
+  progressPath: invalidResumeWorkflow.progressPath,
+});
+const invalidResumeProgress = JSON.parse(await readFile(invalidResumeWorkflow.progressPath, 'utf8'));
+delete invalidResumeProgress.risks;
+await writeJson(invalidResumeWorkflow.progressPath, invalidResumeProgress);
+
+const invalidResumeContext = await sessionStartHook({
+  codexHome: home,
+  cwd,
+});
+assert(invalidResumeContext === '', 'invalid workflow should not rehydrate on session start');
+
+const indexAfterInvalidResume = JSON.parse(await readFile(activeIndexPath(home), 'utf8'));
+assert(!(cwd in indexAfterInvalidResume.entries), 'invalid resumed workflow should be pruned from the active index');
 
 const invalidMissingPhase = await makeWorkflow({
   home,

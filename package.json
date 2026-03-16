@@ -13,7 +13,7 @@
     "install:user": "node scripts/install-user.mjs",
     "install:user:dry": "node scripts/install-user.mjs --dry-run",
     "uninstall:user": "node scripts/uninstall-user.mjs",
-    "verify": "node scripts/verify-repo.mjs && node scripts/verify-governor.mjs && npx tsc --noEmit"
+    "verify": "node scripts/verify-repo.mjs && node scripts/verify-governor.mjs && node scripts/verify-install.mjs && npx tsc --noEmit"
   },
   "devDependencies": {
     "typescript": "^5.7.0"

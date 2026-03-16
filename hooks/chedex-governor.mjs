@@ -10,6 +10,7 @@ export const ACTIVE_STATUS = 'active';
 export const TERMINAL_STATUSES = new Set(['completed', 'paused', 'blocked', 'failed', 'cancelled']);
 export const GOVERNED_MODES = new Set(['ralph', 'autopilot', 'ultrawork']);
 export const VERIFICATION_SATISFIED = 'satisfied';
+export const HANDOFF_REQUIRED_MODES = new Set(['ralph', 'autopilot']);
 
 export function defaultCodexHome() {
   return process.env.CODEX_HOME || join(homedir(), '.codex');
@@ -154,6 +155,14 @@ export function validateGovernedProgress(progress) {
     errors.push('artifacts must be an object');
   }
 
+  const handoff = progress.artifacts?.handoff;
+  if (handoff != null && (typeof handoff !== 'string' || !handoff.trim())) {
+    errors.push('artifacts.handoff must be a non-empty string when present');
+  }
+  if (HANDOFF_REQUIRED_MODES.has(progress.mode) && (typeof handoff !== 'string' || !handoff.trim())) {
+    errors.push(`${progress.mode} workflows require artifacts.handoff`);
+  }
+
   if (!progress.verification || typeof progress.verification !== 'object' || Array.isArray(progress.verification)) {
     errors.push('verification must be an object');
   }
@@ -186,6 +195,78 @@ export function validateGovernedProgress(progress) {
     if (!hasNextStep && !hasBlocker) {
       errors.push(`${status} workflows require next_step or blocker`);
     }
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors,
+  };
+}
+
+export function validateHandoff(handoff) {
+  const errors = [];
+  const requiredArrayFields = [
+    'acceptance_criteria',
+    'verification_targets',
+    'delegation_roster',
+    'source_artifacts',
+  ];
+
+  if (!handoff || typeof handoff !== 'object' || Array.isArray(handoff)) {
+    return {
+      ok: false,
+      errors: ['handoff.json must contain an object'],
+    };
+  }
+
+  if (typeof handoff.task !== 'string' || !handoff.task.trim()) {
+    errors.push('handoff.task must be a non-empty string');
+  }
+
+  for (const field of requiredArrayFields) {
+    if (!Array.isArray(handoff[field])) {
+      errors.push(`handoff.${field} must be an array`);
+    }
+  }
+
+  if (typeof handoff.execution_lane !== 'string' || !handoff.execution_lane.trim()) {
+    errors.push('handoff.execution_lane must be a non-empty string');
+  }
+
+  if (!parseIsoDate(handoff.approved_at)) {
+    errors.push('handoff.approved_at must be ISO-8601');
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors,
+  };
+}
+
+export async function validateGovernedWorkflow(progress, progressPath) {
+  const errors = [...validateGovernedProgress(progress).errors];
+  const progressDir = dirname(progressPath);
+  const handoffPath = resolvePathFrom(progressDir, progress.artifacts?.handoff || null);
+
+  if (!handoffPath) {
+    return {
+      ok: errors.length === 0,
+      errors,
+    };
+  }
+
+  try {
+    const handoff = await readJsonIfExists(handoffPath, null);
+    if (!handoff) {
+      errors.push(`missing handoff.json at ${handoffPath}`);
+    } else {
+      const handoffValidation = validateHandoff(handoff);
+      if (!handoffValidation.ok) {
+        errors.push(...handoffValidation.errors);
+      }
+    }
+  } catch (error) {
+    errors.push(error.message);
   }
 
   return {
@@ -236,7 +317,7 @@ export async function syncWorkflow({ codexHome = defaultCodexHome(), cwd = proce
   const normalizedCwd = resolve(cwd);
   const normalizedProgressPath = resolve(progressPath);
   const progress = await readProgress(normalizedProgressPath);
-  const validation = validateGovernedProgress(progress);
+  const validation = await validateGovernedWorkflow(progress, normalizedProgressPath);
   if (!validation.ok) {
     throw new Error(`invalid governed progress:\n${validation.errors.join('\n')}`);
   }
@@ -286,7 +367,8 @@ export async function pruneIndexForSessionStart(index) {
 
     try {
       const progress = await readProgress(entry.progress_path);
-      if (progress.status === 'completed' || progress.status === 'cancelled') {
+      const validation = await validateGovernedWorkflow(progress, entry.progress_path);
+      if (!validation.ok || progress.status === 'completed' || progress.status === 'cancelled') {
         delete index.entries[cwd];
         changed = true;
       }
@@ -374,7 +456,7 @@ export async function stopHook({ codexHome = defaultCodexHome(), cwd = process.c
   }
 
   const progress = await readProgress(entry.progress_path);
-  const validation = validateGovernedProgress(progress);
+  const validation = await validateGovernedWorkflow(progress, entry.progress_path);
   if (!validation.ok) {
     return {
       action: 'block',

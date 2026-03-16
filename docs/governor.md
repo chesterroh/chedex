@@ -29,7 +29,7 @@ Plain direct turns and small `execute` tasks are not governed unless they explic
 
 ## Hook Responsibilities
 
-- `SessionStart` restores compact workflow context from the active workflow index.
+- `SessionStart` restores compact workflow context only for workflows whose governed state still validates.
 - `Stop` blocks ambiguous endings until the current workflow is terminal.
 
 ## Active Workflow Index
@@ -86,7 +86,7 @@ Stop-gate rules:
 
 ## `handoff.json`
 
-Governed plans and richer governed workflows such as `ralph` and `autopilot` should produce `handoff.json` with:
+Governed plans and richer governed workflows such as `ralph` and `autopilot` must provide `handoff.json` with:
 
 - `task`
 - `acceptance_criteria`
