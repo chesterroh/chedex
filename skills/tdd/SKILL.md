@@ -5,6 +5,9 @@ description: Strict failing-test-first workflow
 
 # TDD
 
+Use this only when the next step is a real behavior change that can be proven with tests.
+If the work is docs-only, prompt-only, config-only, or otherwise not meaningfully testable, drop back to `execute` or `review`.
+
 ## Iron Law
 
 No production code without a failing test first.
