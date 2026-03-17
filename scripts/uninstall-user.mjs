@@ -3,8 +3,10 @@ import { join } from 'node:path';
 import {
   copyTree,
   fileExists,
+  installManifestPaths,
   installTargets,
   isEffectivelyEmptyHooksConfig,
+  listRelativeFiles,
   listSkills,
   readJsonIfExists,
   readTextIfExists,
@@ -19,6 +21,7 @@ import {
 
 const dryRun = process.argv.includes('--dry-run');
 const targets = installTargets();
+const manifest = installManifestPaths();
 
 const configPresent = await fileExists(targets.configPath);
 const currentConfig = await readTextIfExists(targets.configPath);
@@ -30,6 +33,7 @@ const uninstallState = await readJsonIfExists(targets.uninstallStatePath, null);
 const managedPromptPaths = roleNames().map((name) => join(targets.promptsDir, `${name}.md`));
 const managedAgentPaths = roleNames().map((name) => join(targets.agentsDir, `${name}.toml`));
 const managedSkillPaths = listSkills().map((name) => join(targets.skillsDir, name));
+const managedHookPaths = (await listRelativeFiles(manifest.hooksDir)).map((relativePath) => join(targets.hookAssetsDir, relativePath));
 
 async function restoreBackupIfPresent(backupPath, targetPath) {
   if (!backupPath || !(await fileExists(backupPath))) {
@@ -51,6 +55,28 @@ async function restoreManagedPath(targetPath, entry) {
   } else {
     await copyFile(entry.backup_path, targetPath);
   }
+}
+
+function unionManagedPaths(currentPaths, recordedEntries) {
+  const allPaths = new Set(currentPaths);
+  for (const entry of recordedEntries || []) {
+    if (entry?.target_path) {
+      allPaths.add(entry.target_path);
+    }
+  }
+  return [...allPaths];
+}
+
+const hookEntries = Array.isArray(uninstallState?.managed_paths?.hooks)
+  ? [...uninstallState.managed_paths.hooks]
+  : [];
+
+if (!hookEntries.some((entry) => entry?.target_path === targets.hookRuntimePath) && uninstallState?.backups?.hookRuntime) {
+  hookEntries.push({
+    target_path: targets.hookRuntimePath,
+    backup_path: uninstallState.backups.hookRuntime,
+    type: 'file',
+  });
 }
 
 if (!dryRun) {
@@ -76,17 +102,17 @@ if (!dryRun) {
     }
   }
 
-  for (const targetPath of managedPromptPaths) {
+  for (const targetPath of unionManagedPaths(managedPromptPaths, uninstallState?.managed_paths?.prompts)) {
     const entry = uninstallState?.managed_paths?.prompts?.find((candidate) => candidate.target_path === targetPath);
     await restoreManagedPath(targetPath, entry);
   }
 
-  for (const targetPath of managedAgentPaths) {
+  for (const targetPath of unionManagedPaths(managedAgentPaths, uninstallState?.managed_paths?.agents)) {
     const entry = uninstallState?.managed_paths?.agents?.find((candidate) => candidate.target_path === targetPath);
     await restoreManagedPath(targetPath, entry);
   }
 
-  for (const targetPath of managedSkillPaths) {
+  for (const targetPath of unionManagedPaths(managedSkillPaths, uninstallState?.managed_paths?.skills)) {
     const entry = uninstallState?.managed_paths?.skills?.find((candidate) => candidate.target_path === targetPath);
     await restoreManagedPath(targetPath, entry);
   }
@@ -96,9 +122,9 @@ if (!dryRun) {
     await rm(targets.agentsMdPath, { force: true });
   }
 
-  const restoredHookRuntime = await restoreBackupIfPresent(uninstallState?.backups?.hookRuntime, targets.hookRuntimePath);
-  if (!restoredHookRuntime) {
-    await rm(targets.hookRuntimePath, { force: true });
+  for (const targetPath of unionManagedPaths(managedHookPaths, hookEntries)) {
+    const entry = hookEntries.find((candidate) => candidate.target_path === targetPath);
+    await restoreManagedPath(targetPath, entry);
   }
 
   await removeDirIfEmpty(targets.hookAssetsDir);

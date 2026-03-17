@@ -5,36 +5,23 @@ import { join } from 'node:path';
 import { ROLE_DEFINITIONS } from '../registry/agent-definitions.mjs';
 import {
   anyMissing,
+  buildAgentToml,
   buildManagedHooksConfig,
   generatedAgentPath,
   installManifestPaths,
+  listRelativeFiles,
   listSkills,
   probeCodexHooksSupport,
   repoPath,
   roleNames,
   rolePromptPath,
+  stripFrontmatter,
 } from './lib.mjs';
 
 function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
   }
-}
-
-async function listRelativeFiles(root, prefix = '') {
-  const entries = await readdir(join(root, prefix), { withFileTypes: true });
-  const files = [];
-
-  for (const entry of entries) {
-    const relativePath = join(prefix, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...await listRelativeFiles(root, relativePath));
-    } else if (entry.isFile()) {
-      files.push(relativePath);
-    }
-  }
-
-  return files.sort();
 }
 
 async function assertFileEqual(left, right, label) {
@@ -97,14 +84,12 @@ if (missingPrompts.length || missingAgents.length || missingSkills.length) {
 for (const name of roleNames()) {
   const prompt = await readFile(rolePromptPath(name), 'utf8');
   const agent = await readFile(generatedAgentPath(name), 'utf8');
-  if (!agent.includes(`name = "${name}"`)) {
-    throw new Error(`generated agent missing name field for ${name}`);
-  }
-  if (!agent.includes(`role: ${name}`)) {
-    throw new Error(`generated agent missing role metadata for ${name}`);
-  }
   if (!prompt.includes('description:')) {
     throw new Error(`prompt missing frontmatter description for ${name}`);
+  }
+  const expectedAgent = buildAgentToml(ROLE_DEFINITIONS[name], stripFrontmatter(prompt));
+  if (agent !== expectedAgent) {
+    throw new Error(`generated agent is stale for ${name}: ${generatedAgentPath(name)}`);
   }
 }
 
@@ -125,19 +110,6 @@ if (missingInstallPaths.length) {
   throw new Error(`install manifest paths missing: ${missingInstallPaths.join(', ')}`);
 }
 
-const codexOnlySurfaces = [
-  manifest.templateAgents,
-  ...roleNames().map((name) => rolePromptPath(name)),
-  ...roleNames().map((name) => generatedAgentPath(name)),
-  ...repoSkillDirs.map((name) => repoPath('skills', name, 'SKILL.md')),
-  repoPath('README.md'),
-  repoPath('docs', 'install.md'),
-  repoPath('docs', 'customizing.md'),
-  repoPath('docs', 'governor.md'),
-  repoPath('hooks', 'chedex-governor.mjs'),
-  repoPath('hooks', 'codex-release-audit.mjs'),
-];
-
 const skillDocSurfaces = [
   repoPath('README.md'),
   repoPath('docs', 'install.md'),
@@ -154,9 +126,9 @@ for (const path of skillDocSurfaces) {
 }
 
 const governorSurfaceChecks = [
-  [repoPath('README.md'), ['codex_hooks', 'hooks.json', '_active.json', 'handoff.json', '0.115.0']],
-  [repoPath('docs', 'install.md'), ['codex_hooks', 'hooks.json', '0.114.0', '0.115.0', '_codex_release_audit.json']],
-  [repoPath('docs', 'governor.md'), ['workflow-sync', 'SessionStart', 'Stop', 'handoff.json', 'risks', 'release audit']],
+  [repoPath('README.md'), ['codex_hooks', 'multi_agent', 'child_agents_md', 'hooks.json', '_active.json', 'handoff.json', '0.115.0', 'durable evidence log']],
+  [repoPath('docs', 'install.md'), ['codex_hooks', 'multi_agent', 'child_agents_md', 'hooks.json', '0.114.0', '0.115.0', '_codex_release_audit.json']],
+  [repoPath('docs', 'governor.md'), ['workflow-sync', 'SessionStart', 'Stop', 'handoff.json', 'risks', 'release audit', 'multi_agent', 'child_agents_md', 'durable evidence log']],
   [repoPath('skills', 'clarify', 'SKILL.md'), ['Recommended next step', 'ralph', 'autopilot']],
   [repoPath('skills', 'execute', 'SKILL.md'), ['Escalate to `plan`', 'Escalate to `ralph`', 'Escalate to `autopilot`']],
   [repoPath('skills', 'review', 'SKILL.md'), ['Verdict: APPROVE / REVISE / REJECT', 'Findings first']],

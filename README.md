@@ -1,4 +1,4 @@
-# Chedex v0.4
+# Chedex v0.4.1
 
 Native-first agentic harness scaffold for Codex.
 
@@ -17,9 +17,9 @@ It intentionally excludes external orchestration machinery such as:
 - legacy external state systems
 - HUD, mailboxing, linked mode state, and runtime overlays
 
-## v0.4 Shape
+## v0.4.1 Shape
 
-`0.4.0` hardens the governed Chedex shape with startup release audits and refreshed Codex CLI verification.
+`0.4.1` hardens the governed Chedex shape with startup release audits and refreshed Codex CLI verification.
 
 - direct ordinary turns stay lightweight and native
 - `autopilot`, `ralph`, and direct top-level `ultrawork` are governed workflows
@@ -63,7 +63,7 @@ Use this repo as your own harness base:
 - `~/.codex/hooks/chedex/*`
 - `~/.codex/hooks.json`
 - `[agents.*]` entries in `~/.codex/config.toml`
-- `[features] codex_hooks = true` in `~/.codex/config.toml`
+- `[features] multi_agent = true`, `child_agents_md = true`, and `codex_hooks = true` in `~/.codex/config.toml`
 
 ## Current Core Roles
 
@@ -82,7 +82,7 @@ Use this repo as your own harness base:
 - `execute` - implement and verify until done or clearly blocked
 - `review` - reviewer-only pass for plans, diffs, or implementation claims
 - `tdd` - strict failing-test-first workflow
-- `ultrawork` - parallel execution layer for independent work, with minimal governed state (`progress.json`, `verify.md`, active index sync) when used top-level
+- `ultrawork` - parallel execution layer for independent work, with minimal governed state (`progress.json`, active index sync, and `verify.md` when useful) when used top-level
 - `ralph` - persistent multi-step execution with artifacts and verification
 - `autopilot` - end-to-end delivery workflow from idea to verified implementation
 
@@ -103,7 +103,7 @@ Governed workflow state now centers on:
 
 Chedex keeps a clear native-only execution chain:
 
-- `ultrawork` handles parallel fan-out for independent work, and direct top-level use keeps only the minimum governed state it needs: `progress.json`, `verify.md`, and active index sync.
+- `ultrawork` handles parallel fan-out for independent work, and direct top-level use keeps only the minimum governed state it needs: `progress.json`, active index sync, and `verify.md` when it needs a durable evidence log.
 - `ralph` wraps `ultrawork` with resumable artifacts, active workflow registration, and a hard verification loop.
 - `autopilot` owns the full clarify/spec/plan/execute/verify/validate lifecycle, requires `architect` and `verifier` plan admission before Execute, and hands execution to `ralph`.
 
@@ -125,5 +125,6 @@ npm run uninstall:user
 - This repo reflects the stronger delegation policy currently installed in your global `~/.codex/AGENTS.md`.
 - The prompts are the primary role surfaces. The registry is the structured metadata layer.
 - `agents/*.toml` are generated artifacts. Re-run `npm run generate:agents` after changing `registry/agent-definitions.mjs` or any prompt.
+- `npm run install:user` copies the checked-in generated agents as-is and fails fast if they are stale, instead of regenerating tracked repo outputs implicitly.
 - `.codex/` is a checked-in mirror of deterministic installable surfaces only. Refresh it with `npm run refresh:mirror` after changing mirrored source files.
 - The governor runtime lives in [`hooks/chedex-governor.mjs`](hooks/chedex-governor.mjs), and the startup release-audit helper lives in [`hooks/codex-release-audit.mjs`](hooks/codex-release-audit.mjs). See [`docs/governor.md`](docs/governor.md) for the governed workflow contract.

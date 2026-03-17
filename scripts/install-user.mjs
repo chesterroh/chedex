@@ -11,6 +11,7 @@ import {
   fileExists,
   installManifestPaths,
   installTargets,
+  listRelativeFiles,
   listSkills,
   mergeManagedHooksConfig,
   probeCodexHooksSupport,
@@ -18,6 +19,7 @@ import {
   readTextIfExists,
   renderUninstallNote,
   roleNames,
+  staleGeneratedAgents,
   stripChedexBlock,
   timestampSlug,
   upsertFeaturesSection,
@@ -32,7 +34,6 @@ const backupSlug = timestampSlug();
 const backupPath = `${targets.configPath}.chedex.bak-${backupSlug}`;
 const hooksBackupPath = `${targets.hooksConfigPath}.chedex.bak-${backupSlug}`;
 const agentsMdBackupPath = `${targets.agentsMdPath}.chedex.bak-${backupSlug}`;
-const hookRuntimeBackupPath = `${targets.hookRuntimePath}.chedex.bak-${backupSlug}`;
 const configPresentBefore = await fileExists(targets.configPath);
 const existingConfig = await readTextIfExists(targets.configPath);
 const hooksConfigPresentBefore = await fileExists(targets.hooksConfigPath);
@@ -41,6 +42,7 @@ const hookRuntimePresentBefore = await fileExists(targets.hookRuntimePath);
 const managedPromptPaths = roleNames().map((name) => join(targets.promptsDir, `${name}.md`));
 const managedAgentPaths = roleNames().map((name) => join(targets.agentsDir, `${name}.toml`));
 const managedSkillPaths = listSkills().map((name) => join(targets.skillsDir, name));
+const managedHookPaths = (await listRelativeFiles(manifest.hooksDir)).map((relativePath) => join(targets.hookAssetsDir, relativePath));
 const currentHooksConfig = await readJsonIfExists(targets.hooksConfigPath, { hooks: {} });
 const hookProbe = probeCodexHooksSupport();
 const uninstallBackups = [];
@@ -62,11 +64,17 @@ const uninstallState = {
     prompts: [],
     agents: [],
     skills: [],
+    hooks: [],
   },
 };
 
 async function backupManagedPath(targetPath, bucket) {
   if (!(await fileExists(targetPath))) {
+    uninstallState.managed_paths[bucket].push({
+      target_path: targetPath,
+      backup_path: null,
+      type: null,
+    });
     return;
   }
 
@@ -84,8 +92,11 @@ if (!hookProbe.ok) {
   throw new Error(`Chedex requires Codex native hooks support: ${hookProbe.reason}`);
 }
 
-if (!dryRun) {
-  await import(new URL('./generate-agents.mjs', import.meta.url));
+const staleAgents = await staleGeneratedAgents();
+if (staleAgents.length > 0) {
+  throw new Error(
+    `generated agents are stale for: ${staleAgents.join(', ')}\nRun npm run generate:agents before install.`,
+  );
 }
 
 for (const dir of [
@@ -119,12 +130,6 @@ if (!dryRun) {
     uninstallState.backups.agentsMd = agentsMdBackupPath;
   }
 
-  if (hookRuntimePresentBefore) {
-    await copyFile(targets.hookRuntimePath, hookRuntimeBackupPath);
-    uninstallBackups.push(hookRuntimeBackupPath);
-    uninstallState.backups.hookRuntime = hookRuntimeBackupPath;
-  }
-
   for (const path of managedPromptPaths) {
     await backupManagedPath(path, 'prompts');
   }
@@ -135,6 +140,10 @@ if (!dryRun) {
 
   for (const path of managedSkillPaths) {
     await backupManagedPath(path, 'skills');
+  }
+
+  for (const path of managedHookPaths) {
+    await backupManagedPath(path, 'hooks');
   }
 }
 
@@ -158,7 +167,10 @@ const nextHooksConfig = mergeManagedHooksConfig(currentHooksConfig, targets);
 if (!dryRun) {
   await writeFileIfChanged(targets.configPath, nextConfig);
   await writeJsonIfChanged(targets.hooksConfigPath, nextHooksConfig);
-  const uninstall = renderUninstallNote(targets, { backups: uninstallBackups });
+  const uninstall = renderUninstallNote(targets, {
+    backups: uninstallBackups,
+    hookAssets: managedHookPaths,
+  });
   await writeFileIfChanged(targets.uninstallPath, uninstall);
   await writeJsonIfChanged(targets.uninstallStatePath, uninstallState);
 }

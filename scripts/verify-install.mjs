@@ -19,8 +19,8 @@ async function pathMissing(path) {
   }
 }
 
-function runNodeScript(cwd, script, env) {
-  execFileSync('node', [script], {
+function runNodeScript(cwd, script, env, args = []) {
+  execFileSync('node', [script, ...args], {
     cwd,
     env,
     stdio: 'pipe',
@@ -52,6 +52,7 @@ await writeFile(join(installProbeHome, 'AGENTS.md'), '# custom agents\n');
 await writeFile(join(installProbeHome, 'config.toml'), '[features]\nfoo = true\n');
 await writeFile(join(installProbeHome, 'hooks.json'), `${JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: 'echo keep', statusMessage: 'keep me' }] }] } }, null, 2)}\n`);
 await writeFile(join(installProbeHome, 'hooks', 'chedex', 'chedex-governor.mjs'), '# custom runtime\n');
+await writeFile(join(installProbeHome, 'hooks', 'chedex', 'codex-release-audit.mjs'), '# custom release audit\n');
 await writeFile(join(installProbeHome, 'prompts', 'architect.md'), '# custom prompt\n');
 await writeFile(join(installProbeHome, 'skills', 'autopilot', 'SKILL.md'), '# custom skill\n');
 await writeFile(join(installProbeHome, 'agents', 'architect.toml'), '# custom agent\n');
@@ -64,6 +65,7 @@ assert((await readFile(join(installProbeHome, 'AGENTS.md'), 'utf8')) === '# cust
 assert((await readFile(join(installProbeHome, 'config.toml'), 'utf8')) === '[features]\nfoo = true\n', 'uninstall should restore pre-existing config.toml');
 assert((await readFile(join(installProbeHome, 'hooks.json'), 'utf8')).includes('echo keep'), 'uninstall should restore pre-existing hooks.json');
 assert((await readFile(join(installProbeHome, 'hooks', 'chedex', 'chedex-governor.mjs'), 'utf8')) === '# custom runtime\n', 'uninstall should restore pre-existing hook runtime');
+assert((await readFile(join(installProbeHome, 'hooks', 'chedex', 'codex-release-audit.mjs'), 'utf8')) === '# custom release audit\n', 'uninstall should restore pre-existing managed hook assets');
 assert((await readFile(join(installProbeHome, 'prompts', 'architect.md'), 'utf8')) === '# custom prompt\n', 'uninstall should restore pre-existing managed prompts');
 assert((await readFile(join(installProbeHome, 'skills', 'autopilot', 'SKILL.md'), 'utf8')) === '# custom skill\n', 'uninstall should restore pre-existing managed skills');
 assert((await readFile(join(installProbeHome, 'agents', 'architect.toml'), 'utf8')) === '# custom agent\n', 'uninstall should restore pre-existing managed agent TOMLs');
@@ -146,13 +148,47 @@ for (const path of [
   join(freshHome, 'config.toml'),
   join(freshHome, 'hooks.json'),
   join(freshHome, 'hooks', 'chedex', 'chedex-governor.mjs'),
+  join(freshHome, 'hooks', 'chedex', 'codex-release-audit.mjs'),
   join(freshHome, 'CHEDEX_UNINSTALL.json'),
 ]) {
   assert(await pathMissing(path), `fresh uninstall should remove ${path}`);
 }
 
-const dryRunRepoRoot = await mkdtemp(join(tmpdir(), 'chedex-dry-run-repo-'));
-await cp(repoRoot, dryRunRepoRoot, {
+const legacyStateHome = await mkdtemp(join(tmpdir(), 'chedex-install-legacy-state-'));
+await mkdir(join(legacyStateHome, 'skills', 'legacy-skill'), { recursive: true });
+await writeFile(join(legacyStateHome, 'skills', 'legacy-skill', 'SKILL.md'), '# legacy\n');
+await writeJson(join(legacyStateHome, 'CHEDEX_UNINSTALL.json'), {
+  schema_version: 1,
+  existing_before: {
+    config: false,
+    hooksConfig: false,
+    agentsMd: false,
+    hookRuntime: false,
+  },
+  backups: {
+    config: null,
+    hooksConfig: null,
+    agentsMd: null,
+    hookRuntime: null,
+  },
+  managed_paths: {
+    prompts: [],
+    agents: [],
+    skills: [
+      {
+        target_path: join(legacyStateHome, 'skills', 'legacy-skill'),
+        backup_path: null,
+        type: 'directory',
+      },
+    ],
+    hooks: [],
+  },
+});
+runNodeScript(repoRoot, 'scripts/uninstall-user.mjs', { ...process.env, CODEX_HOME: legacyStateHome });
+assert(await pathMissing(join(legacyStateHome, 'skills', 'legacy-skill', 'SKILL.md')), 'uninstall should remove legacy managed skill paths recorded in uninstall state');
+
+const installCheckRepoRoot = await mkdtemp(join(tmpdir(), 'chedex-install-check-repo-'));
+await cp(repoRoot, installCheckRepoRoot, {
   recursive: true,
   force: true,
   filter(source) {
@@ -160,22 +196,55 @@ await cp(repoRoot, dryRunRepoRoot, {
   },
 });
 
-const dryRunAgentPath = join(dryRunRepoRoot, 'agents', 'architect.toml');
-const dryRunAgentOriginal = await readFile(dryRunAgentPath, 'utf8');
-await writeFile(dryRunAgentPath, `${dryRunAgentOriginal}\n# dry-run sentinel\n`);
-
+const installCheckAgentPath = join(installCheckRepoRoot, 'agents', 'architect.toml');
+const installCheckAgentOriginal = await readFile(installCheckAgentPath, 'utf8');
 const dryRunHome = await mkdtemp(join(tmpdir(), 'chedex-dry-run-home-'));
 const dryRunEnv = { ...process.env, CODEX_HOME: dryRunHome };
 execFileSync('node', ['scripts/install-user.mjs', '--dry-run'], {
-  cwd: dryRunRepoRoot,
+  cwd: installCheckRepoRoot,
   env: dryRunEnv,
   stdio: 'pipe',
   encoding: 'utf8',
 });
+const installCheckAgentAfterDryRun = await readFile(installCheckAgentPath, 'utf8');
+assert(installCheckAgentAfterDryRun === installCheckAgentOriginal, 'install:user:dry should not rewrite generated agent files');
 
-const dryRunAgentAfter = await readFile(dryRunAgentPath, 'utf8');
-assert(dryRunAgentAfter.endsWith('# dry-run sentinel\n'), 'install:user:dry should not rewrite generated agent files');
+const installCheckHome = await mkdtemp(join(tmpdir(), 'chedex-install-check-home-'));
+execFileSync('node', ['scripts/install-user.mjs'], {
+  cwd: installCheckRepoRoot,
+  env: { ...process.env, CODEX_HOME: installCheckHome },
+  stdio: 'pipe',
+  encoding: 'utf8',
+});
+const installCheckAgentAfterInstall = await readFile(installCheckAgentPath, 'utf8');
+assert(installCheckAgentAfterInstall === installCheckAgentOriginal, 'install:user should not rewrite generated agent files');
 
-await rm(dryRunRepoRoot, { recursive: true, force: true });
+const staleInstallRepoRoot = await mkdtemp(join(tmpdir(), 'chedex-stale-install-repo-'));
+await cp(repoRoot, staleInstallRepoRoot, {
+  recursive: true,
+  force: true,
+  filter(source) {
+    return !source.includes(`${join(repoRoot, '.git')}`);
+  },
+});
+const staleAgentPath = join(staleInstallRepoRoot, 'agents', 'architect.toml');
+await writeFile(staleAgentPath, `${installCheckAgentOriginal}\n# stale sentinel\n`);
+let staleInstallFailed = false;
+try {
+  execFileSync('node', ['scripts/install-user.mjs', '--dry-run'], {
+    cwd: staleInstallRepoRoot,
+    env: { ...process.env, CODEX_HOME: await mkdtemp(join(tmpdir(), 'chedex-stale-home-')) },
+    stdio: 'pipe',
+    encoding: 'utf8',
+  });
+} catch (error) {
+  staleInstallFailed = error.stderr.includes('Run npm run generate:agents before install.')
+    || error.stdout.includes('Run npm run generate:agents before install.')
+    || error.message.includes('Run npm run generate:agents before install.');
+}
+assert(staleInstallFailed, 'install:user:dry should fail with guidance when generated agents are stale');
+
+await rm(installCheckRepoRoot, { recursive: true, force: true });
+await rm(staleInstallRepoRoot, { recursive: true, force: true });
 
 process.stdout.write('verify-install-ok\n');

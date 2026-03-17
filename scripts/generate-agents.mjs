@@ -2,38 +2,14 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { ROLE_DEFINITIONS } from '../registry/agent-definitions.mjs';
 import {
+  buildAgentToml,
   ensureDir,
-  escapeTomlMultiline,
   repoPath,
   roleNames,
   rolePromptPath,
   writeFileIfChanged,
   stripFrontmatter,
 } from './lib.mjs';
-
-function buildAgentToml(role, promptBody) {
-  const content = [
-    `# Chedex native agent: ${role.id}`,
-    `name = "${role.id}"`,
-    `model_reasoning_effort = "${role.default_effort}"`,
-    'developer_instructions = """',
-    escapeTomlMultiline([
-      promptBody,
-      '',
-      '<metadata>',
-      `- role: ${role.id}`,
-      `- posture: ${role.posture}`,
-      `- tool_policy: ${role.tool_policy}`,
-      `- done_definition: ${role.done_definition}`,
-      `- handoff_targets: ${role.handoff_targets.join(', ')}`,
-      '</metadata>',
-    ].join('\n')),
-    '"""',
-    '',
-  ].join('\n');
-
-  return content;
-}
 
 let updated = 0;
 await ensureDir(repoPath('agents'));

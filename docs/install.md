@@ -18,6 +18,8 @@ npm run generate:agents
 npm run install:user
 ```
 
+Install copies the checked-in generated agent TOMLs as-is. If prompts or registry metadata changed and the generated agents are stale, install fails and tells you to run `npm run generate:agents` first.
+
 This installs:
 
 - `AGENTS.template.md` into `~/.codex/AGENTS.md`
@@ -28,11 +30,11 @@ This installs:
 - a managed `hooks.json` into `~/.codex/hooks.json`
 - a managed Chedex agent block into `~/.codex/config.toml`
 - `CHEDEX_UNINSTALL.md` and `CHEDEX_UNINSTALL.json` into `~/.codex/` for reversible uninstall metadata
-- `codex_hooks = true` inside the `~/.codex/config.toml` `[features]` section
+- `multi_agent = true`, `child_agents_md = true`, and `codex_hooks = true` inside the `~/.codex/config.toml` `[features]` section
 
 Chedex writes native agent files only under `~/.codex` unless `CODEX_HOME` is set.
 Long-running workflow skills such as `ralph` and `autopilot` keep their artifacts under `~/.codex/workflows/`.
-Direct top-level `ultrawork` uses a minimal workflow root under `~/.codex/workflows/ultrawork/` with `progress.json`, `verify.md`, and active index sync; it may omit `handoff.json`.
+Direct top-level `ultrawork` uses a minimal workflow root under `~/.codex/workflows/ultrawork/` with `progress.json`, active index sync, and `verify.md` when it needs a durable evidence log; it may omit `handoff.json`.
 `SessionStart` also performs a best-effort release audit against the published `@openai/codex` package and caches the result in `~/.codex/workflows/_codex_release_audit.json`.
 
 Governed workflow state now includes:
@@ -59,6 +61,6 @@ npm run uninstall:user
 ```
 
 Uninstall uses `CHEDEX_UNINSTALL.json` to restore backed-up managed files and remove files created by install.
-If an existing `config.toml`, `hooks.json`, `AGENTS.md`, managed hook runtime, managed prompt, managed agent TOML, or managed skill directory was present, install also creates a timestamped backup beside it.
+If an existing `config.toml`, `hooks.json`, `AGENTS.md`, managed hook asset, managed prompt, managed agent TOML, or managed skill directory was present, install also creates a timestamped backup beside it.
 If no pre-existing file was present for one of those paths, uninstall removes the file that install created.
 `~/.codex/workflows/_active.json` is created later by the first governed workflow sync, not by install itself.

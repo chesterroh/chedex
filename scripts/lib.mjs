@@ -78,6 +78,51 @@ export function escapeTomlMultiline(value) {
   return value.replace(/"{3,}/g, (match) => match.split('').join('\\'));
 }
 
+export function buildAgentToml(role, promptBody) {
+  return [
+    `# Chedex native agent: ${role.id}`,
+    `name = "${role.id}"`,
+    `model_reasoning_effort = "${role.default_effort}"`,
+    'developer_instructions = """',
+    escapeTomlMultiline([
+      promptBody,
+      '',
+      '<metadata>',
+      `- role: ${role.id}`,
+      `- posture: ${role.posture}`,
+      `- tool_policy: ${role.tool_policy}`,
+      `- done_definition: ${role.done_definition}`,
+      `- handoff_targets: ${role.handoff_targets.join(', ')}`,
+      '</metadata>',
+    ].join('\n')),
+    '"""',
+    '',
+  ].join('\n');
+}
+
+export async function expectedGeneratedAgentToml(name) {
+  assertKnownRole(name);
+  const role = ROLE_DEFINITIONS[name];
+  const prompt = await readFile(rolePromptPath(name), 'utf8');
+  return buildAgentToml(role, stripFrontmatter(prompt));
+}
+
+export async function staleGeneratedAgents(names = roleNames()) {
+  const stale = [];
+
+  for (const name of names) {
+    const [expected, current] = await Promise.all([
+      expectedGeneratedAgentToml(name),
+      readTextIfExists(generatedAgentPath(name)),
+    ]);
+    if (expected !== current) {
+      stale.push(name);
+    }
+  }
+
+  return stale;
+}
+
 export async function copyTree(sourceDir, destDir) {
   await ensureDir(destDir);
   const entries = await readdir(sourceDir, { withFileTypes: true });
@@ -90,6 +135,22 @@ export async function copyTree(sourceDir, destDir) {
       await copyFile(sourcePath, destPath);
     }
   }
+}
+
+export async function listRelativeFiles(root, prefix = '') {
+  const entries = await readdir(join(root, prefix), { withFileTypes: true });
+  const files = [];
+
+  for (const entry of entries) {
+    const relativePath = join(prefix, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...await listRelativeFiles(root, relativePath));
+    } else if (entry.isFile()) {
+      files.push(relativePath);
+    }
+  }
+
+  return files.sort();
 }
 
 export async function copyPath(sourcePath, destPath) {
@@ -229,6 +290,7 @@ export function stripManagedFeaturesSection(config) {
 
 export function renderUninstallNote(targets, options = {}) {
   const backupPaths = Array.isArray(options.backups) ? options.backups : [];
+  const hookAssetPaths = Array.isArray(options.hookAssets) ? options.hookAssets : [];
   const promptFiles = roleNames().map((name) => `${targets.promptsDir}/${name}.md`);
   const agentFiles = roleNames().map((name) => `${targets.agentsDir}/${name}.toml`);
   const skillDirs = listSkills().map((name) => `${targets.skillsDir}/${name}`);
@@ -243,7 +305,7 @@ export function renderUninstallNote(targets, options = {}) {
     ...promptFiles.map((path) => `- ${path}`),
     ...skillDirs.map((path) => `- ${path}`),
     ...agentFiles.map((path) => `- ${path}`),
-    `- ${targets.hookRuntimePath}`,
+    ...(hookAssetPaths.length > 0 ? hookAssetPaths.map((path) => `- ${path}`) : [`- ${targets.hookAssetsDir}/*`]),
     `- ${targets.hooksConfigPath}`,
     `- ${targets.uninstallStatePath}`,
     '',

@@ -8,7 +8,7 @@ The Chedex governor is the native lifecycle layer for governed workflows.
 - Latest verified Codex CLI: `0.115.0`
 - `codex_hooks` feature available in `codex features list`
 
-Install enables `codex_hooks = true` and writes a managed `hooks.json` beside `config.toml`.
+Install enables `multi_agent = true`, `child_agents_md = true`, and `codex_hooks = true`, and writes a managed `hooks.json` beside `config.toml`.
 
 ## Installed Paths
 
@@ -101,7 +101,7 @@ Governed plans and richer governed workflows such as `ralph` and `autopilot` mus
 - `source_artifacts`
 - `approved_at`
 
-Direct top-level `ultrawork` may omit `handoff.json` when no governed plan admitted the work. Its minimum governed state is `progress.json`, `verify.md`, and active index sync.
+Direct top-level `ultrawork` may omit `handoff.json` when no governed plan admitted the work. Its minimum governed state is `progress.json` and active index sync, with `verify.md` used when the lane needs a durable evidence log.
 
 ## Helper Commands
 
