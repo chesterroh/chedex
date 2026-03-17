@@ -130,7 +130,7 @@ if (!dryRun) {
   await removeDirIfEmpty(targets.hookAssetsDir);
   await removeDirIfEmpty(targets.hooksDir);
 
-  await rm(targets.uninstallPath, { force: true });
+  await rm(targets.uninstallPath, { recursive: true, force: true });
   await rm(targets.uninstallStatePath, { force: true });
 }
 

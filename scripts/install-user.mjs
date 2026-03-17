@@ -145,6 +145,10 @@ if (!dryRun) {
   for (const path of managedHookPaths) {
     await backupManagedPath(path, 'hooks');
   }
+
+  // Persist rollback metadata before managed files are copied so a later
+  // install failure still leaves enough state for `uninstall:user`.
+  await writeJsonIfChanged(targets.uninstallStatePath, uninstallState);
 }
 
 const templateContent = await readTextIfExists(manifest.templateAgents);
@@ -172,7 +176,6 @@ if (!dryRun) {
     hookAssets: managedHookPaths,
   });
   await writeFileIfChanged(targets.uninstallPath, uninstall);
-  await writeJsonIfChanged(targets.uninstallStatePath, uninstallState);
 }
 
 const summary = [

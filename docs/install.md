@@ -19,6 +19,7 @@ npm run install:user
 ```
 
 Install copies the checked-in generated agent TOMLs as-is. If prompts or registry metadata changed and the generated agents are stale, install fails and tells you to run `npm run generate:agents` first.
+Once install has captured backups for managed paths, it writes `CHEDEX_UNINSTALL.json` before later managed copies so `npm run uninstall:user` can recover from a late install failure.
 
 This installs:
 
@@ -61,6 +62,7 @@ npm run uninstall:user
 ```
 
 Uninstall uses `CHEDEX_UNINSTALL.json` to restore backed-up managed files and remove files created by install.
+`CHEDEX_UNINSTALL.json` is the authoritative rollback record and is written before managed install mutations, so `npm run uninstall:user` can recover from a mid-install failure.
 If an existing `config.toml`, `hooks.json`, `AGENTS.md`, managed hook asset, managed prompt, managed agent TOML, or managed skill directory was present, install also creates a timestamped backup beside it.
 If no pre-existing file was present for one of those paths, uninstall removes the file that install created.
 `~/.codex/workflows/_active.json` is created later by the first governed workflow sync, not by install itself.

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { repoRoot } from './lib.mjs';
@@ -16,6 +16,15 @@ async function pathMissing(path) {
     return false;
   } catch {
     return true;
+  }
+}
+
+async function pathExists(path) {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -154,6 +163,32 @@ for (const path of [
   assert(await pathMissing(path), `fresh uninstall should remove ${path}`);
 }
 
+const failedInstallHome = await mkdtemp(join(tmpdir(), 'chedex-install-failure-rollback-'));
+await mkdir(join(failedInstallHome, 'CHEDEX_UNINSTALL.md'), { recursive: true });
+let failedInstallDetected = false;
+try {
+  runNodeScript(repoRoot, 'scripts/install-user.mjs', { ...process.env, CODEX_HOME: failedInstallHome });
+} catch (error) {
+  failedInstallDetected = error.stderr.includes('CHEDEX_UNINSTALL.md')
+    || error.stdout.includes('CHEDEX_UNINSTALL.md')
+    || error.message.includes('CHEDEX_UNINSTALL.md');
+}
+assert(failedInstallDetected, 'install should surface a late uninstall-note write failure');
+assert(!(await pathMissing(join(failedInstallHome, 'CHEDEX_UNINSTALL.json'))), 'failed install should persist CHEDEX_UNINSTALL.json for rollback');
+assert(!(await pathMissing(join(failedInstallHome, 'AGENTS.md'))), 'failed install should have reached managed writes before the forced late failure');
+runNodeScript(repoRoot, 'scripts/uninstall-user.mjs', { ...process.env, CODEX_HOME: failedInstallHome });
+for (const path of [
+  join(failedInstallHome, 'AGENTS.md'),
+  join(failedInstallHome, 'config.toml'),
+  join(failedInstallHome, 'hooks.json'),
+  join(failedInstallHome, 'hooks', 'chedex', 'chedex-governor.mjs'),
+  join(failedInstallHome, 'hooks', 'chedex', 'codex-release-audit.mjs'),
+  join(failedInstallHome, 'CHEDEX_UNINSTALL.json'),
+  join(failedInstallHome, 'CHEDEX_UNINSTALL.md'),
+]) {
+  assert(await pathMissing(path), `rollback after failed install should remove ${path}`);
+}
+
 const legacyStateHome = await mkdtemp(join(tmpdir(), 'chedex-install-legacy-state-'));
 await mkdir(join(legacyStateHome, 'skills', 'legacy-skill'), { recursive: true });
 await writeFile(join(legacyStateHome, 'skills', 'legacy-skill', 'SKILL.md'), '# legacy\n');
@@ -186,6 +221,21 @@ await writeJson(join(legacyStateHome, 'CHEDEX_UNINSTALL.json'), {
 });
 runNodeScript(repoRoot, 'scripts/uninstall-user.mjs', { ...process.env, CODEX_HOME: legacyStateHome });
 assert(await pathMissing(join(legacyStateHome, 'skills', 'legacy-skill', 'SKILL.md')), 'uninstall should remove legacy managed skill paths recorded in uninstall state');
+
+const failingInstallHome = await mkdtemp(join(tmpdir(), 'chedex-install-failing-'));
+await mkdir(join(failingInstallHome, 'prompts', 'explore.md'), { recursive: true });
+let failingInstallErrored = false;
+try {
+  runNodeScript(repoRoot, 'scripts/install-user.mjs', { ...process.env, CODEX_HOME: failingInstallHome });
+} catch {
+  failingInstallErrored = true;
+}
+assert(failingInstallErrored, 'install should surface a late failure when a managed target path blocks copy');
+assert(!(await pathMissing(join(failingInstallHome, 'CHEDEX_UNINSTALL.json'))), 'late install failures should still leave uninstall state metadata behind');
+runNodeScript(repoRoot, 'scripts/uninstall-user.mjs', { ...process.env, CODEX_HOME: failingInstallHome });
+assert(await pathMissing(join(failingInstallHome, 'AGENTS.md')), 'uninstall should remove AGENTS.md written before a failed install');
+assert(await pathExists(join(failingInstallHome, 'prompts', 'explore.md')), 'uninstall should restore pre-existing managed path conflicts after a failed install');
+assert(await pathMissing(join(failingInstallHome, 'CHEDEX_UNINSTALL.json')), 'uninstall should clear uninstall state after recovering from a failed install');
 
 const installCheckRepoRoot = await mkdtemp(join(tmpdir(), 'chedex-install-check-repo-'));
 await cp(repoRoot, installCheckRepoRoot, {
