@@ -97,6 +97,9 @@ if (missingPrompts.length || missingAgents.length || missingSkills.length) {
 for (const name of roleNames()) {
   const prompt = await readFile(rolePromptPath(name), 'utf8');
   const agent = await readFile(generatedAgentPath(name), 'utf8');
+  if (!agent.includes(`name = "${name}"`)) {
+    throw new Error(`generated agent missing name field for ${name}`);
+  }
   if (!agent.includes(`role: ${name}`)) {
     throw new Error(`generated agent missing role metadata for ${name}`);
   }

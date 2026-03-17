@@ -14,6 +14,7 @@ import {
 function buildAgentToml(role, promptBody) {
   const content = [
     `# Chedex native agent: ${role.id}`,
+    `name = "${role.id}"`,
     `model_reasoning_effort = "${role.default_effort}"`,
     'developer_instructions = """',
     escapeTomlMultiline([

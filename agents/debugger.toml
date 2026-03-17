@@ -1,4 +1,5 @@
 # Chedex native agent: debugger
+name = "debugger"
 model_reasoning_effort = "high"
 developer_instructions = """
 <identity>

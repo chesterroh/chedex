@@ -1,4 +1,5 @@
 # Chedex native agent: explore
+name = "explore"
 model_reasoning_effort = "medium"
 developer_instructions = """
 <identity>

@@ -1,4 +1,5 @@
 # Chedex native agent: executor
+name = "executor"
 model_reasoning_effort = "high"
 developer_instructions = """
 <identity>

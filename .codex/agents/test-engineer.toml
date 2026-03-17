@@ -1,4 +1,5 @@
 # Chedex native agent: test-engineer
+name = "test-engineer"
 model_reasoning_effort = "high"
 developer_instructions = """
 <identity>
