@@ -163,6 +163,30 @@ for (const path of [
   assert(await pathMissing(path), `fresh uninstall should remove ${path}`);
 }
 
+const hookOwnershipHome = await mkdtemp(join(tmpdir(), 'chedex-install-hook-ownership-'));
+await writeFile(join(hookOwnershipHome, 'hooks.json'), `${JSON.stringify({
+  hooks: {
+    Stop: [
+      {
+        hooks: [
+          {
+            type: 'command',
+            command: 'echo custom-user-hook',
+            statusMessage: 'Chedex governor: my custom local guard',
+          },
+        ],
+      },
+    ],
+  },
+}, null, 2)}\n`);
+const hookOwnershipEnv = { ...process.env, CODEX_HOME: hookOwnershipHome };
+runNodeScript(repoRoot, 'scripts/install-user.mjs', hookOwnershipEnv);
+const hookOwnershipConfig = JSON.parse(await readFile(join(hookOwnershipHome, 'hooks.json'), 'utf8'));
+const hookOwnershipStopCommands = hookOwnershipConfig.hooks.Stop.flatMap((group) => group.hooks.map((hook) => hook.command));
+assert(hookOwnershipStopCommands.includes('echo custom-user-hook'), 'install should preserve user hooks that only share the Chedex statusMessage prefix');
+assert(hookOwnershipStopCommands.some((command) => command.includes('chedex-governor.mjs') && command.includes(' stop')), 'install should still add the managed stop hook');
+runNodeScript(repoRoot, 'scripts/uninstall-user.mjs', hookOwnershipEnv);
+
 const failedInstallHome = await mkdtemp(join(tmpdir(), 'chedex-install-failure-rollback-'));
 await mkdir(join(failedInstallHome, 'CHEDEX_UNINSTALL.md'), { recursive: true });
 let failedInstallDetected = false;

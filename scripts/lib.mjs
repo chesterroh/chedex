@@ -18,6 +18,8 @@ export const chedexHooksFeature = 'codex_hooks';
 export const chedexMinimumCodexVersion = '0.114.0';
 export const chedexLatestVerifiedCodexVersion = '0.115.0';
 export const chedexHookStatusPrefix = 'Chedex governor:';
+export const chedexSessionStartStatusMessage = `${chedexHookStatusPrefix} restore governed workflow context`;
+export const chedexStopStatusMessage = `${chedexHookStatusPrefix} enforce terminal workflow state`;
 
 export function codexHome() {
   return process.env.CODEX_HOME || join(homedir(), '.codex');
@@ -392,11 +394,25 @@ export function normalizeManagedHooksConfig(raw) {
 }
 
 export function isManagedHookHandler(handler) {
-  return handler
-    && typeof handler === 'object'
-    && !Array.isArray(handler)
-    && typeof handler.statusMessage === 'string'
-    && handler.statusMessage.startsWith(chedexHookStatusPrefix);
+  if (!handler || typeof handler !== 'object' || Array.isArray(handler)) {
+    return false;
+  }
+
+  const command = typeof handler.command === 'string' ? handler.command : '';
+  const statusMessage = typeof handler.statusMessage === 'string' ? handler.statusMessage : '';
+  if (!command.includes('chedex-governor.mjs')) {
+    return false;
+  }
+
+  if (statusMessage === chedexSessionStartStatusMessage) {
+    return handler.type === 'command' && command.includes(' session-start');
+  }
+
+  if (statusMessage === chedexStopStatusMessage) {
+    return handler.type === 'command' && command.includes(' stop');
+  }
+
+  return false;
 }
 
 export function stripManagedHooksConfig(raw) {
@@ -451,7 +467,7 @@ export function buildManagedHooksConfig(targets) {
               type: 'command',
               command: `${nodeCommand} ${governorCommand} session-start`,
               timeout: 5,
-              statusMessage: `${chedexHookStatusPrefix} restore governed workflow context`,
+              statusMessage: chedexSessionStartStatusMessage,
             },
           ],
         },
@@ -463,7 +479,7 @@ export function buildManagedHooksConfig(targets) {
               type: 'command',
               command: `${nodeCommand} ${governorCommand} stop`,
               timeout: 5,
-              statusMessage: `${chedexHookStatusPrefix} enforce terminal workflow state`,
+              statusMessage: chedexStopStatusMessage,
             },
           ],
         },

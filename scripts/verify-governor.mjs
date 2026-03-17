@@ -330,6 +330,73 @@ try {
 }
 assert(missingRisksFailed, 'missing risks should fail governed validation');
 
+const invalidWorkflowRoot = await makeWorkflow({
+  home,
+  slug: 'invalid-workflow-root',
+});
+const invalidWorkflowRootProgress = JSON.parse(await readFile(invalidWorkflowRoot.progressPath, 'utf8'));
+invalidWorkflowRootProgress.workflow_root = `${invalidWorkflowRoot.workflowRoot}-missing`;
+await writeJson(invalidWorkflowRoot.progressPath, invalidWorkflowRootProgress);
+let invalidWorkflowRootFailed = false;
+try {
+  await syncWorkflow({
+    codexHome: home,
+    cwd,
+    progressPath: invalidWorkflowRoot.progressPath,
+  });
+} catch (error) {
+  invalidWorkflowRootFailed = error.message.includes('workflow_root must resolve to the directory that contains progress.json');
+}
+assert(invalidWorkflowRootFailed, 'workflow_root must resolve to the directory that contains progress.json');
+
+const corruptedIndexCwd = join(home, 'corrupted-index-workspace');
+await mkdir(corruptedIndexCwd, { recursive: true });
+const corruptedIndexWorkflow = await makeWorkflow({
+  home,
+  slug: 'corrupted-index-workflow',
+  mode: 'ralph',
+});
+await syncWorkflow({
+  codexHome: home,
+  cwd: corruptedIndexCwd,
+  progressPath: corruptedIndexWorkflow.progressPath,
+});
+const corruptedIndex = JSON.parse(await readFile(activeIndexPath(home), 'utf8'));
+corruptedIndex.entries[corruptedIndexCwd].workflow_root = `${corruptedIndexWorkflow.workflowRoot}-missing`;
+await writeJson(activeIndexPath(home), corruptedIndex);
+const corruptedIndexStop = await stopHook({
+  codexHome: home,
+  cwd: corruptedIndexCwd,
+});
+assert(corruptedIndexStop.action === 'block', 'stop should block when the indexed workflow root is missing');
+assert(corruptedIndexStop.reason.includes('active workflow root is missing'), 'stop should explain missing workflow root blocks');
+
+const repairedIndexCwd = join(home, 'repaired-index-workspace');
+await mkdir(repairedIndexCwd, { recursive: true });
+const repairedIndexWorkflow = await makeWorkflow({
+  home,
+  slug: 'repaired-index-workflow',
+  mode: 'ralph',
+});
+await syncWorkflow({
+  codexHome: home,
+  cwd: repairedIndexCwd,
+  progressPath: repairedIndexWorkflow.progressPath,
+});
+const repairedIndex = JSON.parse(await readFile(activeIndexPath(home), 'utf8'));
+repairedIndex.entries[repairedIndexCwd].workflow_root = `${repairedIndexWorkflow.workflowRoot}-missing`;
+await writeJson(activeIndexPath(home), repairedIndex);
+const repairedIndexContext = await sessionStartHook({
+  codexHome: home,
+  cwd: repairedIndexCwd,
+  releaseAudit: {
+    disabled: true,
+  },
+});
+assert(repairedIndexContext.includes('mode: ralph'), 'session-start should still rehydrate when active-index workflow_root metadata is stale');
+const repairedIndexAfterSessionStart = JSON.parse(await readFile(activeIndexPath(home), 'utf8'));
+assert(repairedIndexAfterSessionStart.entries[repairedIndexCwd].workflow_root === repairedIndexWorkflow.workflowRoot, 'session-start should repair stale workflow_root metadata in the active index');
+
 const currentReleaseAudit = await buildReleaseAudit({
   codexHome: home,
   readInstalledVersion() {

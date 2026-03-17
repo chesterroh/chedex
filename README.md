@@ -1,4 +1,4 @@
-# Chedex v0.4.1
+# Chedex v0.4.2
 
 Native-first agentic harness scaffold for Codex.
 
@@ -17,9 +17,9 @@ It intentionally excludes external orchestration machinery such as:
 - legacy external state systems
 - HUD, mailboxing, linked mode state, and runtime overlays
 
-## v0.4.1 Shape
+## v0.4.2 Shape
 
-`0.4.1` hardens the governed Chedex shape with startup release audits and refreshed Codex CLI verification.
+`0.4.2` hardens the governed Chedex shape with startup release audits and refreshed Codex CLI verification.
 
 - direct ordinary turns stay lightweight and native
 - `autopilot`, `ralph`, and direct top-level `ultrawork` are governed workflows

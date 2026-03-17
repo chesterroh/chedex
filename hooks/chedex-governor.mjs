@@ -248,7 +248,14 @@ export function validateHandoff(handoff) {
 export async function validateGovernedWorkflow(progress, progressPath) {
   const errors = [...validateGovernedProgress(progress).errors];
   const progressDir = dirname(progressPath);
+  const workflowRoot = resolvePathFrom(progressDir, progress.workflow_root || null);
   const handoffPath = resolvePathFrom(progressDir, progress.artifacts?.handoff || null);
+
+  if (!workflowRoot) {
+    errors.push('workflow_root must resolve to a directory');
+  } else if (workflowRoot !== progressDir) {
+    errors.push('workflow_root must resolve to the directory that contains progress.json');
+  }
 
   if (!handoffPath) {
     return {
@@ -355,12 +362,6 @@ export async function pruneIndexForSessionStart(index) {
       continue;
     }
 
-    if (!(await pathExists(entry.workflow_root))) {
-      delete index.entries[cwd];
-      changed = true;
-      continue;
-    }
-
     if (!(await pathExists(entry.progress_path))) {
       delete index.entries[cwd];
       changed = true;
@@ -372,6 +373,17 @@ export async function pruneIndexForSessionStart(index) {
       const validation = await validateGovernedWorkflow(progress, entry.progress_path);
       if (!validation.ok || progress.status === 'completed' || progress.status === 'cancelled') {
         delete index.entries[cwd];
+        changed = true;
+        continue;
+      }
+
+      const normalizedEntry = deriveActiveEntry({
+        cwd,
+        progressPath: entry.progress_path,
+        progress,
+      });
+      if (JSON.stringify(entry) !== JSON.stringify(normalizedEntry)) {
+        index.entries[cwd] = normalizedEntry;
         changed = true;
       }
     } catch {
@@ -464,16 +476,17 @@ export async function stopHook({ codexHome = defaultCodexHome(), cwd = process.c
     return { action: 'allow' };
   }
 
-  if (!(await pathExists(entry.workflow_root))) {
-    delete index.entries[normalizedCwd];
-    await saveActiveIndex(index, codexHome);
-    return { action: 'allow' };
-  }
-
   if (!(await pathExists(entry.progress_path))) {
     return {
       action: 'block',
       reason: `Chedex governor blocked stop because the active workflow is missing progress.json at ${entry.progress_path}. Restore the file or clear the workflow explicitly.`,
+    };
+  }
+
+  if (!(await pathExists(entry.workflow_root))) {
+    return {
+      action: 'block',
+      reason: `Chedex governor blocked stop because the active workflow root is missing at ${entry.workflow_root}. Restore the workflow directory or clear the workflow explicitly.`,
     };
   }
 
