@@ -132,6 +132,7 @@ const codexOnlySurfaces = [
   repoPath('docs', 'customizing.md'),
   repoPath('docs', 'governor.md'),
   repoPath('hooks', 'chedex-governor.mjs'),
+  repoPath('hooks', 'codex-release-audit.mjs'),
 ];
 
 const skillDocSurfaces = [
@@ -150,9 +151,9 @@ for (const path of skillDocSurfaces) {
 }
 
 const governorSurfaceChecks = [
-  [repoPath('README.md'), ['codex_hooks', 'hooks.json', '_active.json', 'handoff.json']],
-  [repoPath('docs', 'install.md'), ['codex_hooks', 'hooks.json', '0.114.0']],
-  [repoPath('docs', 'governor.md'), ['workflow-sync', 'SessionStart', 'Stop', 'handoff.json', 'risks']],
+  [repoPath('README.md'), ['codex_hooks', 'hooks.json', '_active.json', 'handoff.json', '0.115.0']],
+  [repoPath('docs', 'install.md'), ['codex_hooks', 'hooks.json', '0.114.0', '0.115.0', '_codex_release_audit.json']],
+  [repoPath('docs', 'governor.md'), ['workflow-sync', 'SessionStart', 'Stop', 'handoff.json', 'risks', 'release audit']],
   [repoPath('skills', 'clarify', 'SKILL.md'), ['Recommended next step', 'ralph', 'autopilot']],
   [repoPath('skills', 'execute', 'SKILL.md'), ['Escalate to `plan`', 'Escalate to `ralph`', 'Escalate to `autopilot`']],
   [repoPath('skills', 'review', 'SKILL.md'), ['Verdict: APPROVE / REVISE / REJECT', 'Findings first']],
@@ -191,9 +192,16 @@ for (const snippet of ['copyTree', '.codex', 'mirrorHookAssetsDir']) {
 }
 
 const governorRuntime = await readFile(repoPath('hooks', 'chedex-governor.mjs'), 'utf8');
-for (const snippet of ['session-start', 'workflow-sync', 'workflow-clear', 'risks must be an array']) {
+for (const snippet of ['session-start', 'workflow-sync', 'workflow-clear', 'risks must be an array', 'buildReleaseAudit']) {
   if (!governorRuntime.includes(snippet)) {
     throw new Error(`governor runtime missing "${snippet}"`);
+  }
+}
+
+const releaseAuditRuntime = await readFile(repoPath('hooks', 'codex-release-audit.mjs'), 'utf8');
+for (const snippet of ['registry.npmjs.org', 'renderReleaseAuditAdvisory', 'KNOWN_CODEX_RELEASE_DELTAS']) {
+  if (!releaseAuditRuntime.includes(snippet)) {
+    throw new Error(`release audit runtime missing "${snippet}"`);
   }
 }
 
@@ -212,7 +220,7 @@ const mirrorRequiredPaths = [
   repoPath('.codex', 'prompts'),
   repoPath('.codex', 'skills'),
   repoPath('.codex', 'agents'),
-  repoPath('.codex', 'hooks', 'chedex', 'chedex-governor.mjs'),
+  repoPath('.codex', 'hooks', 'chedex'),
 ];
 const missingMirrorPaths = anyMissing(mirrorRequiredPaths);
 if (missingMirrorPaths.length) {
@@ -223,11 +231,7 @@ await assertFileEqual(manifest.templateAgents, repoPath('.codex', 'AGENTS.md'), 
 await assertTreeEqual(manifest.promptsDir, repoPath('.codex', 'prompts'), '.codex/prompts');
 await assertTreeEqual(manifest.skillsDir, repoPath('.codex', 'skills'), '.codex/skills');
 await assertTreeEqual(manifest.agentsDir, repoPath('.codex', 'agents'), '.codex/agents');
-await assertFileEqual(
-  repoPath('hooks', 'chedex-governor.mjs'),
-  repoPath('.codex', 'hooks', 'chedex', 'chedex-governor.mjs'),
-  '.codex/hooks/chedex/chedex-governor.mjs',
-);
+await assertTreeEqual(manifest.hooksDir, repoPath('.codex', 'hooks', 'chedex'), '.codex/hooks/chedex');
 
 const quotedHookCommand = buildManagedHooksConfig({
   hookRuntimePath: '/tmp/Codex Home/hooks/chedex/chedex-governor.mjs',
@@ -275,6 +279,7 @@ execFileSync(process.execPath, [repoPath('scripts', 'install-user.mjs')], {
 const installedHooksConfig = JSON.parse(await readFile(join(installHome, 'hooks.json'), 'utf8'));
 const sessionStartCommand = installedHooksConfig.hooks.SessionStart[0].hooks[0].command;
 assert(sessionStartCommand.includes(`'${join(installHome, 'hooks', 'chedex', 'chedex-governor.mjs')}'`), 'install-user should quote managed hook runtime paths');
+assert(installedHooksConfig.hooks.SessionStart[0].matcher === '^(startup|resume)$', 'install-user should preserve the SessionStart startup/resume matcher');
 
 execFileSync(process.execPath, [repoPath('scripts', 'uninstall-user.mjs')], {
   cwd: repoPath(),

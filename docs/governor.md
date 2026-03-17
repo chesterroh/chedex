@@ -5,17 +5,19 @@ The Chedex governor is the native lifecycle layer for governed workflows.
 ## Requirements
 
 - Codex CLI `>= 0.114.0`
+- Latest verified Codex CLI: `0.115.0`
 - `codex_hooks` feature available in `codex features list`
 
 Install enables `codex_hooks = true` and writes a managed `hooks.json` beside `config.toml`.
 
 ## Installed Paths
 
-- `~/.codex/hooks/chedex/chedex-governor.mjs`
+- `~/.codex/hooks/chedex/*`
 - `~/.codex/hooks.json`
 - `~/.codex/workflows/`
 
 The active index at `~/.codex/workflows/_active.json` is created on first governed workflow sync, not during install.
+The release-audit cache at `~/.codex/workflows/_codex_release_audit.json` is created lazily by `SessionStart` when the audit runs successfully.
 
 ## Governed Modes
 
@@ -30,7 +32,10 @@ Plain direct turns and small `execute` tasks are not governed unless they explic
 ## Hook Responsibilities
 
 - `SessionStart` restores compact workflow context only for workflows whose governed state still validates.
+- `SessionStart` also runs a non-blocking release audit. If the installed Codex CLI is behind the latest published `@openai/codex` release, it appends a short upgrade advisory and repo follow-up plan.
 - `Stop` blocks ambiguous endings until the current workflow is terminal.
+
+`SessionStart` does not auto-upgrade Codex CLI. It stays advisory, short-timeout, and fail-open.
 
 ## Active Workflow Index
 

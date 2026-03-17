@@ -9,6 +9,10 @@ import {
   stopHook,
   syncWorkflow,
 } from '../hooks/chedex-governor.mjs';
+import {
+  buildReleaseAudit,
+  releaseAuditCachePath,
+} from '../hooks/codex-release-audit.mjs';
 
 function assert(condition, message) {
   if (!condition) {
@@ -109,6 +113,9 @@ for (const mode of ['ralph', 'autopilot', 'ultrawork']) {
   const sessionContext = await sessionStartHook({
     codexHome: home,
     cwd,
+    releaseAudit: {
+      disabled: true,
+    },
   });
   assert(sessionContext.includes(`mode: ${mode}`), `session-start did not inject governed context for ${mode}`);
 
@@ -247,6 +254,9 @@ assert(pausedAllowed.action === 'allow', 'paused workflow with next_step should 
 const resumedContext = await sessionStartHook({
   codexHome: home,
   cwd,
+  releaseAudit: {
+    disabled: true,
+  },
 });
 assert(resumedContext.includes('status: paused'), 'paused workflow should still rehydrate on session start');
 
@@ -273,6 +283,9 @@ await writeJson(invalidResumeWorkflow.progressPath, invalidResumeProgress);
 const invalidResumeContext = await sessionStartHook({
   codexHome: home,
   cwd,
+  releaseAudit: {
+    disabled: true,
+  },
 });
 assert(invalidResumeContext === '', 'invalid workflow should not rehydrate on session start');
 
@@ -316,5 +329,132 @@ try {
   missingRisksFailed = error.message.includes('missing field: risks');
 }
 assert(missingRisksFailed, 'missing risks should fail governed validation');
+
+const currentReleaseAudit = await buildReleaseAudit({
+  codexHome: home,
+  readInstalledVersion() {
+    return {
+      raw: 'codex-cli 0.115.0',
+      normalized: '0.115.0',
+      semver: [0, 115, 0],
+    };
+  },
+  async getLatestReleaseInfo() {
+    return {
+      latest_version: '0.115.0',
+      published_at: '2026-03-16T00:00:00Z',
+      checked_at: '2026-03-17T00:00:00Z',
+      source: 'npm-registry',
+    };
+  },
+});
+assert(currentReleaseAudit.state === 'current', 'matching installed/latest versions should report current');
+
+const releaseAuditOnlyContext = await sessionStartHook({
+  codexHome: home,
+  cwd: join(home, 'release-audit-only'),
+  releaseAudit: {
+    readInstalledVersion() {
+      return {
+        raw: 'codex-cli 0.114.0',
+        normalized: '0.114.0',
+        semver: [0, 114, 0],
+      };
+    },
+    async getLatestReleaseInfo() {
+      return {
+        latest_version: '0.115.0',
+        published_at: '2026-03-16T00:00:00Z',
+        checked_at: '2026-03-17T00:00:00Z',
+        source: 'npm-registry',
+      };
+    },
+  },
+});
+assert(releaseAuditOnlyContext.includes('Chedex release audit detected a newer Codex CLI release.'), 'session-start should render a release advisory when Codex is outdated');
+assert(releaseAuditOnlyContext.includes('known_delta:'), 'release advisory should include known delta notes');
+assert(releaseAuditOnlyContext.includes('upgrade_plan:'), 'release advisory should include an upgrade plan');
+
+const combinedWorkflowCwd = join(home, 'release-audit-combined');
+await mkdir(combinedWorkflowCwd, { recursive: true });
+const combinedWorkflow = await makeWorkflow({
+  home,
+  slug: 'release-audit-combined',
+  mode: 'ralph',
+});
+await syncWorkflow({
+  codexHome: home,
+  cwd: combinedWorkflowCwd,
+  progressPath: combinedWorkflow.progressPath,
+});
+
+const workflowAndAuditContext = await sessionStartHook({
+  codexHome: home,
+  cwd: combinedWorkflowCwd,
+  releaseAudit: {
+    readInstalledVersion() {
+      return {
+        raw: 'codex-cli 0.114.0',
+        normalized: '0.114.0',
+        semver: [0, 114, 0],
+      };
+    },
+    async getLatestReleaseInfo() {
+      return {
+        latest_version: '0.115.0',
+        published_at: '2026-03-16T00:00:00Z',
+        checked_at: '2026-03-17T00:00:00Z',
+        source: 'npm-registry',
+      };
+    },
+  },
+});
+assert(workflowAndAuditContext.includes('mode: ralph'), 'workflow context should still render when a release advisory is present');
+assert(workflowAndAuditContext.includes('Chedex release audit detected a newer Codex CLI release.'), 'workflow context should append the release advisory when Codex is outdated');
+
+const releaseAuditFailureContext = await sessionStartHook({
+  codexHome: home,
+  cwd: join(home, 'release-audit-failure'),
+  releaseAudit: {
+    readInstalledVersion() {
+      return {
+        raw: 'codex-cli 0.114.0',
+        normalized: '0.114.0',
+        semver: [0, 114, 0],
+      };
+    },
+    async getLatestReleaseInfo() {
+      throw new Error('network down');
+    },
+  },
+});
+assert(releaseAuditFailureContext === '', 'release audit failures should fail open on session start');
+
+await writeJson(releaseAuditCachePath(home), {
+  schema_version: 1,
+  latest_version: '0.115.0',
+  published_at: '2026-03-16T00:00:00Z',
+  checked_at: '2026-03-16T00:00:00Z',
+  source: 'npm-registry',
+});
+
+const staleCacheAudit = await buildReleaseAudit({
+  codexHome: home,
+  readInstalledVersion() {
+    return {
+      raw: 'codex-cli 0.114.0',
+      normalized: '0.114.0',
+      semver: [0, 114, 0],
+    };
+  },
+  async getLatestReleaseInfo({ codexHome }) {
+    const cache = JSON.parse(await readFile(releaseAuditCachePath(codexHome), 'utf8'));
+    return {
+      ...cache,
+      stale: true,
+    };
+  },
+});
+assert(staleCacheAudit.stale, 'release audit should preserve stale cache metadata when live refresh is unavailable');
 
 process.stdout.write('verify-governor-ok\n');

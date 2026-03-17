@@ -1,4 +1,4 @@
-# Chedex v0.2
+# Chedex v0.4
 
 Native-first agentic harness scaffold for Codex.
 
@@ -17,15 +17,16 @@ It intentionally excludes external orchestration machinery such as:
 - legacy external state systems
 - HUD, mailboxing, linked mode state, and runtime overlays
 
-## v0.2 Shape
+## v0.4 Shape
 
-`0.2.0` hardens the first governed Chedex shape.
+`0.4.0` hardens the governed Chedex shape with startup release audits and refreshed Codex CLI verification.
 
 - direct ordinary turns stay lightweight and native
 - `autopilot`, `ralph`, and direct top-level `ultrawork` are governed workflows
 - Codex native hooks provide session rehydration and stop gating
+- `SessionStart` can also surface a non-blocking Codex release audit when the installed CLI lags the latest published package release
 - governed workflows persist authoritative state under `~/.codex/workflows/`
-- Chedex now requires Codex `>= 0.114.0` with the `codex_hooks` feature surface available
+- Chedex currently requires Codex `>= 0.114.0` with the `codex_hooks` feature surface available and is verified against Codex `0.115.0`
 - the governed workflow schema is now enforced consistently across docs, skills, and runtime validation
 - the repo keeps a deterministic `.codex/` mirror for installable source surfaces and verifies parity explicitly
 
@@ -38,7 +39,7 @@ It intentionally excludes external orchestration machinery such as:
 - `prompts/` — installable role prompts
 - `skills/` — installable workflow skills
 - `agents/` — generated native agent TOMLs
-- `hooks/` — native lifecycle governor runtime installed under `~/.codex/hooks/chedex/`
+- `hooks/` — native lifecycle governor runtime and release-audit helper installed under `~/.codex/hooks/chedex/`
 - `.codex/` — checked-in mirror of deterministic installable surfaces used for parity checks
 - `scripts/` — generation, install, uninstall, and verification scripts
 - `docs/` — install and customization guides
@@ -59,7 +60,7 @@ Use this repo as your own harness base:
 - `~/.codex/prompts/*.md`
 - `~/.codex/skills/*/SKILL.md`
 - `~/.codex/agents/*.toml`
-- `~/.codex/hooks/chedex/chedex-governor.mjs`
+- `~/.codex/hooks/chedex/*`
 - `~/.codex/hooks.json`
 - `[agents.*]` entries in `~/.codex/config.toml`
 - `[features] codex_hooks = true` in `~/.codex/config.toml`
@@ -95,6 +96,7 @@ Governed workflow state now centers on:
 - `handoff.json` as the plan-to-execution ratchet for governed plans and richer workflows
 - `verify.md` as the governed evidence log
 - `~/.codex/workflows/_active.json` as the active workflow index
+- `~/.codex/workflows/_codex_release_audit.json` as the startup release-audit cache
 - native `SessionStart` and `Stop` hooks for resume and closeout enforcement
 
 ## Workflow Alignment
@@ -124,4 +126,4 @@ npm run uninstall:user
 - The prompts are the primary role surfaces. The registry is the structured metadata layer.
 - `agents/*.toml` are generated artifacts. Re-run `npm run generate:agents` after changing `registry/agent-definitions.mjs` or any prompt.
 - `.codex/` is a checked-in mirror of deterministic installable surfaces only. Refresh it with `npm run refresh:mirror` after changing mirrored source files.
-- The governor runtime lives in [`hooks/chedex-governor.mjs`](hooks/chedex-governor.mjs). See [`docs/governor.md`](docs/governor.md) for the governed workflow contract.
+- The governor runtime lives in [`hooks/chedex-governor.mjs`](hooks/chedex-governor.mjs), and the startup release-audit helper lives in [`hooks/codex-release-audit.mjs`](hooks/codex-release-audit.mjs). See [`docs/governor.md`](docs/governor.md) for the governed workflow contract.

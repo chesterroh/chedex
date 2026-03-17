@@ -3,6 +3,7 @@
 ## Requirements
 
 - Codex CLI `>= 0.114.0`
+- Latest verified Codex CLI: `0.115.0`
 - `codex features list` must expose `codex_hooks`
 - Node `>= 20`
 
@@ -23,7 +24,7 @@ This installs:
 - `prompts/*.md` into `~/.codex/prompts/`
 - the registered `skills/<name>/` directories into `~/.codex/skills/`: `clarify`, `plan`, `review`, `execute`, `tdd`, `ultrawork`, `ralph`, and `autopilot`
 - `agents/*.toml` into `~/.codex/agents/`
-- `hooks/chedex-governor.mjs` into `~/.codex/hooks/chedex/`
+- `hooks/*` into `~/.codex/hooks/chedex/`
 - a managed `hooks.json` into `~/.codex/hooks.json`
 - a managed Chedex agent block into `~/.codex/config.toml`
 - `CHEDEX_UNINSTALL.md` and `CHEDEX_UNINSTALL.json` into `~/.codex/` for reversible uninstall metadata
@@ -32,6 +33,7 @@ This installs:
 Chedex writes native agent files only under `~/.codex` unless `CODEX_HOME` is set.
 Long-running workflow skills such as `ralph` and `autopilot` keep their artifacts under `~/.codex/workflows/`.
 Direct top-level `ultrawork` uses a minimal workflow root under `~/.codex/workflows/ultrawork/` with `progress.json`, `verify.md`, and active index sync; it may omit `handoff.json`.
+`SessionStart` also performs a best-effort release audit against the published `@openai/codex` package and caches the result in `~/.codex/workflows/_codex_release_audit.json`.
 
 Governed workflow state now includes:
 
@@ -40,6 +42,7 @@ Governed workflow state now includes:
 - `verify.md`
 
 `handoff.json` is required for governed plans and the richer `ralph` / `autopilot` workflows, but direct top-level `ultrawork` may omit it.
+The release audit is advisory only: it does not auto-upgrade Codex CLI.
 
 ## Dry Run
 

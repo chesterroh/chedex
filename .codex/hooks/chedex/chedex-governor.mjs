@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
+import { realpathSync } from 'node:fs';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildReleaseAudit, renderReleaseAuditAdvisory } from './codex-release-audit.mjs';
 
 export const GOVERNOR_SCHEMA_VERSION = 1;
 export const ACTIVE_STATUS = 'active';
@@ -416,7 +418,11 @@ export function renderSessionStartContext(entry, progress) {
   return `${lines.join('\n')}\n`;
 }
 
-export async function sessionStartHook({ codexHome = defaultCodexHome(), cwd = process.cwd() }) {
+export async function sessionStartHook({
+  codexHome = defaultCodexHome(),
+  cwd = process.cwd(),
+  releaseAudit = {},
+}) {
   const normalizedCwd = resolve(cwd);
   const index = await loadActiveIndex(codexHome);
   const changed = await pruneIndexForSessionStart(index);
@@ -424,13 +430,29 @@ export async function sessionStartHook({ codexHome = defaultCodexHome(), cwd = p
     await saveActiveIndex(index, codexHome);
   }
 
+  let releaseAuditContext = '';
+  if (!releaseAudit.disabled && process.env.CHEDEX_DISABLE_RELEASE_AUDIT !== '1') {
+    const audit = await buildReleaseAudit({
+      codexHome,
+      now: releaseAudit.now || new Date(),
+      readInstalledVersion: releaseAudit.readInstalledVersion,
+      getLatestReleaseInfo: releaseAudit.getLatestReleaseInfo,
+    });
+    releaseAuditContext = renderReleaseAuditAdvisory(audit);
+  }
+
   const entry = index.entries[normalizedCwd];
   if (!entry) {
-    return '';
+    return releaseAuditContext;
   }
 
   const progress = await readProgress(entry.progress_path);
-  return renderSessionStartContext(entry, progress);
+  const workflowContext = renderSessionStartContext(entry, progress);
+  if (!releaseAuditContext) {
+    return workflowContext;
+  }
+
+  return `${workflowContext}\n${releaseAuditContext}`;
 }
 
 export async function stopHook({ codexHome = defaultCodexHome(), cwd = process.cwd() }) {
@@ -577,7 +599,15 @@ async function runCli() {
   }
 }
 
-const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+function resolveCliPath(path) {
+  try {
+    return realpathSync(path);
+  } catch {
+    return resolve(path);
+  }
+}
+
+const isMain = process.argv[1] && resolveCliPath(process.argv[1]) === resolveCliPath(fileURLToPath(import.meta.url));
 if (isMain) {
   runCli().catch((error) => {
     process.stderr.write(`${error.message}\n`);

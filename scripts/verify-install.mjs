@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { repoRoot } from './lib.mjs';
 
 function assert(condition, message) {
@@ -26,6 +26,21 @@ function runNodeScript(cwd, script, env) {
     stdio: 'pipe',
     encoding: 'utf8',
   });
+}
+
+function runShellCommand(command, env, input = '') {
+  return execFileSync('sh', ['-lc', command], {
+    cwd: repoRoot,
+    env,
+    input,
+    stdio: 'pipe',
+    encoding: 'utf8',
+  });
+}
+
+async function writeJson(path, value) {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
 const installProbeHome = await mkdtemp(join(tmpdir(), 'chedex-install-verify-'));
@@ -57,6 +72,73 @@ assert(await pathMissing(join(installProbeHome, 'CHEDEX_UNINSTALL.json')), 'unin
 const freshHome = await mkdtemp(join(tmpdir(), 'chedex-install-fresh-'));
 const freshEnv = { ...process.env, CODEX_HOME: freshHome };
 runNodeScript(repoRoot, 'scripts/install-user.mjs', freshEnv);
+
+const installedHooksConfig = JSON.parse(await readFile(join(freshHome, 'hooks.json'), 'utf8'));
+const installedSessionStartCommand = installedHooksConfig.hooks.SessionStart[0].hooks[0].command;
+assert(installedSessionStartCommand.includes('session-start'), 'install should wire SessionStart to the governor session-start command');
+
+const emptySessionStartOutput = runShellCommand(
+  installedSessionStartCommand,
+  { ...freshEnv, CHEDEX_DISABLE_RELEASE_AUDIT: '1' },
+  `${JSON.stringify({ cwd: join(freshHome, 'workspace-empty') })}\n`,
+);
+assert(emptySessionStartOutput === '', 'session-start should stay quiet when no governed workflow is active');
+
+const installedGovernorPath = join(freshHome, 'hooks', 'chedex', 'chedex-governor.mjs');
+const governedCwd = join(freshHome, 'workspace-governed');
+const workflowRoot = join(freshHome, 'workflows', 'ralph', 'install-smoke');
+const progressPath = join(workflowRoot, 'progress.json');
+await mkdir(governedCwd, { recursive: true });
+await mkdir(workflowRoot, { recursive: true });
+await writeFile(join(workflowRoot, 'plan.md'), '# plan\n');
+await writeFile(join(workflowRoot, 'verify.md'), '# verify\n');
+await writeJson(join(workflowRoot, 'handoff.json'), {
+  task: 'install smoke task',
+  acceptance_criteria: ['restore workflow on session start'],
+  verification_targets: ['session-start'],
+  delegation_roster: ['executor'],
+  execution_lane: 'default',
+  source_artifacts: [],
+  approved_at: '2026-03-17T00:00:00Z',
+});
+await writeJson(progressPath, {
+  schema_version: 1,
+  mode: 'ralph',
+  task: 'install smoke task',
+  active: true,
+  status: 'active',
+  phase: 'execute',
+  updated_at: '2026-03-17T00:00:00Z',
+  workflow_root: workflowRoot,
+  next_step: 'Continue implementation',
+  artifacts: {
+    plan: join(workflowRoot, 'plan.md'),
+    verify: join(workflowRoot, 'verify.md'),
+    handoff: join(workflowRoot, 'handoff.json'),
+  },
+  verification: {
+    state: 'pending',
+    evidence: [],
+  },
+  blocker: null,
+  risks: ['Pending verification'],
+});
+
+execFileSync(process.execPath, [installedGovernorPath, 'workflow-sync', '--codex-home', freshHome, '--cwd', governedCwd, '--progress', progressPath], {
+  cwd: repoRoot,
+  env: freshEnv,
+  stdio: 'pipe',
+  encoding: 'utf8',
+});
+
+const governedSessionStartOutput = runShellCommand(
+  installedSessionStartCommand,
+  { ...freshEnv, CHEDEX_DISABLE_RELEASE_AUDIT: '1' },
+  `${JSON.stringify({ cwd: governedCwd })}\n`,
+);
+assert(governedSessionStartOutput.includes('mode: ralph'), 'installed session-start hook should restore governed workflow context');
+assert(governedSessionStartOutput.includes('task: install smoke task'), 'installed session-start hook should render the governed workflow summary');
+
 runNodeScript(repoRoot, 'scripts/uninstall-user.mjs', freshEnv);
 
 for (const path of [

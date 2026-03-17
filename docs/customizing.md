@@ -13,7 +13,7 @@ npm run refresh:mirror
 npm run verify
 ```
 
-The checked-in mirror is limited to `.codex/AGENTS.md`, `.codex/prompts/`, `.codex/skills/`, `.codex/agents/`, and `.codex/hooks/chedex/chedex-governor.mjs`.
+The checked-in mirror is limited to `.codex/AGENTS.md`, `.codex/prompts/`, `.codex/skills/`, `.codex/agents/`, and `.codex/hooks/chedex/`.
 Do not commit repo-local install byproducts such as `.codex/config.toml`, `.codex/hooks.json`, `.codex/CHEDEX_UNINSTALL.md`, `.codex/CHEDEX_UNINSTALL.json`, or workflow state.
 
 ## Add a New Skill
@@ -43,6 +43,7 @@ If the changed paths are mirrored under `.codex/`, run `npm run refresh:mirror` 
 Update together:
 
 - `hooks/chedex-governor.mjs`
+- `hooks/codex-release-audit.mjs`
 - `scripts/install-user.mjs`
 - `scripts/uninstall-user.mjs`
 - `docs/governor.md`

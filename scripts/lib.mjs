@@ -16,6 +16,7 @@ export const uninstallFileName = 'CHEDEX_UNINSTALL.md';
 export const uninstallStateFileName = 'CHEDEX_UNINSTALL.json';
 export const chedexHooksFeature = 'codex_hooks';
 export const chedexMinimumCodexVersion = '0.114.0';
+export const chedexLatestVerifiedCodexVersion = '0.115.0';
 export const chedexHookStatusPrefix = 'Chedex governor:';
 
 export function codexHome() {
