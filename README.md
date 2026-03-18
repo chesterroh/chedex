@@ -1,5 +1,7 @@
 # Chedex v0.4.2
 
+An homage to preceding projects such as Oh My OpenAgent, Oh My Codex, and Ourobos.
+
 Native-first agentic harness scaffold for Codex.
 
 This repo is the clean source-of-truth version of the Chedex extraction that was installed into `~/.codex`.
