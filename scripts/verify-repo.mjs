@@ -126,7 +126,7 @@ for (const path of skillDocSurfaces) {
 }
 
 const governorSurfaceChecks = [
-  [repoPath('README.md'), ['codex_hooks', 'multi_agent', 'child_agents_md', 'hooks.json', '_active.json', 'handoff.json', '0.115.0', 'durable evidence log']],
+  [repoPath('README.md'), ['codex_hooks', 'multi_agent', 'child_agents_md', 'hooks.json', '_active.json', 'handoff.json', '0.116.0', 'durable evidence log']],
   [repoPath('docs', 'install.md'), ['codex_hooks', 'multi_agent', 'child_agents_md', 'hooks.json', '0.114.0', '0.115.0', '_codex_release_audit.json']],
   [repoPath('docs', 'governor.md'), ['workflow-sync', 'SessionStart', 'Stop', 'handoff.json', 'risks', 'release audit', 'multi_agent', 'child_agents_md', 'durable evidence log']],
   [repoPath('skills', 'clarify', 'SKILL.md'), ['Recommended next step', 'ralph', 'autopilot']],

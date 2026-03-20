@@ -1,4 +1,4 @@
-# Chedex v0.4.2
+# Chedex v0.4.3
 
 An homage to preceding projects such as Oh My OpenAgent, Oh My Codex, and Ourobos.
 
@@ -19,16 +19,16 @@ It intentionally excludes external orchestration machinery such as:
 - legacy external state systems
 - HUD, mailboxing, linked mode state, and runtime overlays
 
-## v0.4.2 Shape
+## v0.4.3 Shape
 
-`0.4.2` hardens the governed Chedex shape with startup release audits and refreshed Codex CLI verification.
+`0.4.3` marks the current Chedex shape as Codex `0.116.0` ready while keeping the governed workflow and release-audit hardening introduced in the `0.4.x` line.
 
 - direct ordinary turns stay lightweight and native
 - `autopilot`, `ralph`, and direct top-level `ultrawork` are governed workflows
 - Codex native hooks provide session rehydration and stop gating
 - `SessionStart` can also surface a non-blocking Codex release audit when the installed CLI lags the latest published package release
 - governed workflows persist authoritative state under `~/.codex/workflows/`
-- Chedex currently requires Codex `>= 0.114.0` with the `codex_hooks` feature surface available and is verified against Codex `0.115.0`
+- Chedex currently requires Codex `>= 0.114.0` with the `codex_hooks` feature surface available and is verified against Codex `0.116.0`
 - the governed workflow schema is now enforced consistently across docs, skills, and runtime validation
 - the repo keeps a deterministic `.codex/` mirror for installable source surfaces and verifies parity explicitly
 
