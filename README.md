@@ -1,6 +1,6 @@
 # Chedex v0.5.4
 
-An homage to preceding projects such as Oh My OpenAgent, Oh My Codex, and Ourobos.
+An homage to preceding projects such as Oh My OpenAgent, Oh My Codex, and Ouroboros.
 
 Native-first agentic harness scaffold for Codex.
 
