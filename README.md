@@ -1,4 +1,4 @@
-# Chedex v0.4.3
+# Chedex v0.5.0
 
 An homage to preceding projects such as Oh My OpenAgent, Oh My Codex, and Ourobos.
 
@@ -19,9 +19,9 @@ It intentionally excludes external orchestration machinery such as:
 - legacy external state systems
 - HUD, mailboxing, linked mode state, and runtime overlays
 
-## v0.4.3 Shape
+## v0.5.0 Shape
 
-`0.4.3` marks the current Chedex shape as Codex `0.116.0` ready while keeping the governed workflow and release-audit hardening introduced in the `0.4.x` line.
+`0.5.0` marks the current Chedex shape as Codex `0.116.0` ready while carrying forward the governed workflow and release-audit hardening introduced in the `0.4.x` line.
 
 - direct ordinary turns stay lightweight and native
 - `autopilot`, `ralph`, and direct top-level `ultrawork` are governed workflows
@@ -45,6 +45,8 @@ It intentionally excludes external orchestration machinery such as:
 - `.codex/` — checked-in mirror of deterministic installable surfaces used for parity checks
 - `scripts/` — generation, install, uninstall, and verification scripts
 - `docs/` — install and customization guides
+  - `docs/guidance-schema.md` — canonical instruction-surface structure
+  - `docs/prompt-contract.md` — core behavior contract for prompts and skills
 
 ## Intended Use
 
@@ -125,6 +127,8 @@ npm run uninstall:user
 ## Notes
 
 - This repo reflects the stronger delegation policy currently installed in your global `~/.codex/AGENTS.md`.
+- `AGENTS.template.md`, `prompts/`, and `skills/` should stay aligned with `docs/guidance-schema.md` and `docs/prompt-contract.md`.
+- Explicit caller-specified sub-agent model or reasoning settings should override repo defaults unless unavailable or incompatible, and prompt changes should preserve that rule through generated agents and mirrors.
 - The prompts are the primary role surfaces. The registry is the structured metadata layer.
 - `agents/*.toml` are generated artifacts. Re-run `npm run generate:agents` after changing `registry/agent-definitions.mjs` or any prompt.
 - `npm run install:user` copies the checked-in generated agents as-is and fails fast if they are stale, instead of regenerating tracked repo outputs implicitly.

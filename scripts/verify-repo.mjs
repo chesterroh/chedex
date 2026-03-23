@@ -125,19 +125,38 @@ for (const path of skillDocSurfaces) {
   }
 }
 
+const requiredContractDocs = [
+  repoPath('docs', 'guidance-schema.md'),
+  repoPath('docs', 'prompt-contract.md'),
+];
+const missingContractDocs = anyMissing(requiredContractDocs);
+if (missingContractDocs.length) {
+  throw new Error(`instruction contract docs missing: ${missingContractDocs.join(', ')}`);
+}
+
+const explicitUserModelIntentDocSnippet = 'If the user explicitly specifies a sub-agent model or reasoning setting, treat that as binding over inherited or default settings unless it is unavailable or incompatible.';
+const explicitUserFallbackDocSnippet = 'If the explicit request cannot be honored, say so and use the closest compliant fallback instead of silently overriding it.';
+const explicitUserDefaultsAreFallbackDocSnippet = 'Built-in role defaults, inherited defaults, and generated agent defaults are fallback only and must not be used to justify ignoring an explicit user request.';
+const explicitCallerModelIntentPromptSnippet = 'Honor any explicit caller-specified sub-agent model or reasoning setting over inherited or default settings unless unavailable or incompatible.';
+const explicitCallerFallbackPromptSnippet = 'Treat built-in agent defaults as fallback only, and say so before using the closest compliant fallback.';
+
 const governorSurfaceChecks = [
-  [repoPath('README.md'), ['codex_hooks', 'multi_agent', 'child_agents_md', 'hooks.json', '_active.json', 'handoff.json', '0.116.0', 'durable evidence log']],
+  [repoPath('README.md'), ['codex_hooks', 'multi_agent', 'child_agents_md', 'hooks.json', '_active.json', 'handoff.json', '0.116.0', 'durable evidence log', 'override repo defaults unless unavailable or incompatible']],
   [repoPath('docs', 'install.md'), ['codex_hooks', 'multi_agent', 'child_agents_md', 'hooks.json', '0.114.0', '0.115.0', '_codex_release_audit.json']],
   [repoPath('docs', 'governor.md'), ['workflow-sync', 'SessionStart', 'Stop', 'handoff.json', 'risks', 'release audit', 'multi_agent', 'child_agents_md', 'durable evidence log']],
+  [repoPath('docs', 'guidance-schema.md'), ['Role And Intent', 'Execution Protocol', 'Verification And Completion', 'explicitly invoked by name first', 'behavioral contract needs surface-specific wording', 'make it explicit in the prompts and their verification', 'fallback only']],
+  [repoPath('docs', 'prompt-contract.md'), ['Compact, Evidence-Dense Output', 'Local Task Updates Override Locally', 'Persist With Tools Until The Claim Is Grounded', 'explicit invocation', 'Respect Explicit User Model Intent', explicitUserModelIntentDocSnippet, explicitUserFallbackDocSnippet, explicitUserDefaultsAreFallbackDocSnippet, 'Must preserve the same behaviors in role-appropriate wording.', 'explicit caller-specified sub-agent model or reasoning settings over inherited or default settings unless unavailable or incompatible', 'fallback only']],
+  [repoPath('docs', 'customizing.md'), ['docs/guidance-schema.md', 'docs/prompt-contract.md', 'explicit invocation by name', 'binding over inherited or default settings unless unavailable or incompatible', 'relevant files under `prompts/`', 'generated files under `agents/` when prompts change', 'mirrored files under `.codex/` when mirrored source surfaces change', 'npm run generate:agents', 'npm run refresh:mirror', 'npm run verify', 'fallback only']],
   [repoPath('skills', 'clarify', 'SKILL.md'), ['Recommended next step', 'ralph', 'autopilot']],
+  [repoPath('skills', 'clarify', 'SKILL.md'), ['Decision boundaries']],
   [repoPath('skills', 'execute', 'SKILL.md'), ['Escalate to `plan`', 'Escalate to `ralph`', 'Escalate to `autopilot`']],
   [repoPath('skills', 'review', 'SKILL.md'), ['Verdict: APPROVE / REVISE / REJECT', 'Findings first']],
   [repoPath('skills', 'tdd', 'SKILL.md'), ['Use this only when', 'execute` or `review`']],
-  [repoPath('skills', 'plan', 'SKILL.md'), ['handoff.json', 'architect', 'verifier']],
+  [repoPath('skills', 'plan', 'SKILL.md'), ['handoff.json', 'architect', 'verifier', 'Decision boundaries']],
   [repoPath('skills', 'ralph', 'SKILL.md'), ['schema_version', 'workflow_root', 'verification', 'risks']],
   [repoPath('skills', 'autopilot', 'SKILL.md'), ['handoff.json', 'architect', 'verifier', 'verification']],
   [repoPath('skills', 'ultrawork', 'SKILL.md'), ['$CODEX_HOME/workflows/ultrawork', 'verify.md', 'handoff.json']],
-  [repoPath('AGENTS.template.md'), ['SessionStart', 'Stop', 'terminal']],
+  [repoPath('AGENTS.template.md'), ['SessionStart', 'Stop', 'terminal', 'docs/guidance-schema.md', 'docs/prompt-contract.md', 'explicitly invoked by name first', 'If the user explicitly specifies a sub-agent model, treat that choice as binding over inherited or default settings unless the requested model is unavailable or incompatible.', 'If the user explicitly specifies sub-agent reasoning effort, treat that choice as binding over inherited or default settings unless the requested setting is unavailable or incompatible.', 'Do not override, downgrade, or swap', 'fallback only; they never justify silently overriding an explicit user request']],
 ];
 
 for (const [path, snippets] of governorSurfaceChecks) {
@@ -146,6 +165,26 @@ for (const [path, snippets] of governorSurfaceChecks) {
     if (!content.includes(snippet)) {
       throw new Error(`governor surface missing "${snippet}": ${path}`);
     }
+  }
+}
+
+for (const name of roleNames()) {
+  const prompt = await readFile(rolePromptPath(name), 'utf8');
+  if (!prompt.includes(explicitCallerModelIntentPromptSnippet)) {
+    throw new Error(`role prompt missing explicit caller model-intent rule for ${name}: ${rolePromptPath(name)}`);
+  }
+  if (!prompt.includes(explicitCallerFallbackPromptSnippet)) {
+    throw new Error(`role prompt missing explicit caller fallback rule for ${name}: ${rolePromptPath(name)}`);
+  }
+}
+
+for (const name of roleNames()) {
+  const agent = await readFile(generatedAgentPath(name), 'utf8');
+  if (!agent.includes(explicitCallerModelIntentPromptSnippet)) {
+    throw new Error(`generated agent missing explicit caller model-intent rule for ${name}: ${generatedAgentPath(name)}`);
+  }
+  if (!agent.includes(explicitCallerFallbackPromptSnippet)) {
+    throw new Error(`generated agent missing explicit caller fallback rule for ${name}: ${generatedAgentPath(name)}`);
   }
 }
 

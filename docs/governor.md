@@ -32,8 +32,9 @@ Plain direct turns and small `execute` tasks are not governed unless they explic
 ## Hook Responsibilities
 
 - `SessionStart` restores compact workflow context only for workflows whose governed state still validates.
+- `SessionStart` warns instead of silently dropping the current workspace's indexed workflow when governed state is unreadable or malformed, so stop protection is preserved until repair or explicit clear.
 - `SessionStart` also runs a non-blocking release audit. If the installed Codex CLI is behind the latest published `@openai/codex` release, it appends a short upgrade advisory and repo follow-up plan.
-- `Stop` blocks ambiguous endings until the current workflow is terminal.
+- `Stop` blocks ambiguous or unreadable governed state until the current workflow is terminal or explicitly repaired/cleared.
 
 `SessionStart` does not auto-upgrade Codex CLI. It stays advisory, short-timeout, and fail-open.
 
@@ -56,6 +57,8 @@ Each entry records:
 - `phase`
 - `next_step`
 - `updated_at`
+
+Governor-managed `_active.json` updates are serialized and written atomically. If the active index cannot be read safely, `Stop` fails closed and `SessionStart` surfaces a warning instead of silently clearing protection.
 
 ## Governed `progress.json`
 

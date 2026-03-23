@@ -20,10 +20,44 @@ Do not commit repo-local install byproducts such as `.codex/config.toml`, `.code
 
 1. Create `skills/<name>/SKILL.md`
 2. Register it in `scripts/lib.mjs` inside `listSkills()`
-3. Update docs if the skill should be part of the default install set
-4. If the skill creates persistent artifacts, document the `$CODEX_HOME` path it owns
-5. If the skill is a governed workflow, document its `progress.json` and `handoff.json` expectations
-6. If the skill is mirrored under `.codex/`, refresh the mirror before verifying
+3. Decide invocation policy:
+   - default new skills to explicit invocation by name
+   - add trigger guidance in `AGENTS` only when the trigger is high-signal, low-ambiguity, and worth the extra routing complexity
+4. Update docs if the skill should be part of the default install set
+5. Keep the skill aligned with `docs/guidance-schema.md` and `docs/prompt-contract.md`
+6. If the skill creates persistent artifacts, document the `$CODEX_HOME` path it owns
+7. If the skill is a governed workflow, document its `progress.json` and `handoff.json` expectations
+8. If the skill is mirrored under `.codex/`, refresh the mirror before verifying
+
+## Change Instruction Surfaces
+
+Update together when instruction behavior changes:
+
+- `docs/guidance-schema.md`
+- `docs/prompt-contract.md`
+- `AGENTS.template.md`
+- relevant files under `prompts/`
+- relevant files under `skills/`
+- generated files under `agents/` when prompts change
+- mirrored files under `.codex/` when mirrored source surfaces change
+- `README.md`
+- `scripts/verify-repo.mjs`
+
+Keep instruction changes small and coordinated. Structural rules belong in `docs/guidance-schema.md`; behavioral rules belong in `docs/prompt-contract.md`.
+
+If the change affects delegation or sub-agent behavior, update:
+
+- `AGENTS.template.md`
+- `docs/prompt-contract.md`
+- relevant files under `prompts/`
+- generated files under `agents/` when prompts change
+- mirrored files under `.codex/` when mirrored source surfaces change
+- `scripts/verify-repo.mjs`
+
+Explicit user model and reasoning requests should remain binding over inherited or default settings unless unavailable or incompatible.
+Built-in role defaults and generated agent defaults should remain fallback only.
+
+If prompt text changed, run `npm run generate:agents`, `npm run refresh:mirror`, and `npm run verify`.
 
 ## Change Install Paths
 

@@ -14,9 +14,13 @@ Use this when the user explicitly wants a plan, or when the task is broad enough
 - Keep plans actionable and testable.
 - Prefer 3-6 steps.
 - Include risks and verification.
+- Default to compact, evidence-dense planning output.
+- Treat newer user updates as local overrides for the active planning branch while preserving earlier non-conflicting instructions.
+- Proceed automatically on clear, low-risk, reversible next steps inside the planning workflow.
 - If the plan is meant to flow into `ralph` or `autopilot`, treat it as a governed plan.
 - Governed plans must produce both `plan.md` and `handoff.json`.
 - Governed plans should not be execution-ready until an `architect` pass and a `verifier` pass agree the plan is grounded enough to run, including when `autopilot` owns the lifecycle.
+- If `Non-goals` or `Decision boundaries` are still unclear, run `clarify` first rather than hand off guesswork.
 
 ## Output
 

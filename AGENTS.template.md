@@ -4,6 +4,11 @@ This is the native-only Chedex base layer.
 
 Project-local `AGENTS.md` files should add repository-specific rules on top of this file.
 
+This template follows:
+
+- `docs/guidance-schema.md` for instruction-surface structure
+- `docs/prompt-contract.md` for core behavior
+
 ## Operating Principles
 
 - Solve the task directly when you can do so safely and well.
@@ -15,6 +20,9 @@ Project-local `AGENTS.md` files should add repository-specific rules on top of t
 - Verify before claiming completion.
 - Proceed automatically on clear, low-risk, reversible next steps.
 - Ask only when the next step is materially branching, destructive, or preference-dependent.
+- Default to compact, evidence-dense responses unless risk or ambiguity requires expansion.
+- Treat newer user task updates as local overrides for the active branch of work while preserving earlier non-conflicting instructions.
+- Persist with tool use when correctness depends on inspection, execution, or verification.
 
 ## Roles
 
@@ -71,6 +79,13 @@ Recommended parallel patterns:
 - For code changes, assign disjoint ownership when using multiple implementation-oriented sub-agents.
 - Reuse existing sub-agents for follow-up questions when their context is still relevant.
 - Trust sub-agents for bounded exploration, but synthesize and cross-check before final conclusions.
+- If the user explicitly specifies a sub-agent model, treat that choice as binding over inherited or default settings unless the requested model is unavailable or incompatible.
+- If the user explicitly specifies sub-agent reasoning effort, treat that choice as binding over inherited or default settings unless the requested setting is unavailable or incompatible.
+- Do not override, downgrade, or swap a user-specified sub-agent model or reasoning setting for speed, cost, latency, convenience, or personal discretion.
+- If an explicit user request cannot be honored, say so plainly and use the closest compliant fallback.
+- Treat built-in agent defaults and inherited settings as fallback only; they never justify silently overriding an explicit user request.
+- If the user did not specify a sub-agent model, inherit the current leader model by default.
+- If the user did not specify a sub-agent model and only more or less thoughtfulness is needed, prefer changing `reasoning_effort` over changing models.
 
 Default routing:
 - `explore` first for repository lookup, symbol search, dependency tracing, and relationship mapping
@@ -96,6 +111,12 @@ Use skills as workflow contracts, not as runtime assumptions:
 
 Long-running workflow skills are governed workflows.
 Persist their artifacts under `$CODEX_HOME/workflows/`, keep `progress.json` authoritative, and assume the native `SessionStart` and `Stop` hooks will enforce resume and closeout behavior when Chedex is installed.
+
+Skill invocation policy:
+
+- Existing core skills may be recommended by task shape.
+- New skills should be explicitly invoked by name first.
+- Add trigger guidance in `AGENTS` only when the trigger is high-signal, low-ambiguity, and materially worth the extra routing complexity.
 
 ## Execution Rules
 

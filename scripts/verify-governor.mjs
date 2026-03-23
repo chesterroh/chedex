@@ -1,7 +1,9 @@
+import { execFileSync } from 'node:child_process';
 import { mkdtemp, mkdir, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
+  acquireActiveIndexLock,
   GOVERNOR_SCHEMA_VERSION,
   activeIndexPath,
   clearWorkflow,
@@ -90,6 +92,12 @@ async function makeWorkflow({
     workflowRoot,
     progressPath,
   };
+}
+
+function sleep(ms) {
+  return new Promise((resolvePromise) => {
+    setTimeout(resolvePromise, ms);
+  });
 }
 
 const home = await mkdtemp(join(tmpdir(), 'chedex-governor-'));
@@ -287,10 +295,40 @@ const invalidResumeContext = await sessionStartHook({
     disabled: true,
   },
 });
-assert(invalidResumeContext === '', 'invalid workflow should not rehydrate on session start');
+assert(invalidResumeContext.includes('could not restore it safely'), 'invalid workflow should warn on session start');
 
 const indexAfterInvalidResume = JSON.parse(await readFile(activeIndexPath(home), 'utf8'));
-assert(!(cwd in indexAfterInvalidResume.entries), 'invalid resumed workflow should be pruned from the active index');
+assert(cwd in indexAfterInvalidResume.entries, 'invalid resumed workflow should remain indexed so stop protection is preserved');
+
+const invalidIndexedProgressCwd = join(home, 'invalid-indexed-progress');
+await mkdir(invalidIndexedProgressCwd, { recursive: true });
+const invalidIndexedProgressWorkflow = await makeWorkflow({
+  home,
+  slug: 'invalid-indexed-progress',
+  mode: 'ralph',
+});
+await syncWorkflow({
+  codexHome: home,
+  cwd: invalidIndexedProgressCwd,
+  progressPath: invalidIndexedProgressWorkflow.progressPath,
+});
+await writeFile(invalidIndexedProgressWorkflow.progressPath, '{bad json\n');
+const invalidIndexedProgressContext = await sessionStartHook({
+  codexHome: home,
+  cwd: invalidIndexedProgressCwd,
+  releaseAudit: {
+    disabled: true,
+  },
+});
+assert(invalidIndexedProgressContext.includes('could not restore it safely'), 'session-start should warn when indexed progress.json is malformed');
+const indexAfterMalformedProgress = JSON.parse(await readFile(activeIndexPath(home), 'utf8'));
+assert(invalidIndexedProgressCwd in indexAfterMalformedProgress.entries, 'session-start should preserve the index entry when progress.json is malformed');
+const invalidIndexedProgressStop = await stopHook({
+  codexHome: home,
+  cwd: invalidIndexedProgressCwd,
+});
+assert(invalidIndexedProgressStop.action === 'block', 'stop should block when indexed progress.json is malformed');
+assert(invalidIndexedProgressStop.reason.includes('progress.json is unreadable'), 'stop should explain malformed progress.json blocks');
 
 const invalidMissingPhase = await makeWorkflow({
   home,
@@ -368,8 +406,28 @@ const corruptedIndexStop = await stopHook({
   codexHome: home,
   cwd: corruptedIndexCwd,
 });
-assert(corruptedIndexStop.action === 'block', 'stop should block when the indexed workflow root is missing');
-assert(corruptedIndexStop.reason.includes('active workflow root is missing'), 'stop should explain missing workflow root blocks');
+assert(corruptedIndexStop.action === 'block', 'stop should still block when stale index metadata points at a missing workflow root');
+assert(corruptedIndexStop.reason.includes('workflow is still active'), 'stop should rely on valid progress state rather than stale workflow_root metadata');
+
+await writeFile(activeIndexPath(home), '{bad json\n');
+const invalidIndexContext = await sessionStartHook({
+  codexHome: home,
+  cwd: corruptedIndexCwd,
+  releaseAudit: {
+    disabled: true,
+  },
+});
+assert(invalidIndexContext.includes('could not read the active workflow index'), 'session-start should warn when _active.json is malformed');
+const invalidIndexStop = await stopHook({
+  codexHome: home,
+  cwd: corruptedIndexCwd,
+});
+assert(invalidIndexStop.action === 'block', 'stop should block when _active.json is malformed');
+assert(invalidIndexStop.reason.includes('active workflow index is invalid'), 'stop should explain malformed _active.json blocks');
+await writeJson(activeIndexPath(home), {
+  schema_version: GOVERNOR_SCHEMA_VERSION,
+  entries: {},
+});
 
 const repairedIndexCwd = join(home, 'repaired-index-workspace');
 await mkdir(repairedIndexCwd, { recursive: true });
@@ -396,6 +454,45 @@ const repairedIndexContext = await sessionStartHook({
 assert(repairedIndexContext.includes('mode: ralph'), 'session-start should still rehydrate when active-index workflow_root metadata is stale');
 const repairedIndexAfterSessionStart = JSON.parse(await readFile(activeIndexPath(home), 'utf8'));
 assert(repairedIndexAfterSessionStart.entries[repairedIndexCwd].workflow_root === repairedIndexWorkflow.workflowRoot, 'session-start should repair stale workflow_root metadata in the active index');
+
+const lockedHome = await mkdtemp(join(tmpdir(), 'chedex-governor-lock-'));
+const lockedCwdA = join(lockedHome, 'workspace-a');
+const lockedCwdB = join(lockedHome, 'workspace-b');
+await mkdir(lockedCwdA, { recursive: true });
+await mkdir(lockedCwdB, { recursive: true });
+const lockedWorkflowA = await makeWorkflow({
+  home: lockedHome,
+  slug: 'locked-a',
+  mode: 'ralph',
+});
+const lockedWorkflowB = await makeWorkflow({
+  home: lockedHome,
+  slug: 'locked-b',
+  mode: 'ralph',
+});
+const heldLock = await acquireActiveIndexLock(lockedHome);
+const blockedSyncA = syncWorkflow({
+  codexHome: lockedHome,
+  cwd: lockedCwdA,
+  progressPath: lockedWorkflowA.progressPath,
+});
+const blockedSyncB = syncWorkflow({
+  codexHome: lockedHome,
+  cwd: lockedCwdB,
+  progressPath: lockedWorkflowB.progressPath,
+});
+await sleep(100);
+let lockHeldObserved = false;
+try {
+  await readFile(activeIndexPath(lockedHome), 'utf8');
+} catch {
+  lockHeldObserved = true;
+}
+assert(lockHeldObserved, 'sync should wait for the active index lock before writing');
+await heldLock.release();
+await Promise.all([blockedSyncA, blockedSyncB]);
+const lockedIndex = JSON.parse(await readFile(activeIndexPath(lockedHome), 'utf8'));
+assert(Object.keys(lockedIndex.entries).length === 2, 'serialized syncs should preserve both active index entries');
 
 const currentReleaseAudit = await buildReleaseAudit({
   codexHome: home,
@@ -523,5 +620,23 @@ const staleCacheAudit = await buildReleaseAudit({
   },
 });
 assert(staleCacheAudit.stale, 'release audit should preserve stale cache metadata when live refresh is unavailable');
+
+const malformedSessionStartCli = execFileSync(process.execPath, [join(process.cwd(), 'hooks', 'chedex-governor.mjs'), 'session-start', '--codex-home', home], {
+  cwd: process.cwd(),
+  env: process.env,
+  input: '{bad json\n',
+  encoding: 'utf8',
+});
+assert(malformedSessionStartCli.includes('could not restore it safely'), 'session-start CLI should handle malformed hook input without crashing');
+
+const malformedStopCli = execFileSync(process.execPath, [join(process.cwd(), 'hooks', 'chedex-governor.mjs'), 'stop', '--codex-home', home], {
+  cwd: process.cwd(),
+  env: process.env,
+  input: '{bad json\n',
+  encoding: 'utf8',
+});
+const malformedStopVerdict = JSON.parse(malformedStopCli);
+assert(malformedStopVerdict.decision === 'block', 'stop CLI should block on malformed hook input');
+assert(malformedStopVerdict.reason.includes('invalid hook JSON input'), 'stop CLI should explain malformed hook input blocks');
 
 process.stdout.write('verify-governor-ok\n');

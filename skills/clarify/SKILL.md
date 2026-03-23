@@ -17,7 +17,10 @@ Turn a vague request into a compact, execution-ready spec without assuming hidde
 - Ask one question at a time.
 - Gather codebase facts yourself before asking the user about them.
 - Target the biggest ambiguity first: goal, constraints, success criteria, or context.
+- Make `Non-goals` and `Decision boundaries` explicit before handing broad work to a heavier workflow.
 - Stop once the request is concrete enough to hand off safely.
+- Treat newer user updates as local overrides for the active clarification branch while preserving earlier non-conflicting instructions.
+- Keep the output compact, but do not hide assumptions or unresolved risk.
 - Recommend the lightest next skill that fits the now-grounded task:
   - `execute` for a small direct change or answer
   - `plan` for scoped but still multi-step work
@@ -31,6 +34,7 @@ Produce a short spec with:
 - Goal
 - Constraints
 - Non-goals
+- Decision boundaries
 - Acceptance criteria
 - Open assumptions
 - Recommended next step: `execute`, `plan`, `ralph`, or `autopilot`

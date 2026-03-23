@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 import { realpathSync } from 'node:fs';
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildReleaseAudit, renderReleaseAuditAdvisory } from './codex-release-audit.mjs';
 
@@ -13,6 +13,8 @@ export const TERMINAL_STATUSES = new Set(['completed', 'paused', 'blocked', 'fai
 export const GOVERNED_MODES = new Set(['ralph', 'autopilot', 'ultrawork']);
 export const VERIFICATION_SATISFIED = 'satisfied';
 export const HANDOFF_REQUIRED_MODES = new Set(['ralph', 'autopilot']);
+export const ACTIVE_INDEX_LOCK_TIMEOUT_MS = 5000;
+export const ACTIVE_INDEX_LOCK_RETRY_MS = 25;
 
 export function defaultCodexHome() {
   return process.env.CODEX_HOME || join(homedir(), '.codex');
@@ -24,6 +26,10 @@ export function workflowsRoot(codexHome = defaultCodexHome()) {
 
 export function activeIndexPath(codexHome = defaultCodexHome()) {
   return join(workflowsRoot(codexHome), '_active.json');
+}
+
+export function activeIndexLockPath(codexHome = defaultCodexHome()) {
+  return join(workflowsRoot(codexHome), '_active.lock');
 }
 
 export async function pathExists(path) {
@@ -53,7 +59,67 @@ export async function readJsonIfExists(path, fallback = null) {
 export async function writeJson(path, value) {
   await mkdir(dirname(path), { recursive: true });
   const content = `${JSON.stringify(value, null, 2)}\n`;
-  await writeFile(path, content);
+  const tempPath = join(
+    dirname(path),
+    `.${basename(path)}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`,
+  );
+  try {
+    await writeFile(tempPath, content);
+    await rename(tempPath, path);
+  } catch (error) {
+    await rm(tempPath, { force: true }).catch(() => {});
+    throw error;
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolvePromise) => {
+    setTimeout(resolvePromise, ms);
+  });
+}
+
+export async function acquireActiveIndexLock(
+  codexHome = defaultCodexHome(),
+  {
+    timeoutMs = ACTIVE_INDEX_LOCK_TIMEOUT_MS,
+    retryMs = ACTIVE_INDEX_LOCK_RETRY_MS,
+  } = {},
+) {
+  await mkdir(workflowsRoot(codexHome), { recursive: true });
+  const lockPath = activeIndexLockPath(codexHome);
+  const deadline = Date.now() + timeoutMs;
+
+  for (;;) {
+    try {
+      await mkdir(lockPath);
+      let released = false;
+      return {
+        lockPath,
+        async release() {
+          if (released) return;
+          released = true;
+          await rm(lockPath, { recursive: true, force: true });
+        },
+      };
+    } catch (error) {
+      if (error?.code !== 'EEXIST') {
+        throw error;
+      }
+      if (Date.now() >= deadline) {
+        throw new Error(`timed out waiting for active index lock at ${lockPath}`);
+      }
+      await sleep(retryMs);
+    }
+  }
+}
+
+export async function withActiveIndexLock(codexHome, fn, options) {
+  const lock = await acquireActiveIndexLock(codexHome, options);
+  try {
+    return await fn();
+  } finally {
+    await lock.release();
+  }
 }
 
 export function normalizeActiveIndex(raw) {
@@ -71,6 +137,39 @@ export function normalizeActiveIndex(raw) {
   return {
     schema_version: GOVERNOR_SCHEMA_VERSION,
     entries,
+  };
+}
+
+export function validateActiveIndexEntry(entry) {
+  const errors = [];
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+    return {
+      ok: false,
+      errors: ['active index entry must be an object'],
+    };
+  }
+
+  for (const field of ['mode', 'task', 'workflow_root', 'progress_path', 'verify_path', 'status', 'updated_at', 'cwd']) {
+    if (typeof entry[field] !== 'string' || !entry[field].trim()) {
+      errors.push(`active index entry field ${field} must be a non-empty string`);
+    }
+  }
+
+  if (entry.handoff_path != null && (typeof entry.handoff_path !== 'string' || !entry.handoff_path.trim())) {
+    errors.push('active index entry field handoff_path must be a non-empty string or null');
+  }
+
+  if (entry.phase != null && typeof entry.phase !== 'string') {
+    errors.push('active index entry field phase must be a string or null');
+  }
+
+  if (entry.next_step != null && typeof entry.next_step !== 'string') {
+    errors.push('active index entry field next_step must be a string or null');
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors,
   };
 }
 
@@ -322,6 +421,87 @@ export async function saveActiveIndex(index, codexHome = defaultCodexHome()) {
   await writeJson(activeIndexPath(codexHome), index);
 }
 
+export async function loadActiveIndexResult(codexHome = defaultCodexHome()) {
+  try {
+    return {
+      ok: true,
+      index: await loadActiveIndex(codexHome),
+      error: null,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      index: null,
+      error,
+    };
+  }
+}
+
+function formatErrorReason(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function buildIndexInvalidReason(codexHome, error) {
+  return `Chedex governor could not read the active workflow index at ${activeIndexPath(codexHome)}.\nReason: ${formatErrorReason(error)}`;
+}
+
+function buildLockBusyReason(codexHome, error) {
+  return `Chedex governor could not safely access the active workflow index lock at ${activeIndexLockPath(codexHome)}.\nReason: ${formatErrorReason(error)}`;
+}
+
+export async function inspectIndexedWorkflowEntry(entry) {
+  const entryValidation = validateActiveIndexEntry(entry);
+  if (!entryValidation.ok) {
+    return {
+      ok: false,
+      reason: `the active workflow index entry is invalid:\n- ${entryValidation.errors.join('\n- ')}`,
+    };
+  }
+
+  if (!(await pathExists(entry.progress_path))) {
+    return {
+      ok: false,
+      reason: `the active workflow is missing progress.json at ${entry.progress_path}. Restore the file or clear the workflow explicitly.`,
+    };
+  }
+
+  let progress;
+  try {
+    progress = await readProgress(entry.progress_path);
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `progress.json is unreadable:\n- ${formatErrorReason(error)}`,
+    };
+  }
+
+  const validation = await validateGovernedWorkflow(progress, entry.progress_path);
+  if (!validation.ok) {
+    return {
+      ok: false,
+      reason: `progress.json is invalid:\n- ${validation.errors.join('\n- ')}`,
+    };
+  }
+
+  const normalizedEntry = deriveActiveEntry({
+    cwd: entry.cwd,
+    progressPath: entry.progress_path,
+    progress,
+  });
+  if (!(await pathExists(normalizedEntry.workflow_root))) {
+    return {
+      ok: false,
+      reason: `the active workflow root is missing at ${normalizedEntry.workflow_root}. Restore the workflow directory or clear the workflow explicitly.`,
+    };
+  }
+
+  return {
+    ok: true,
+    progress,
+    normalizedEntry,
+  };
+}
+
 export async function syncWorkflow({ codexHome = defaultCodexHome(), cwd = process.cwd(), progressPath }) {
   const normalizedCwd = resolve(cwd);
   const normalizedProgressPath = resolve(progressPath);
@@ -331,63 +511,49 @@ export async function syncWorkflow({ codexHome = defaultCodexHome(), cwd = proce
     throw new Error(`invalid governed progress:\n${validation.errors.join('\n')}`);
   }
 
-  const index = await loadActiveIndex(codexHome);
-  index.entries[normalizedCwd] = deriveActiveEntry({
-    cwd: normalizedCwd,
-    progressPath: normalizedProgressPath,
-    progress,
-  });
+  return withActiveIndexLock(codexHome, async () => {
+    const index = await loadActiveIndex(codexHome);
+    index.entries[normalizedCwd] = deriveActiveEntry({
+      cwd: normalizedCwd,
+      progressPath: normalizedProgressPath,
+      progress,
+    });
 
-  await saveActiveIndex(index, codexHome);
-  return index.entries[normalizedCwd];
+    await saveActiveIndex(index, codexHome);
+    return index.entries[normalizedCwd];
+  });
 }
 
 export async function clearWorkflow({ codexHome = defaultCodexHome(), cwd = process.cwd() }) {
   const normalizedCwd = resolve(cwd);
-  const index = await loadActiveIndex(codexHome);
-  if (!(normalizedCwd in index.entries)) {
-    return false;
-  }
-  delete index.entries[normalizedCwd];
-  await saveActiveIndex(index, codexHome);
-  return true;
+  return withActiveIndexLock(codexHome, async () => {
+    const index = await loadActiveIndex(codexHome);
+    if (!(normalizedCwd in index.entries)) {
+      return false;
+    }
+    delete index.entries[normalizedCwd];
+    await saveActiveIndex(index, codexHome);
+    return true;
+  });
 }
 
 export async function pruneIndexForSessionStart(index) {
   let changed = false;
   for (const [cwd, entry] of Object.entries(index.entries)) {
-    if (!entry || typeof entry !== 'object') {
+    const inspection = await inspectIndexedWorkflowEntry(entry);
+    if (!inspection.ok) {
+      continue;
+    }
+
+    const { progress, normalizedEntry } = inspection;
+    if (progress.status === 'completed' || progress.status === 'cancelled') {
       delete index.entries[cwd];
       changed = true;
       continue;
     }
 
-    if (!(await pathExists(entry.progress_path))) {
-      delete index.entries[cwd];
-      changed = true;
-      continue;
-    }
-
-    try {
-      const progress = await readProgress(entry.progress_path);
-      const validation = await validateGovernedWorkflow(progress, entry.progress_path);
-      if (!validation.ok || progress.status === 'completed' || progress.status === 'cancelled') {
-        delete index.entries[cwd];
-        changed = true;
-        continue;
-      }
-
-      const normalizedEntry = deriveActiveEntry({
-        cwd,
-        progressPath: entry.progress_path,
-        progress,
-      });
-      if (JSON.stringify(entry) !== JSON.stringify(normalizedEntry)) {
-        index.entries[cwd] = normalizedEntry;
-        changed = true;
-      }
-    } catch {
-      delete index.entries[cwd];
+    if (JSON.stringify(entry) !== JSON.stringify(normalizedEntry)) {
+      index.entries[cwd] = normalizedEntry;
       changed = true;
     }
   }
@@ -430,16 +596,60 @@ export function renderSessionStartContext(entry, progress) {
   return `${lines.join('\n')}\n`;
 }
 
+export function renderSessionStartWarning(reason) {
+  return [
+    'Chedex governor found governed workflow state for this workspace, but it could not restore it safely.',
+    reason,
+    'closeout rule: stop will remain blocked until the workflow state is repaired or cleared, and when completed, verification is satisfied.',
+    '',
+  ].join('\n');
+}
+
 export async function sessionStartHook({
   codexHome = defaultCodexHome(),
   cwd = process.cwd(),
   releaseAudit = {},
 }) {
   const normalizedCwd = resolve(cwd);
-  const index = await loadActiveIndex(codexHome);
-  const changed = await pruneIndexForSessionStart(index);
-  if (changed) {
-    await saveActiveIndex(index, codexHome);
+  let workflowContext = '';
+
+  try {
+    workflowContext = await withActiveIndexLock(codexHome, async () => {
+      const loadResult = await loadActiveIndexResult(codexHome);
+      if (!loadResult.ok) {
+        return renderSessionStartWarning(buildIndexInvalidReason(codexHome, loadResult.error));
+      }
+
+      const index = loadResult.index;
+      const changed = await pruneIndexForSessionStart(index);
+      const entry = index.entries[normalizedCwd];
+
+      if (!entry) {
+        if (changed) {
+          await saveActiveIndex(index, codexHome);
+        }
+        return '';
+      }
+
+      const inspection = await inspectIndexedWorkflowEntry(entry);
+      if (!inspection.ok) {
+        if (changed) {
+          await saveActiveIndex(index, codexHome);
+        }
+        return renderSessionStartWarning(inspection.reason);
+      }
+
+      const normalizedEntry = inspection.normalizedEntry;
+      if (JSON.stringify(entry) !== JSON.stringify(normalizedEntry)) {
+        index.entries[normalizedCwd] = normalizedEntry;
+      }
+      if (changed || JSON.stringify(entry) !== JSON.stringify(normalizedEntry)) {
+        await saveActiveIndex(index, codexHome);
+      }
+      return renderSessionStartContext(normalizedEntry, inspection.progress);
+    });
+  } catch (error) {
+    workflowContext = renderSessionStartWarning(buildLockBusyReason(codexHome, error));
   }
 
   let releaseAuditContext = '';
@@ -453,68 +663,62 @@ export async function sessionStartHook({
     releaseAuditContext = renderReleaseAuditAdvisory(audit);
   }
 
-  const entry = index.entries[normalizedCwd];
-  if (!entry) {
-    return releaseAuditContext;
-  }
-
-  const progress = await readProgress(entry.progress_path);
-  const workflowContext = renderSessionStartContext(entry, progress);
   if (!releaseAuditContext) {
     return workflowContext;
   }
-
   return `${workflowContext}\n${releaseAuditContext}`;
 }
 
 export async function stopHook({ codexHome = defaultCodexHome(), cwd = process.cwd() }) {
   const normalizedCwd = resolve(cwd);
-  const index = await loadActiveIndex(codexHome);
-  const entry = index.entries[normalizedCwd];
+  try {
+    return await withActiveIndexLock(codexHome, async () => {
+      const loadResult = await loadActiveIndexResult(codexHome);
+      if (!loadResult.ok) {
+        return {
+          action: 'block',
+          reason: `Chedex governor blocked stop because the active workflow index is invalid:\n- ${buildIndexInvalidReason(codexHome, loadResult.error)}`,
+        };
+      }
 
-  if (!entry) {
-    return { action: 'allow' };
-  }
+      const index = loadResult.index;
+      const entry = index.entries[normalizedCwd];
+      if (!entry) {
+        return { action: 'allow' };
+      }
 
-  if (!(await pathExists(entry.progress_path))) {
+      const inspection = await inspectIndexedWorkflowEntry(entry);
+      if (!inspection.ok) {
+        return {
+          action: 'block',
+          reason: `Chedex governor blocked stop because ${inspection.reason}`,
+        };
+      }
+
+      const progress = inspection.progress;
+      if (progress.status === ACTIVE_STATUS) {
+        const nextStep = typeof progress.next_step === 'string' && progress.next_step.trim()
+          ? progress.next_step.trim()
+          : 'continue the governed workflow';
+        return {
+          action: 'block',
+          reason: `Chedex governor blocked stop because the workflow is still active in phase ${progress.phase || 'unspecified'}. Next step: ${nextStep}.`,
+        };
+      }
+
+      if (progress.status === 'completed' || progress.status === 'cancelled') {
+        delete index.entries[normalizedCwd];
+        await saveActiveIndex(index, codexHome);
+      }
+
+      return { action: 'allow' };
+    });
+  } catch (error) {
     return {
       action: 'block',
-      reason: `Chedex governor blocked stop because the active workflow is missing progress.json at ${entry.progress_path}. Restore the file or clear the workflow explicitly.`,
+      reason: `Chedex governor blocked stop because it could not safely access governed state:\n- ${buildLockBusyReason(codexHome, error)}`,
     };
   }
-
-  if (!(await pathExists(entry.workflow_root))) {
-    return {
-      action: 'block',
-      reason: `Chedex governor blocked stop because the active workflow root is missing at ${entry.workflow_root}. Restore the workflow directory or clear the workflow explicitly.`,
-    };
-  }
-
-  const progress = await readProgress(entry.progress_path);
-  const validation = await validateGovernedWorkflow(progress, entry.progress_path);
-  if (!validation.ok) {
-    return {
-      action: 'block',
-      reason: `Chedex governor blocked stop because progress.json is invalid:\n- ${validation.errors.join('\n- ')}`,
-    };
-  }
-
-  if (progress.status === ACTIVE_STATUS) {
-    const nextStep = typeof progress.next_step === 'string' && progress.next_step.trim()
-      ? progress.next_step.trim()
-      : 'continue the governed workflow';
-    return {
-      action: 'block',
-      reason: `Chedex governor blocked stop because the workflow is still active in phase ${progress.phase || 'unspecified'}. Next step: ${nextStep}.`,
-    };
-  }
-
-  if (progress.status === 'completed' || progress.status === 'cancelled') {
-    delete index.entries[normalizedCwd];
-    await saveActiveIndex(index, codexHome);
-  }
-
-  return { action: 'allow' };
 }
 
 export function parseArgs(argv) {
@@ -547,7 +751,14 @@ export async function readHookInput() {
     chunks.push(Buffer.from(chunk));
   }
   const raw = Buffer.concat(chunks).toString('utf8').trim();
-  return raw ? JSON.parse(raw) : {};
+  if (!raw) {
+    return {};
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`invalid hook JSON input: ${formatErrorReason(error)}`);
+  }
 }
 
 export function blockResponse(reason) {
@@ -568,7 +779,13 @@ async function runCli() {
 
   switch (command) {
     case 'session-start': {
-      const input = await readHookInput();
+      let input;
+      try {
+        input = await readHookInput();
+      } catch (error) {
+        process.stdout.write(renderSessionStartWarning(formatErrorReason(error)));
+        return;
+      }
       const output = await sessionStartHook({
         codexHome,
         cwd: input.cwd || process.cwd(),
@@ -577,7 +794,13 @@ async function runCli() {
       return;
     }
     case 'stop': {
-      const input = await readHookInput();
+      let input;
+      try {
+        input = await readHookInput();
+      } catch (error) {
+        process.stdout.write(blockResponse(`Chedex governor blocked stop because ${formatErrorReason(error)}`));
+        return;
+      }
       const verdict = await stopHook({
         codexHome,
         cwd: input.cwd || process.cwd(),
