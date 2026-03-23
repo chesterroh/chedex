@@ -101,6 +101,7 @@ Default routing:
 Use skills as workflow contracts, not as runtime assumptions:
 
 - `clarify` for one-question-at-a-time requirement clarification
+- `deep-interview` for high-rigor Socratic requirements clarification with durable artifacts
 - `plan` for turning a request into an actionable plan
 - `execute` for implement-and-verify persistence
 - `review` for reviewer-only evaluation
@@ -109,8 +110,9 @@ Use skills as workflow contracts, not as runtime assumptions:
 - `ralph` for persistent multi-step execution with artifacts and verification
 - `autopilot` for end-to-end clarify/spec/plan/execute/verify flow
 
-Long-running workflow skills are governed workflows.
-Persist their artifacts under `$CODEX_HOME/workflows/`, keep `progress.json` authoritative, and assume the native `SessionStart` and `Stop` hooks will enforce resume and closeout behavior when Chedex is installed.
+Artifact-backed workflow skills persist their artifacts under `$CODEX_HOME/workflows/`.
+Governed execution workflows keep `progress.json` authoritative and assume the native `SessionStart` and `Stop` hooks will enforce resume and closeout behavior when Chedex is installed.
+Non-governed requirements workflows such as `deep-interview` may persist durable artifacts there without `progress.json` or `handoff.json`.
 
 Skill invocation policy:
 

@@ -20,7 +20,7 @@ Use this when the user explicitly wants a plan, or when the task is broad enough
 - If the plan is meant to flow into `ralph` or `autopilot`, treat it as a governed plan.
 - Governed plans must produce both `plan.md` and `handoff.json`.
 - Governed plans should not be execution-ready until an `architect` pass and a `verifier` pass agree the plan is grounded enough to run, including when `autopilot` owns the lifecycle.
-- If `Non-goals` or `Decision boundaries` are still unclear, run `clarify` first rather than hand off guesswork.
+- If `Non-goals` or `Decision boundaries` are still unclear, run `clarify` first, or `deep-interview` when the work needs a durable requirements artifact rather than hand off guesswork.
 
 ## Output
 
@@ -36,4 +36,4 @@ Governed plans should also include or produce:
 - the intended workflow owner: `ralph` or `autopilot`
 - the proof path that the governor will later use to allow completion
 
-If the request is still ambiguous, run `clarify` first.
+If the request is still ambiguous, run `clarify` first, or `deep-interview` when a higher-rigor requirements pass is the safer next step.

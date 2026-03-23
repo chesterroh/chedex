@@ -25,7 +25,7 @@ Recommended files:
 
 1. Ground the task before execution.
 2. Reuse existing artifacts when they are still accurate; resume instead of restarting.
-3. If the task is still ambiguous, run `clarify` first.
+3. If the task is still ambiguous, run `clarify` first, or `deep-interview` when the work needs a more durable requirements artifact.
 4. If there is no usable plan yet, create or refresh `plan.md`.
 5. Refuse deep execution until `handoff.json` declares acceptance criteria, verification targets, and the intended execution lane.
 6. Use `ultrawork` as the parallel execution layer when the task splits into independent lanes.

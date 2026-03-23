@@ -25,6 +25,7 @@ Recommended files:
 
 1. Clarify
    - If the request is vague, run `clarify` to close the biggest gaps.
+   - If ambiguity remains high or the task needs durable requirements artifacts, run `deep-interview` and reuse its `context.md`, `interview.md`, and `spec.md`.
    - Ground the work in `context.md`.
 2. Specify
    - Turn the request into a compact spec in `spec.md`.
@@ -50,6 +51,7 @@ Recommended files:
 - Complete phases in order; skip only when an earlier artifact is already good enough.
 - Prefer native roles already present in Chedex: `explore`, `planner`, `executor`, `architect`, `verifier`, `debugger`, and `test-engineer`.
 - `autopilot` owns the lifecycle, `ralph` owns persistence and verification, and `ultrawork` owns parallel fan-out.
+- Reuse existing `clarify` or `deep-interview` artifacts when they are still accurate instead of re-deriving them.
 - `autopilot` is a governed workflow owner; assume native `SessionStart` and `Stop` hooks will restore and gate it.
 - Governed execution is not admitted until the `architect` and `verifier` plan-hardening passes both agree the work is ready to run.
 - Use parallel delegation only inside a grounded phase.

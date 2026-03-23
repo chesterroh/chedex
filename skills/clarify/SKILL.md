@@ -23,6 +23,7 @@ Turn a vague request into a compact, execution-ready spec without assuming hidde
 - Keep the output compact, but do not hide assumptions or unresolved risk.
 - Recommend the lightest next skill that fits the now-grounded task:
   - `execute` for a small direct change or answer
+  - `deep-interview` for a higher-rigor requirements pass with durable artifacts when scope, decision rights, or hidden assumptions still need active discovery
   - `plan` for scoped but still multi-step work
   - `ralph` for substantial resumable execution with governed artifacts
   - `autopilot` for broad end-to-end clarify/spec/plan/execute/verify work
@@ -37,4 +38,4 @@ Produce a short spec with:
 - Decision boundaries
 - Acceptance criteria
 - Open assumptions
-- Recommended next step: `execute`, `plan`, `ralph`, or `autopilot`
+- Recommended next step: `execute`, `deep-interview`, `plan`, `ralph`, or `autopilot`

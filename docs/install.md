@@ -25,7 +25,7 @@ This installs:
 
 - `AGENTS.template.md` into `~/.codex/AGENTS.md`
 - `prompts/*.md` into `~/.codex/prompts/`
-- the registered `skills/<name>/` directories into `~/.codex/skills/`: `clarify`, `plan`, `review`, `execute`, `tdd`, `ultrawork`, `ralph`, and `autopilot`
+- the registered `skills/<name>/` directories into `~/.codex/skills/`: `clarify`, `deep-interview`, `plan`, `review`, `execute`, `tdd`, `ultrawork`, `ralph`, and `autopilot`
 - `agents/*.toml` into `~/.codex/agents/`
 - `hooks/*` into `~/.codex/hooks/chedex/`
 - a managed `hooks.json` into `~/.codex/hooks.json`
@@ -34,7 +34,9 @@ This installs:
 - `multi_agent = true`, `child_agents_md = true`, and `codex_hooks = true` inside the `~/.codex/config.toml` `[features]` section
 
 Chedex writes native agent files only under `~/.codex` unless `CODEX_HOME` is set.
-Long-running workflow skills such as `ralph` and `autopilot` keep their artifacts under `~/.codex/workflows/`.
+Artifact-backed workflow skills keep their artifacts under `~/.codex/workflows/`.
+`deep-interview` keeps durable `context.md`, `interview.md`, and `spec.md` artifacts under `~/.codex/workflows/deep-interview/` and does not require `progress.json` or `handoff.json` by default.
+Governed workflows such as `ralph` and `autopilot` keep their execution state under `~/.codex/workflows/`.
 Direct top-level `ultrawork` uses a minimal workflow root under `~/.codex/workflows/ultrawork/` with `progress.json`, active index sync, and `verify.md` when it needs a durable evidence log; it may omit `handoff.json`.
 `SessionStart` also performs a best-effort release audit against the published `@openai/codex` package and caches the result in `~/.codex/workflows/_codex_release_audit.json`.
 
