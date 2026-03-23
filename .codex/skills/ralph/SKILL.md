@@ -6,7 +6,7 @@ argument-hint: "<task, spec, or plan path>"
 
 # Ralph
 
-Use this when the task is substantial enough to need persistent context, resumable progress, and a hard verification loop.
+Use this when the task is substantial enough to need persistent context, resumable progress, and a hard verification loop, but not specialized enough to want a dedicated governed workflow such as `autoresearch`.
 
 ## Artifact Root
 
@@ -26,12 +26,13 @@ Recommended files:
 1. Ground the task before execution.
 2. Reuse existing artifacts when they are still accurate; resume instead of restarting.
 3. If the task is still ambiguous, run `clarify` first, or `deep-interview` when the work needs a more durable requirements artifact.
-4. If there is no usable plan yet, create or refresh `plan.md`.
-5. Refuse deep execution until `handoff.json` declares acceptance criteria, verification targets, and the intended execution lane.
-6. Use `ultrawork` as the parallel execution layer when the task splits into independent lanes.
-7. Keep `progress.json` current after each meaningful step and sync the active workflow index when the governor is installed.
-8. Verify with fresh evidence before claiming progress or completion.
-9. Run an `architect` or `verifier` pass before closeout, and re-open the loop if they reject the result.
+4. If the task is really a repeatable metric-driven experiment loop, prefer `autoresearch` instead of forcing it through generic execution.
+5. If there is no usable plan yet, create or refresh `plan.md`.
+6. Refuse deep execution until `handoff.json` declares acceptance criteria, verification targets, and the intended execution lane.
+7. Use `ultrawork` as the parallel execution layer when the task splits into independent lanes.
+8. Keep `progress.json` current after each meaningful step and sync the active workflow index when the governor is installed.
+9. Verify with fresh evidence before claiming progress or completion.
+10. Run an `architect` or `verifier` pass before closeout, and re-open the loop if they reject the result.
 
 ## Rules
 

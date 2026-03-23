@@ -36,7 +36,8 @@ Recommended files:
    - Note risks, dependencies, and proof steps before execution starts.
    - Run an `architect` pass and a `verifier` pass before handoff to confirm the governed plan is grounded enough to execute.
 4. Execute
-   - Hand off implementation to `ralph` only after the plan-hardening pass agrees the work is execution-ready.
+   - Hand research-loop execution to `autoresearch` when the task is stable-metric optimization over a fixed comparison boundary.
+   - Hand off general implementation to `ralph` only after the plan-hardening pass agrees the work is execution-ready.
    - Let `ralph` use `ultrawork` for parallel execution only when the work splits cleanly.
    - Reuse the same facts, plan, and verification targets instead of re-deriving them.
 5. Verify
@@ -50,7 +51,7 @@ Recommended files:
 
 - Complete phases in order; skip only when an earlier artifact is already good enough.
 - Prefer native roles already present in Chedex: `explore`, `planner`, `executor`, `architect`, `verifier`, `debugger`, and `test-engineer`.
-- `autopilot` owns the lifecycle, `ralph` owns persistence and verification, and `ultrawork` owns parallel fan-out.
+- `autopilot` owns the lifecycle, `autoresearch` owns governed experiment loops, `ralph` owns general persistence and verification, and `ultrawork` owns parallel fan-out.
 - Reuse existing `clarify` or `deep-interview` artifacts when they are still accurate instead of re-deriving them.
 - `autopilot` is a governed workflow owner; assume native `SessionStart` and `Stop` hooks will restore and gate it.
 - Governed execution is not admitted until the `architect` and `verifier` plan-hardening passes both agree the work is ready to run.

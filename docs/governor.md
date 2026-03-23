@@ -24,6 +24,7 @@ The release-audit cache at `~/.codex/workflows/_codex_release_audit.json` is cre
 These workflows are governed:
 
 - `autopilot`
+- `autoresearch`
 - `ralph`
 - direct top-level `ultrawork`
 
@@ -94,7 +95,7 @@ Stop-gate rules:
 
 ## `handoff.json`
 
-Governed plans and richer governed workflows such as `ralph` and `autopilot` must provide `handoff.json` with:
+Governed plans and richer governed workflows such as `autoresearch`, `ralph`, and `autopilot` must provide `handoff.json` with:
 
 - `task`
 - `acceptance_criteria`

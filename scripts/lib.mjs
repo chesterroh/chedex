@@ -357,7 +357,7 @@ export function installManifestPaths() {
 }
 
 export function listSkills() {
-  return ['clarify', 'deep-interview', 'plan', 'review', 'execute', 'tdd', 'ultrawork', 'ralph', 'autopilot'];
+  return ['clarify', 'deep-interview', 'autoresearch', 'plan', 'review', 'execute', 'tdd', 'ultrawork', 'ralph', 'autopilot'];
 }
 
 export async function writeFileIfChanged(path, content) {

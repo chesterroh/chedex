@@ -102,6 +102,7 @@ Use skills as workflow contracts, not as runtime assumptions:
 
 - `clarify` for one-question-at-a-time requirement clarification
 - `deep-interview` for high-rigor Socratic requirements clarification with durable artifacts
+- `autoresearch` for governed baseline/experiment/ledger optimization loops
 - `plan` for turning a request into an actionable plan
 - `execute` for implement-and-verify persistence
 - `review` for reviewer-only evaluation

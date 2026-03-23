@@ -25,7 +25,7 @@ This installs:
 
 - `AGENTS.template.md` into `~/.codex/AGENTS.md`
 - `prompts/*.md` into `~/.codex/prompts/`
-- the registered `skills/<name>/` directories into `~/.codex/skills/`: `clarify`, `deep-interview`, `plan`, `review`, `execute`, `tdd`, `ultrawork`, `ralph`, and `autopilot`
+- the registered `skills/<name>/` directories into `~/.codex/skills/`: `clarify`, `deep-interview`, `autoresearch`, `plan`, `review`, `execute`, `tdd`, `ultrawork`, `ralph`, and `autopilot`
 - `agents/*.toml` into `~/.codex/agents/`
 - `hooks/*` into `~/.codex/hooks/chedex/`
 - a managed `hooks.json` into `~/.codex/hooks.json`
@@ -36,7 +36,8 @@ This installs:
 Chedex writes native agent files only under `~/.codex` unless `CODEX_HOME` is set.
 Artifact-backed workflow skills keep their artifacts under `~/.codex/workflows/`.
 `deep-interview` keeps durable `context.md`, `interview.md`, and `spec.md` artifacts under `~/.codex/workflows/deep-interview/` and does not require `progress.json` or `handoff.json` by default.
-Governed workflows such as `ralph` and `autopilot` keep their execution state under `~/.codex/workflows/`.
+`autoresearch` keeps governed `context.md`, `spec.md`, `results.tsv`, `handoff.json`, `progress.json`, and `verify.md` artifacts under `~/.codex/workflows/autoresearch/`.
+Governed workflows such as `autoresearch`, `ralph`, and `autopilot` keep their execution state under `~/.codex/workflows/`.
 Direct top-level `ultrawork` uses a minimal workflow root under `~/.codex/workflows/ultrawork/` with `progress.json`, active index sync, and `verify.md` when it needs a durable evidence log; it may omit `handoff.json`.
 `SessionStart` also performs a best-effort release audit against the published `@openai/codex` package and caches the result in `~/.codex/workflows/_codex_release_audit.json`.
 
@@ -46,7 +47,7 @@ Governed workflow state now includes:
 - `progress.json`
 - `verify.md`
 
-`handoff.json` is required for governed plans and the richer `ralph` / `autopilot` workflows, but direct top-level `ultrawork` may omit it.
+`handoff.json` is required for governed plans and the richer `autoresearch` / `ralph` / `autopilot` workflows, but direct top-level `ultrawork` may omit it.
 The release audit is advisory only: it does not auto-upgrade Codex CLI.
 
 ## Dry Run
