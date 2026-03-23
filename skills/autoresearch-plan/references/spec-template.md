@@ -1,6 +1,6 @@
 # Task To Research Spec
 
-Use this template to convert a loose task into a compact governed research workflow.
+Use this template to convert a loose optimization task into a compact research plan that can hand off cleanly to `autoresearch-loop`.
 
 ## Minimum Spec
 

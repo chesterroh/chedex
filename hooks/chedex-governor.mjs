@@ -10,9 +10,9 @@ import { buildReleaseAudit, renderReleaseAuditAdvisory } from './codex-release-a
 export const GOVERNOR_SCHEMA_VERSION = 1;
 export const ACTIVE_STATUS = 'active';
 export const TERMINAL_STATUSES = new Set(['completed', 'paused', 'blocked', 'failed', 'cancelled']);
-export const GOVERNED_MODES = new Set(['ralph', 'autopilot', 'ultrawork']);
+export const GOVERNED_MODES = new Set(['ralph', 'autopilot', 'ultrawork', 'autoresearch-loop']);
 export const VERIFICATION_SATISFIED = 'satisfied';
-export const HANDOFF_REQUIRED_MODES = new Set(['ralph', 'autopilot']);
+export const HANDOFF_REQUIRED_MODES = new Set(['ralph', 'autopilot', 'autoresearch-loop']);
 export const ACTIVE_INDEX_LOCK_TIMEOUT_MS = 5000;
 export const ACTIVE_INDEX_LOCK_RETRY_MS = 25;
 
@@ -256,6 +256,18 @@ export function validateGovernedProgress(progress) {
     errors.push('artifacts must be an object');
   }
 
+  const requiredArtifactFieldsByMode = {
+    'autoresearch-loop': ['spec', 'results', 'verify'],
+  };
+
+  const modeRequiredArtifacts = requiredArtifactFieldsByMode[progress.mode] || [];
+  for (const field of modeRequiredArtifacts) {
+    const artifactPath = progress.artifacts?.[field];
+    if (typeof artifactPath !== 'string' || !artifactPath.trim()) {
+      errors.push(`${progress.mode} workflows require artifacts.${field}`);
+    }
+  }
+
   const handoff = progress.artifacts?.handoff;
   if (handoff != null && (typeof handoff !== 'string' || !handoff.trim())) {
     errors.push('artifacts.handoff must be a non-empty string when present');
@@ -349,11 +361,31 @@ export async function validateGovernedWorkflow(progress, progressPath) {
   const progressDir = dirname(progressPath);
   const workflowRoot = resolvePathFrom(progressDir, progress.workflow_root || null);
   const handoffPath = resolvePathFrom(progressDir, progress.artifacts?.handoff || null);
+  const specPath = resolvePathFrom(progressDir, progress.artifacts?.spec || null);
+  const resultsPath = resolvePathFrom(progressDir, progress.artifacts?.results || null);
+  const verifyPath = resolvePathFrom(progressDir, progress.artifacts?.verify || null);
 
   if (!workflowRoot) {
     errors.push('workflow_root must resolve to a directory');
   } else if (workflowRoot !== progressDir) {
     errors.push('workflow_root must resolve to the directory that contains progress.json');
+  }
+
+  const requiredArtifactPathsByMode = {
+    'autoresearch-loop': [
+      ['spec', specPath],
+      ['results', resultsPath],
+      ['verify', verifyPath],
+    ],
+  };
+
+  for (const [field, artifactPath] of requiredArtifactPathsByMode[progress.mode] || []) {
+    if (!artifactPath) {
+      continue;
+    }
+    if (!(await pathExists(artifactPath))) {
+      errors.push(`missing ${field} artifact at ${artifactPath}`);
+    }
   }
 
   if (!handoffPath) {
@@ -580,6 +612,7 @@ export function renderSessionStartContext(entry, progress) {
   const artifactLines = [
     artifacts.context ? `context: ${artifacts.context}` : null,
     artifacts.spec ? `spec: ${artifacts.spec}` : null,
+    artifacts.results ? `results: ${artifacts.results}` : null,
     artifacts.plan ? `plan: ${artifacts.plan}` : null,
     artifacts.handoff ? `handoff: ${artifacts.handoff}` : null,
     artifacts.verify ? `verify: ${artifacts.verify}` : null,

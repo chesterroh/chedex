@@ -42,7 +42,7 @@ Recommended files:
 3. Crystallize `spec.md`.
    - Include Intent, Desired outcome, Constraints, `Non-goals`, `Decision boundaries`, Acceptance criteria, and Open assumptions.
 4. Hand off explicitly.
-   - Recommend `execute`, `autoresearch`, `plan`, `ralph`, or `autopilot` based on execution weight.
+   - Recommend `execute`, `autoresearch-plan`, `autoresearch-loop`, `plan`, `ralph`, or `autopilot` based on execution weight.
    - Treat `spec.md` as the downstream source of truth unless the user revises it.
 
 ## Output
@@ -50,4 +50,4 @@ Recommended files:
 - Current question or artifact update
 - Artifact paths produced
 - Remaining ambiguity or unresolved decisions
-- Recommended next step: `execute`, `autoresearch`, `plan`, `ralph`, or `autopilot`
+- Recommended next step: `execute`, `autoresearch-plan`, `autoresearch-loop`, `plan`, `ralph`, or `autopilot`

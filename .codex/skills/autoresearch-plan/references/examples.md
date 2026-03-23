@@ -1,6 +1,6 @@
 # Examples
 
-These examples show how different tasks can be normalized into the same research loop.
+These examples show how different tasks can be normalized into the same planning shape before `autoresearch-loop` runs them.
 
 ## Example 1: Model Training Repo
 
@@ -16,12 +16,6 @@ Normalization:
 - `entrypoint`: baseline run plus one experiment run command
 - `ledger`: one row per experiment with metric, memory, status, description
 
-Typical experiments:
-
-- adjust learning-rate schedule
-- shrink or widen model under fixed budget
-- simplify architecture while holding eval constant
-
 ## Example 2: Prompt Optimization
 
 User task:
@@ -35,13 +29,6 @@ Normalization:
 - `mutable_layer`: system prompt, few-shot examples, formatting instructions
 - `entrypoint`: prompt run over eval set
 - `ledger`: prompt revision, score, failure notes, keep/discard status
-
-Typical experiments:
-
-- clarify output constraints
-- reorder instructions
-- add or remove examples
-- simplify verbose prompt sections that do not help score
 
 ## Example 3: Retrieval Or Ranking Task
 
@@ -57,12 +44,6 @@ Normalization:
 - `entrypoint`: offline eval script
 - `ledger`: config ID, metric, latency, status, description
 
-Typical experiments:
-
-- modify chunk size
-- alter scoring weights
-- add reranking only if latency budget allows
-
 ## Example 4: Data Pipeline Quality
 
 User task:
@@ -77,9 +58,3 @@ Normalization:
 - `mutable_layer`: parsing rules, retries, validation thresholds, batching strategy
 - `entrypoint`: pipeline run against stable fixtures
 - `ledger`: run ID, quality metric, runtime, status, description
-
-Typical experiments:
-
-- tighten or relax validation
-- isolate flaky stages
-- reduce batch size only if quality gain justifies throughput cost

@@ -6,7 +6,7 @@ argument-hint: "<task, spec, or plan path>"
 
 # Ralph
 
-Use this when the task is substantial enough to need persistent context, resumable progress, and a hard verification loop, but not specialized enough to want a different loop contract such as `autoresearch`.
+Use this when the task is substantial enough to need persistent context, resumable progress, and a hard verification loop, but not specialized enough to want a different loop contract such as `autoresearch-loop`.
 
 ## Artifact Root
 
@@ -16,7 +16,7 @@ If `CODEX_HOME` is unset, default to `~/.codex/workflows/ralph/<slug>/`.
 Recommended files:
 - `context.md` for grounded facts, constraints, and touchpoints
 - `plan.md` for the current execution plan
-- `handoff.json` for execution admission and verification targets
+- `handoff.json` for execution admission, including `task`, `acceptance_criteria`, `verification_targets`, `delegation_roster`, `execution_lane`, `source_artifacts`, and `approved_at`
 - `progress.json` for task status and next step
 - `verify.md` for verification evidence
 - `prd.md` only when the user explicitly wants a PRD-style definition of done
@@ -26,9 +26,9 @@ Recommended files:
 1. Ground the task before execution.
 2. Reuse existing artifacts when they are still accurate; resume instead of restarting.
 3. If the task is still ambiguous, run `clarify` first, or `deep-interview` when the work needs a more durable requirements artifact.
-4. If the task is really a repeatable metric-driven experiment loop, use `autoresearch` as the loop contract while `ralph` remains the governed owner today.
+4. If the task is really a repeatable metric-driven experiment loop, use `autoresearch-plan` while the spec is still forming and `autoresearch-loop` once the governed loop is ready to own execution.
 5. If there is no usable plan yet, create or refresh `plan.md`.
-6. Refuse deep execution until `handoff.json` declares acceptance criteria, verification targets, and the intended execution lane.
+6. Refuse deep execution until `handoff.json` declares the task, acceptance criteria, verification targets, delegation roster, intended execution lane, source artifacts, and approval timestamp.
 7. Use `ultrawork` as the parallel execution layer when the task splits into independent lanes.
 8. Keep `progress.json` current after each meaningful step and sync the active workflow index when the governor is installed.
 9. Verify with fresh evidence before claiming progress or completion.
@@ -39,6 +39,7 @@ Recommended files:
 - Use native Codex agents and repo-local commands only.
 - Do not depend on tmux, HUD state, notify hooks, or custom state servers.
 - Ralph owns persistence and verification; `ultrawork` owns parallel fan-out inside the execution slice.
+- When `ralph` runs inside an existing governed `autopilot` workflow in the same workspace, reuse the parent governed state instead of syncing a competing `ralph` workflow entry.
 - Ralph is a governed workflow owner; assume native `SessionStart` and `Stop` hooks will restore and gate it.
 - Prefer the smallest execution slice that produces fresh evidence.
 - Keep artifacts short and update them in place rather than creating throwaway copies.

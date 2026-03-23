@@ -1,4 +1,4 @@
-# Chedex v0.5.3
+# Chedex v0.5.4
 
 An homage to preceding projects such as Oh My OpenAgent, Oh My Codex, and Ourobos.
 
@@ -19,14 +19,14 @@ It intentionally excludes external orchestration machinery such as:
 - legacy external state systems
 - HUD, mailboxing, linked mode state, and runtime overlays
 
-## v0.5.3 Shape
+## v0.5.4 Shape
 
-`0.5.3` marks the current Chedex shape as Codex `0.115.0` verified while carrying forward the governed workflow and release-audit hardening introduced in the `0.4.x` line.
+`0.5.4` marks the current Chedex shape as Codex `0.115.0` verified while carrying forward the governed workflow and release-audit hardening introduced in the `0.4.x` line.
 
 - direct ordinary turns stay lightweight and native
-- `autopilot`, `ralph`, and direct top-level `ultrawork` are governed workflows
+- `autopilot`, `ralph`, `autoresearch-loop`, and direct top-level `ultrawork` are governed workflows
 - `deep-interview` is an explicit artifact-backed requirements skill, not a governed execution workflow
-- `autoresearch` is currently a concept-first research loop skill, not a native governor-admitted mode
+- `autoresearch` is now a compatibility router, `autoresearch-plan` is non-governed planning, and `autoresearch-loop` is the governed research execution mode
 - Codex native hooks provide session rehydration and stop gating
 - `SessionStart` can also surface a non-blocking Codex release audit when the installed CLI lags the latest published package release
 - governed workflows persist authoritative state under `~/.codex/workflows/`
@@ -85,7 +85,9 @@ Use this repo as your own harness base:
 
 - `clarify` - lightweight one-question-at-a-time requirements clarification
 - `deep-interview` - high-rigor Socratic requirements clarification with durable artifacts
-- `autoresearch` - concept-first baseline/experiment/ledger workflow for metric-driven optimization loops
+- `autoresearch` - compatibility router for research-shaped work
+- `autoresearch-plan` - turn an optimization problem into a defensible research spec and experiment queue
+- `autoresearch-loop` - governed baseline/experiment/ledger workflow for metric-driven optimization loops
 - `plan` - turn a request into an actionable work plan
 - `execute` - implement and verify until done or clearly blocked
 - `review` - reviewer-only pass for plans, diffs, or implementation claims
@@ -109,21 +111,26 @@ Governed workflow state now centers on:
 
 `deep-interview` keeps durable requirements artifacts under `~/.codex/workflows/deep-interview/<slug>/`, typically `context.md`, `interview.md`, and `spec.md`.
 It is not governed by `progress.json` or `handoff.json` by default.
-`autoresearch` may keep research artifacts under `~/.codex/workflows/autoresearch/<slug>/`, typically `context.md`, `spec.md`, `results.tsv`, and `verify.md`, but it is not stop-gated by the current governor runtime.
+`autoresearch-plan` may keep planning artifacts under `~/.codex/workflows/autoresearch-plan/<slug>/`, typically `context.md`, `spec.md`, and sometimes a seeded `results.tsv`.
+`autoresearch-loop` keeps governed research artifacts under `~/.codex/workflows/autoresearch-loop/<slug>/`, typically `context.md`, `spec.md`, `results.tsv`, `handoff.json`, `progress.json`, and `verify.md`.
 
 ## Workflow Alignment
 
 Chedex keeps a clear native-only execution chain:
 
 - `clarify` closes a few critical gaps quickly; `deep-interview` handles the higher-rigor interview pass when intent, scope, non-goals, or decision rights need a durable artifact trail.
-- `autoresearch` turns a stable evaluation path into a baseline/experiment/ledger loop contract with explicit keep-or-revert decisions.
+- `autoresearch` routes research-shaped work to the right lane when the user or caller has not chosen yet.
+- `autoresearch-plan` turns a stable evaluation target into a defensible research spec, fixed layer, mutable layer, and experiment queue.
+- `autoresearch-loop` owns governed research execution, including baseline/experiment/decide/repeat and stop-gated closeout.
 - `ultrawork` handles parallel fan-out for independent work, and direct top-level use keeps only the minimum governed state it needs: `progress.json`, active index sync, and `verify.md` when it needs a durable evidence log.
 - `ralph` wraps `ultrawork` with resumable artifacts, active workflow registration, and a hard verification loop.
-- `autopilot` owns the full clarify/spec/plan/execute/verify/validate lifecycle, can reuse `deep-interview` artifacts when they exist, requires `architect` and `verifier` plan admission before Execute, and can use `autoresearch` as the research-loop contract while `autopilot` remains the governed owner today.
+- `autopilot` owns broad clarify/spec/plan/execute/verify/validate work, can use `autoresearch-plan` during planning, and should hand research execution to `autoresearch-loop` when the task resolves into a governed optimization loop.
+- The current governor model admits one active governed workflow entry per workspace `cwd`. Within one workspace, nested `ultrawork` lanes and `ralph` execution slices should normally report through the current governed owner instead of syncing competing governed state.
 
 ## Current Gaps
 
-- `autoresearch` is present as a skill and documentation concept, but the governor runtime in `hooks/chedex-governor.mjs` does not yet admit `mode: "autoresearch"`. Until that lands, use `autopilot` or `ralph` when stop-gated governed execution is required.
+- The legacy `autoresearch` surface remains as a compatibility router. Prefer explicit invocation of `autoresearch-plan` or `autoresearch-loop` for new work.
+- Plan-hardening with `architect` and `verifier` is currently a workflow-contract requirement rather than stored governor provenance. Runtime admission still validates governed artifacts such as `handoff.json` and `progress.json`.
 - Repo verification still relies partly on required-text checks in `scripts/verify-repo.mjs`. This is good at catching drift, but it is not full semantic validation.
 - The latest verified Codex CLI version is still maintained as repo metadata plus docs wording, not generated into docs from one canonical source.
 

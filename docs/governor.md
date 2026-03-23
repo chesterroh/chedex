@@ -24,11 +24,12 @@ The release-audit cache at `~/.codex/workflows/_codex_release_audit.json` is cre
 These workflows are governed:
 
 - `autopilot`
+- `autoresearch-loop`
 - `ralph`
 - direct top-level `ultrawork`
 
 Plain direct turns and small `execute` tasks are not governed unless they explicitly opt into the workflow contract.
-`autoresearch` is not yet admitted as a native governed mode by the current runtime.
+autoresearch-plan and the compatibility `autoresearch` router are not governed modes.
 
 ## Hook Responsibilities
 
@@ -46,6 +47,7 @@ The active workflow index lives at:
 - `~/.codex/workflows/_active.json`
 
 It is keyed by absolute workspace `cwd`.
+That means the current governor model keeps one active governed workflow entry per workspace.
 Each entry records:
 
 - `mode`
@@ -60,6 +62,7 @@ Each entry records:
 - `updated_at`
 
 Governor-managed `_active.json` updates are serialized and written atomically. If the active index cannot be read safely, `Stop` fails closed and `SessionStart` surfaces a warning instead of silently clearing protection.
+Syncing a different governed workflow from the same `cwd` replaces the previous indexed entry rather than nesting multiple owners.
 
 ## Governed `progress.json`
 
@@ -95,7 +98,7 @@ Stop-gate rules:
 
 ## `handoff.json`
 
-Governed plans and richer governed workflows such as `ralph` and `autopilot` must provide `handoff.json` with:
+Governed plans and richer governed workflows such as `ralph`, `autopilot`, and `autoresearch-loop` must provide `handoff.json` with:
 
 - `task`
 - `acceptance_criteria`
@@ -105,7 +108,20 @@ Governed plans and richer governed workflows such as `ralph` and `autopilot` mus
 - `source_artifacts`
 - `approved_at`
 
+The governor validates the presence and shape of these fields.
+Plan-hardening passes such as `architect` and `verifier` remain workflow-level requirements today; the runtime does not yet store or enforce their approval provenance directly.
+
 Direct top-level `ultrawork` may omit `handoff.json` when no governed plan admitted the work. Its minimum governed state is `progress.json` and active index sync, with `verify.md` used when the lane needs a durable evidence log.
+
+## Mode-Specific Artifact Rules
+
+`autoresearch-loop` must also provide and keep on disk:
+
+- `artifacts.spec`
+- `artifacts.results`
+- `artifacts.verify`
+
+This keeps the governed loop tied to its accepted research contract, append-only ledger, and durable closeout evidence instead of treating it as a generic execution lane.
 
 ## Helper Commands
 
@@ -120,5 +136,5 @@ If `CODEX_HOME` is unset, replace it with `~/.codex`.
 
 ## Future Enhancements
 
-- Add native governor admission for `mode: "autoresearch"` once the workflow contract is proven enough to justify stop-gated persistence.
+- Deprecate the compatibility `autoresearch` router once callers have moved to explicit `autoresearch-plan` / `autoresearch-loop` invocation.
 - Extend `scripts/verify-governor.mjs` to exercise every admitted governed mode automatically rather than relying on a hand-maintained test list.

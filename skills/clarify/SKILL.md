@@ -24,7 +24,8 @@ Turn a vague request into a compact, execution-ready spec without assuming hidde
 - Recommend the lightest next skill that fits the now-grounded task:
   - `execute` for a small direct change or answer
   - `deep-interview` for a higher-rigor requirements pass with durable artifacts when scope, decision rights, or hidden assumptions still need active discovery
-  - `autoresearch` for metric-driven optimization work with a stable evaluation path and repeatable experiments
+  - `autoresearch-plan` for metric-driven optimization work that still needs a grounded research spec
+  - `autoresearch-loop` when the research spec already exists and the governed loop is ready to run
   - `plan` for scoped but still multi-step work
   - `ralph` for substantial resumable execution with governed artifacts
   - `autopilot` for broad end-to-end clarify/spec/plan/execute/verify work
@@ -39,4 +40,4 @@ Produce a short spec with:
 - Decision boundaries
 - Acceptance criteria
 - Open assumptions
-- Recommended next step: `execute`, `deep-interview`, `autoresearch`, `plan`, `ralph`, or `autopilot`
+- Recommended next step: `execute`, `deep-interview`, `autoresearch-plan`, `autoresearch-loop`, `plan`, `ralph`, or `autopilot`

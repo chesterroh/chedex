@@ -45,8 +45,16 @@ async function makeWorkflow({
   const progressPath = join(workflowRoot, 'progress.json');
   const verifyPath = join(workflowRoot, 'verify.md');
   const handoffPath = includeHandoff ? join(workflowRoot, 'handoff.json') : null;
+  const specPath = mode === 'autoresearch-loop' ? join(workflowRoot, 'spec.md') : null;
+  const resultsPath = mode === 'autoresearch-loop' ? join(workflowRoot, 'results.tsv') : null;
 
   await writeFile(verifyPath, '# verify\n');
+  if (specPath) {
+    await writeFile(specPath, '# spec\n');
+  }
+  if (resultsPath) {
+    await writeFile(resultsPath, 'run_id\tmetric\tstatus\tcost\tnotes\nbaseline\t0\tkept\t0\tseed\n');
+  }
   if (handoffPath) {
     await writeJson(handoffPath, {
       task: `${slug} task`,
@@ -84,6 +92,12 @@ async function makeWorkflow({
   if (handoffPath) {
     progress.artifacts.handoff = handoffPath;
   }
+  if (specPath) {
+    progress.artifacts.spec = specPath;
+  }
+  if (resultsPath) {
+    progress.artifacts.results = resultsPath;
+  }
 
   await writeJson(progressPath, progress);
   await writeFile(join(workflowRoot, 'plan.md'), '# plan\n');
@@ -104,7 +118,7 @@ const home = await mkdtemp(join(tmpdir(), 'chedex-governor-'));
 const cwd = join(home, 'workspace');
 await mkdir(cwd, { recursive: true });
 
-for (const mode of ['ralph', 'autopilot', 'ultrawork']) {
+for (const mode of ['ralph', 'autopilot', 'ultrawork', 'autoresearch-loop']) {
   const activeWorkflow = await makeWorkflow({
     home,
     slug: `${mode}-active-run`,
@@ -126,6 +140,9 @@ for (const mode of ['ralph', 'autopilot', 'ultrawork']) {
     },
   });
   assert(sessionContext.includes(`mode: ${mode}`), `session-start did not inject governed context for ${mode}`);
+  if (mode === 'autoresearch-loop') {
+    assert(sessionContext.includes('results:'), 'session-start should surface results.tsv for autoresearch-loop');
+  }
 
   const activeStop = await stopHook({
     codexHome: home,
@@ -143,7 +160,7 @@ for (const mode of ['ralph', 'autopilot', 'ultrawork']) {
   }
 }
 
-for (const mode of ['ralph', 'autopilot']) {
+for (const mode of ['ralph', 'autopilot', 'autoresearch-loop']) {
   const missingHandoffWorkflow = await makeWorkflow({
     home,
     slug: `${mode}-missing-handoff`,
@@ -234,6 +251,93 @@ assert(completedAllowed.action === 'allow', 'completed workflow with satisfied v
 
 const indexAfterCompleted = JSON.parse(await readFile(activeIndexPath(home), 'utf8'));
 assert(!(cwd in indexAfterCompleted.entries), 'completed workflow should be cleared from the active index');
+
+const completedResearchLoop = await makeWorkflow({
+  home,
+  slug: 'completed-autoresearch-loop',
+  mode: 'autoresearch-loop',
+  status: 'completed',
+  phase: 'validate',
+  verificationState: 'satisfied',
+  evidence: ['npm run verify'],
+  nextStep: 'Report results',
+  risks: [],
+  includeHandoff: true,
+});
+
+await syncWorkflow({
+  codexHome: home,
+  cwd,
+  progressPath: completedResearchLoop.progressPath,
+});
+
+const completedResearchAllowed = await stopHook({
+  codexHome: home,
+  cwd,
+});
+assert(completedResearchAllowed.action === 'allow', 'completed autoresearch-loop with satisfied verification should allow stop');
+
+const missingResearchSpecWorkflow = await makeWorkflow({
+  home,
+  slug: 'autoresearch-loop-missing-spec',
+  mode: 'autoresearch-loop',
+});
+const missingResearchSpecProgress = JSON.parse(await readFile(missingResearchSpecWorkflow.progressPath, 'utf8'));
+delete missingResearchSpecProgress.artifacts.spec;
+await writeJson(missingResearchSpecWorkflow.progressPath, missingResearchSpecProgress);
+let missingResearchSpecFailed = false;
+try {
+  await syncWorkflow({
+    codexHome: home,
+    cwd,
+    progressPath: missingResearchSpecWorkflow.progressPath,
+  });
+} catch (error) {
+  missingResearchSpecFailed = error.message.includes('autoresearch-loop workflows require artifacts.spec');
+}
+assert(missingResearchSpecFailed, 'autoresearch-loop should require a spec artifact');
+
+const missingResearchResultsWorkflow = await makeWorkflow({
+  home,
+  slug: 'autoresearch-loop-missing-results',
+  mode: 'autoresearch-loop',
+});
+const missingResearchResultsProgress = JSON.parse(await readFile(missingResearchResultsWorkflow.progressPath, 'utf8'));
+delete missingResearchResultsProgress.artifacts.results;
+await writeJson(missingResearchResultsWorkflow.progressPath, missingResearchResultsProgress);
+let missingResearchResultsFailed = false;
+try {
+  await syncWorkflow({
+    codexHome: home,
+    cwd,
+    progressPath: missingResearchResultsWorkflow.progressPath,
+  });
+} catch (error) {
+  missingResearchResultsFailed = error.message.includes('autoresearch-loop workflows require artifacts.results');
+}
+assert(missingResearchResultsFailed, 'autoresearch-loop should require a results artifact');
+
+const missingResearchVerifyFile = await makeWorkflow({
+  home,
+  slug: 'autoresearch-loop-missing-verify-file',
+  mode: 'autoresearch-loop',
+});
+const missingResearchVerifyPath = join(missingResearchVerifyFile.workflowRoot, 'verify.md');
+await writeFile(missingResearchVerifyPath, '');
+const missingResearchVerifyProgress = JSON.parse(await readFile(missingResearchVerifyFile.progressPath, 'utf8'));
+missingResearchVerifyProgress.artifacts.verify = join(missingResearchVerifyFile.workflowRoot, 'missing-verify.md');
+await writeJson(missingResearchVerifyFile.progressPath, missingResearchVerifyProgress);
+let missingResearchVerifyFailed = false;
+try {
+  await syncWorkflow({
+    codexHome: home,
+    cwd,
+    progressPath: missingResearchVerifyFile.progressPath,
+  });
+} catch (error) {
+  missingResearchVerifyFailed = error.message.includes('missing verify artifact');
+}
+assert(missingResearchVerifyFailed, 'autoresearch-loop should require an existing verify artifact');
 
 const pausedWorkflow = await makeWorkflow({
   home,

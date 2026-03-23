@@ -102,7 +102,9 @@ Use skills as workflow contracts, not as runtime assumptions:
 
 - `clarify` for one-question-at-a-time requirement clarification
 - `deep-interview` for high-rigor Socratic requirements clarification with durable artifacts
-- `autoresearch` for concept-first baseline/experiment/ledger optimization loops
+- `autoresearch` for routing research-shaped work to planning or loop execution
+- `autoresearch-plan` for turning an optimization problem into a defensible research spec
+- `autoresearch-loop` for governed baseline/experiment/ledger optimization loops
 - `plan` for turning a request into an actionable plan
 - `execute` for implement-and-verify persistence
 - `review` for reviewer-only evaluation
@@ -114,7 +116,9 @@ Use skills as workflow contracts, not as runtime assumptions:
 Artifact-backed workflow skills persist their artifacts under `$CODEX_HOME/workflows/`.
 Governed execution workflows keep `progress.json` authoritative and assume the native `SessionStart` and `Stop` hooks will enforce resume and closeout behavior when Chedex is installed.
 Non-governed requirements workflows such as `deep-interview` may persist durable artifacts there without `progress.json` or `handoff.json`.
-`autoresearch` is not yet a native governed mode in the current governor runtime; use it as a loop contract today, and let `autopilot` or `ralph` remain the governed owner when stop-gated persistence is required.
+`autoresearch-plan` is artifact-backed but non-governed by default.
+`autoresearch-loop` is the governed research execution mode.
+`autoresearch` remains a router/deprecation surface that points to the split.
 
 Skill invocation policy:
 
