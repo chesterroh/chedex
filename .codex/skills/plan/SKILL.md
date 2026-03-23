@@ -17,10 +17,10 @@ Use this when the user explicitly wants a plan, or when the task is broad enough
 - Default to compact, evidence-dense planning output.
 - Treat newer user updates as local overrides for the active planning branch while preserving earlier non-conflicting instructions.
 - Proceed automatically on clear, low-risk, reversible next steps inside the planning workflow.
-- If the plan is meant to flow into `autoresearch`, `ralph`, or `autopilot`, treat it as a governed plan.
+- If the plan is meant to flow into `ralph` or `autopilot`, treat it as a governed plan.
 - Governed plans must produce both `plan.md` and `handoff.json`.
 - Governed plans should not be execution-ready until an `architect` pass and a `verifier` pass agree the plan is grounded enough to run, including when `autopilot` owns the lifecycle.
-- If the task is stable-metric optimization over a fixed comparison boundary, prefer `autoresearch` as the workflow owner.
+- If the task is stable-metric optimization over a fixed comparison boundary, prefer `autoresearch` as the loop contract, with `autopilot` or `ralph` remaining the workflow owner when governed execution is needed.
 - If `Non-goals` or `Decision boundaries` are still unclear, run `clarify` first, or `deep-interview` when the work needs a durable requirements artifact rather than hand off guesswork.
 
 ## Output
@@ -34,7 +34,7 @@ Every plan should include:
 
 Governed plans should also include or produce:
 - a `handoff.json` with `task`, `acceptance_criteria`, `verification_targets`, `delegation_roster`, `execution_lane`, `source_artifacts`, and `approved_at`
-- the intended workflow owner: `autoresearch`, `ralph`, or `autopilot`
+- the intended workflow owner: `ralph` or `autopilot`
 - the proof path that the governor will later use to allow completion
 
 If the request is still ambiguous, run `clarify` first, or `deep-interview` when a higher-rigor requirements pass is the safer next step.

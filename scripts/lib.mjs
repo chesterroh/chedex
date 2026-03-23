@@ -14,6 +14,7 @@ export const chedexMarkerStart = '# BEGIN CHEDEX NATIVE AGENTS';
 export const chedexMarkerEnd = '# END CHEDEX NATIVE AGENTS';
 export const uninstallFileName = 'CHEDEX_UNINSTALL.md';
 export const uninstallStateFileName = 'CHEDEX_UNINSTALL.json';
+export const backupsDirName = '.chedex-backups';
 export const chedexHooksFeature = 'codex_hooks';
 export const chedexMinimumCodexVersion = '0.114.0';
 export const chedexLatestVerifiedCodexVersion = '0.115.0';
@@ -30,6 +31,7 @@ export function installTargets() {
   const hookAssetsDir = join(home, 'hooks', 'chedex');
   return {
     codexHome: home,
+    backupsDir: join(home, backupsDirName),
     promptsDir: join(home, 'prompts'),
     skillsDir: join(home, 'skills'),
     agentsDir: join(home, 'agents'),
@@ -316,6 +318,10 @@ export function renderUninstallNote(targets, options = {}) {
     `- ${targets.configPath}`,
     `- managed block markers: ${chedexMarkerStart} / ${chedexMarkerEnd}`,
     '- features enforced: `multi_agent = true`, `child_agents_md = true`, `codex_hooks = true`',
+    '',
+    '## Backup Root',
+    '',
+    `- ${targets.backupsDir}`,
   ];
 
   if (backupPaths.length > 0) {

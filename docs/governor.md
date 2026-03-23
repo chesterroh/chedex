@@ -24,11 +24,11 @@ The release-audit cache at `~/.codex/workflows/_codex_release_audit.json` is cre
 These workflows are governed:
 
 - `autopilot`
-- `autoresearch`
 - `ralph`
 - direct top-level `ultrawork`
 
 Plain direct turns and small `execute` tasks are not governed unless they explicitly opt into the workflow contract.
+`autoresearch` is not yet admitted as a native governed mode by the current runtime.
 
 ## Hook Responsibilities
 
@@ -95,7 +95,7 @@ Stop-gate rules:
 
 ## `handoff.json`
 
-Governed plans and richer governed workflows such as `autoresearch`, `ralph`, and `autopilot` must provide `handoff.json` with:
+Governed plans and richer governed workflows such as `ralph` and `autopilot` must provide `handoff.json` with:
 
 - `task`
 - `acceptance_criteria`
@@ -117,3 +117,8 @@ The installed governor runtime also exposes helper commands:
 ```
 
 If `CODEX_HOME` is unset, replace it with `~/.codex`.
+
+## Future Enhancements
+
+- Add native governor admission for `mode: "autoresearch"` once the workflow contract is proven enough to justify stop-gated persistence.
+- Extend `scripts/verify-governor.mjs` to exercise every admitted governed mode automatically rather than relying on a hand-maintained test list.

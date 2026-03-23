@@ -84,6 +84,15 @@ const freshHome = await mkdtemp(join(tmpdir(), 'chedex-install-fresh-'));
 const freshEnv = { ...process.env, CODEX_HOME: freshHome };
 runNodeScript(repoRoot, 'scripts/install-user.mjs', freshEnv);
 
+const freshUninstallState = JSON.parse(await readFile(join(freshHome, 'CHEDEX_UNINSTALL.json'), 'utf8'));
+const freshSkillBackupPaths = freshUninstallState.managed_paths.skills
+  .map((entry) => entry.backup_path)
+  .filter(Boolean);
+assert(
+  freshSkillBackupPaths.every((path) => !path.startsWith(join(freshHome, 'skills'))),
+  'install should keep managed skill backups outside the live skills directory',
+);
+
 const installedHooksConfig = JSON.parse(await readFile(join(freshHome, 'hooks.json'), 'utf8'));
 const installedSessionStartCommand = installedHooksConfig.hooks.SessionStart[0].hooks[0].command;
 assert(installedSessionStartCommand.includes('session-start'), 'install should wire SessionStart to the governor session-start command');

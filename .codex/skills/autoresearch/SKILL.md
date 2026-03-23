@@ -1,6 +1,6 @@
 ---
 name: autoresearch
-description: Governed baseline-experiment-ledger workflow for metric-driven optimization loops
+description: Concept-first baseline-experiment-ledger workflow for metric-driven optimization loops
 argument-hint: "<optimization target, repo path, or experiment brief>"
 ---
 
@@ -17,8 +17,6 @@ Recommended files:
 - `context.md` for grounded repo facts, constraints, and in-scope surfaces
 - `spec.md` for the compact research spec
 - `results.tsv` for the experiment ledger
-- `handoff.json` for governed execution admission and verification targets
-- `progress.json` for governed workflow status
 - `verify.md` for baseline, best-run, and completion evidence
 
 ## Rules
@@ -33,18 +31,17 @@ Recommended files:
 - Prefer one meaningful variable per experiment unless the change is inherently coupled.
 - Keep `results.tsv` append-only and durable. Record identifier, metric, status, cost, and short description for every run, including crashes.
 - If the task lacks a defensible metric or experiment boundary, ask the minimum question needed or run `deep-interview` before starting the loop.
-- `autoresearch` is a governed workflow owner; keep `progress.json` current and assume native `SessionStart` and `Stop` hooks will restore and gate it when Chedex is installed.
-- Provide `handoff.json` before deep execution begins, including the fixed layer, mutable layer, metric, experiment command, ledger path, and source artifacts.
+- `autoresearch` is not yet a native governed mode in the current governor runtime. Use it as the loop contract today, and let `autopilot` or `ralph` remain the governed owner when stop-gated persistence is required.
 - Do not use destructive history rewriting as the default keep-or-revert mechanism. Prefer committing only kept experiments, reverting discarded working-tree changes before commit, or using a scratch branch or worktree when isolation is needed.
 - Use `ultrawork` only when experiment lanes are truly independent, preserve the same fixed layer, and keep separate ledgers or run identifiers.
-- Stop only when the workflow reaches a governed terminal state with fresh evidence in `verify.md`, or when the user interrupts the loop.
+- Stop only when the current loop has fresh evidence in `verify.md`, or when the user interrupts it. If the loop is running under `autopilot` or `ralph`, let that parent workflow own the terminal governed state.
 
 ## Flow
 
 1. Normalize
    - Ground the repo in `context.md`.
    - Write `spec.md` with objective, metric, fixed layer, mutable layer, entrypoint, budget, ledger, and decision rule.
-   - Produce `handoff.json` before iterative execution starts.
+   - If the work is running under `autopilot` or `ralph`, let that parent workflow own `handoff.json` and `progress.json`.
 2. Baseline
    - Record the current best-known state.
    - Run or inspect the unmodified baseline when feasible.
@@ -56,7 +53,7 @@ Recommended files:
 4. Decide
    - Keep the change only if it materially improves the objective or preserves results while simplifying the system.
    - Revert or discard the change when it regresses, destabilizes, or adds unjustified complexity.
-   - Update `results.tsv`, `progress.json`, and `verify.md` with the outcome.
+   - Update `results.tsv` and `verify.md` with the outcome, and update parent workflow artifacts when this loop is running inside a governed owner.
 5. Repeat
    - Continue from the current best-known state until interrupted or blocked by a real constraint.
 

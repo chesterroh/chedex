@@ -21,15 +21,16 @@ It intentionally excludes external orchestration machinery such as:
 
 ## v0.5.3 Shape
 
-`0.5.3` marks the current Chedex shape as Codex `0.116.0` ready while carrying forward the governed workflow and release-audit hardening introduced in the `0.4.x` line.
+`0.5.3` marks the current Chedex shape as Codex `0.115.0` verified while carrying forward the governed workflow and release-audit hardening introduced in the `0.4.x` line.
 
 - direct ordinary turns stay lightweight and native
-- `autopilot`, `autoresearch`, `ralph`, and direct top-level `ultrawork` are governed workflows
+- `autopilot`, `ralph`, and direct top-level `ultrawork` are governed workflows
 - `deep-interview` is an explicit artifact-backed requirements skill, not a governed execution workflow
+- `autoresearch` is currently a concept-first research loop skill, not a native governor-admitted mode
 - Codex native hooks provide session rehydration and stop gating
 - `SessionStart` can also surface a non-blocking Codex release audit when the installed CLI lags the latest published package release
 - governed workflows persist authoritative state under `~/.codex/workflows/`
-- Chedex currently requires Codex `>= 0.114.0` with the `codex_hooks` feature surface available and is verified against Codex `0.116.0`
+- Chedex currently requires Codex `>= 0.114.0` with the `codex_hooks` feature surface available and is verified against Codex `0.115.0`
 - the governed workflow schema is now enforced consistently across docs, skills, and runtime validation
 - the repo keeps a deterministic `.codex/` mirror for installable source surfaces and verifies parity explicitly
 
@@ -84,7 +85,7 @@ Use this repo as your own harness base:
 
 - `clarify` - lightweight one-question-at-a-time requirements clarification
 - `deep-interview` - high-rigor Socratic requirements clarification with durable artifacts
-- `autoresearch` - governed baseline/experiment/ledger workflow for metric-driven optimization loops
+- `autoresearch` - concept-first baseline/experiment/ledger workflow for metric-driven optimization loops
 - `plan` - turn a request into an actionable work plan
 - `execute` - implement and verify until done or clearly blocked
 - `review` - reviewer-only pass for plans, diffs, or implementation claims
@@ -108,19 +109,23 @@ Governed workflow state now centers on:
 
 `deep-interview` keeps durable requirements artifacts under `~/.codex/workflows/deep-interview/<slug>/`, typically `context.md`, `interview.md`, and `spec.md`.
 It is not governed by `progress.json` or `handoff.json` by default.
-`autoresearch` keeps governed research artifacts under `~/.codex/workflows/autoresearch/<slug>/`, typically `context.md`, `spec.md`, `results.tsv`, `handoff.json`, `progress.json`, and `verify.md`.
+`autoresearch` may keep research artifacts under `~/.codex/workflows/autoresearch/<slug>/`, typically `context.md`, `spec.md`, `results.tsv`, and `verify.md`, but it is not stop-gated by the current governor runtime.
 
 ## Workflow Alignment
 
 Chedex keeps a clear native-only execution chain:
 
 - `clarify` closes a few critical gaps quickly; `deep-interview` handles the higher-rigor interview pass when intent, scope, non-goals, or decision rights need a durable artifact trail.
-- `autoresearch` turns a stable evaluation path into a governed baseline/experiment/ledger loop with explicit keep-or-revert decisions.
+- `autoresearch` turns a stable evaluation path into a baseline/experiment/ledger loop contract with explicit keep-or-revert decisions.
 - `ultrawork` handles parallel fan-out for independent work, and direct top-level use keeps only the minimum governed state it needs: `progress.json`, active index sync, and `verify.md` when it needs a durable evidence log.
 - `ralph` wraps `ultrawork` with resumable artifacts, active workflow registration, and a hard verification loop.
-- `autopilot` owns the full clarify/spec/plan/execute/verify/validate lifecycle, can reuse `deep-interview` artifacts when they exist, requires `architect` and `verifier` plan admission before Execute, and hands execution to `autoresearch` for research-shaped optimization or to `ralph` for general execution.
+- `autopilot` owns the full clarify/spec/plan/execute/verify/validate lifecycle, can reuse `deep-interview` artifacts when they exist, requires `architect` and `verifier` plan admission before Execute, and can use `autoresearch` as the research-loop contract while `autopilot` remains the governed owner today.
 
-## Notes
+## Current Gaps
+
+- `autoresearch` is present as a skill and documentation concept, but the governor runtime in `hooks/chedex-governor.mjs` does not yet admit `mode: "autoresearch"`. Until that lands, use `autopilot` or `ralph` when stop-gated governed execution is required.
+- Repo verification still relies partly on required-text checks in `scripts/verify-repo.mjs`. This is good at catching drift, but it is not full semantic validation.
+- The latest verified Codex CLI version is still maintained as repo metadata plus docs wording, not generated into docs from one canonical source.
 
 ## Commands
 
@@ -132,8 +137,6 @@ npm run install:user
 npm run install:user:dry
 npm run uninstall:user
 ```
-
-## Notes
 
 - This repo reflects the stronger delegation policy currently installed in your global `~/.codex/AGENTS.md`.
 - `AGENTS.template.md`, `prompts/`, and `skills/` should stay aligned with `docs/guidance-schema.md` and `docs/prompt-contract.md`.

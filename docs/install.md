@@ -36,8 +36,8 @@ This installs:
 Chedex writes native agent files only under `~/.codex` unless `CODEX_HOME` is set.
 Artifact-backed workflow skills keep their artifacts under `~/.codex/workflows/`.
 `deep-interview` keeps durable `context.md`, `interview.md`, and `spec.md` artifacts under `~/.codex/workflows/deep-interview/` and does not require `progress.json` or `handoff.json` by default.
-`autoresearch` keeps governed `context.md`, `spec.md`, `results.tsv`, `handoff.json`, `progress.json`, and `verify.md` artifacts under `~/.codex/workflows/autoresearch/`.
-Governed workflows such as `autoresearch`, `ralph`, and `autopilot` keep their execution state under `~/.codex/workflows/`.
+`autoresearch` may keep `context.md`, `spec.md`, `results.tsv`, and `verify.md` artifacts under `~/.codex/workflows/autoresearch/`, but it is not yet a native governor-admitted mode.
+Governed workflows such as `ralph` and `autopilot` keep their execution state under `~/.codex/workflows/`.
 Direct top-level `ultrawork` uses a minimal workflow root under `~/.codex/workflows/ultrawork/` with `progress.json`, active index sync, and `verify.md` when it needs a durable evidence log; it may omit `handoff.json`.
 `SessionStart` also performs a best-effort release audit against the published `@openai/codex` package and caches the result in `~/.codex/workflows/_codex_release_audit.json`.
 
@@ -47,8 +47,12 @@ Governed workflow state now includes:
 - `progress.json`
 - `verify.md`
 
-`handoff.json` is required for governed plans and the richer `autoresearch` / `ralph` / `autopilot` workflows, but direct top-level `ultrawork` may omit it.
+`handoff.json` is required for governed plans and the richer `ralph` / `autopilot` workflows, but direct top-level `ultrawork` may omit it.
 The release audit is advisory only: it does not auto-upgrade Codex CLI.
+
+## Notes
+
+- `autoresearch` is installed as a skill surface today, but not yet as a native governed mode in the current governor runtime. If you need stop-gated persistence for research-shaped work, run it under `autopilot` or `ralph`.
 
 ## Dry Run
 
@@ -66,6 +70,6 @@ npm run uninstall:user
 
 Uninstall uses `CHEDEX_UNINSTALL.json` to restore backed-up managed files and remove files created by install.
 `CHEDEX_UNINSTALL.json` is the authoritative rollback record and is written before managed install mutations, so `npm run uninstall:user` can recover from a mid-install failure.
-If an existing `config.toml`, `hooks.json`, `AGENTS.md`, managed hook asset, managed prompt, managed agent TOML, or managed skill directory was present, install also creates a timestamped backup beside it.
+If an existing `config.toml`, `hooks.json`, `AGENTS.md`, managed hook asset, managed prompt, managed agent TOML, or managed skill directory was present, install also creates a timestamped backup under `~/.codex/.chedex-backups/<timestamp>/`.
 If no pre-existing file was present for one of those paths, uninstall removes the file that install created.
 `~/.codex/workflows/_active.json` is created later by the first governed workflow sync, not by install itself.

@@ -1,5 +1,5 @@
 import { copyFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import {
   buildAgentConfigBlock,
   chedexMarkerEnd,
@@ -31,9 +31,7 @@ const dryRun = process.argv.includes('--dry-run');
 const targets = installTargets();
 const manifest = installManifestPaths();
 const backupSlug = timestampSlug();
-const backupPath = `${targets.configPath}.chedex.bak-${backupSlug}`;
-const hooksBackupPath = `${targets.hooksConfigPath}.chedex.bak-${backupSlug}`;
-const agentsMdBackupPath = `${targets.agentsMdPath}.chedex.bak-${backupSlug}`;
+const backupRoot = join(targets.backupsDir, backupSlug);
 const configPresentBefore = await fileExists(targets.configPath);
 const existingConfig = await readTextIfExists(targets.configPath);
 const hooksConfigPresentBefore = await fileExists(targets.hooksConfigPath);
@@ -68,6 +66,14 @@ const uninstallState = {
   },
 };
 
+function backupDestinationFor(targetPath) {
+  const relativePath = relative(targets.codexHome, targetPath);
+  if (!relativePath || relativePath.startsWith('..')) {
+    throw new Error(`refusing to write backup outside CODEX_HOME: ${targetPath}`);
+  }
+  return join(backupRoot, relativePath);
+}
+
 async function backupManagedPath(targetPath, bucket) {
   if (!(await fileExists(targetPath))) {
     uninstallState.managed_paths[bucket].push({
@@ -78,7 +84,7 @@ async function backupManagedPath(targetPath, bucket) {
     return;
   }
 
-  const backupPath = `${targetPath}.chedex.bak-${backupSlug}`;
+  const backupPath = backupDestinationFor(targetPath);
   const type = await copyPath(targetPath, backupPath);
   uninstallBackups.push(backupPath);
   uninstallState.managed_paths[bucket].push({
@@ -101,6 +107,7 @@ if (staleAgents.length > 0) {
 
 for (const dir of [
   targets.codexHome,
+  targets.backupsDir,
   targets.promptsDir,
   targets.skillsDir,
   targets.agentsDir,
@@ -113,21 +120,27 @@ for (const dir of [
 
 if (!dryRun) {
   if (configPresentBefore) {
+    const backupPath = backupDestinationFor(targets.configPath);
+    await ensureDir(dirname(backupPath));
     await copyFile(targets.configPath, backupPath);
     uninstallBackups.push(backupPath);
     uninstallState.backups.config = backupPath;
   }
 
   if (hooksConfigPresentBefore) {
-    await copyFile(targets.hooksConfigPath, hooksBackupPath);
-    uninstallBackups.push(hooksBackupPath);
-    uninstallState.backups.hooksConfig = hooksBackupPath;
+    const backupPath = backupDestinationFor(targets.hooksConfigPath);
+    await ensureDir(dirname(backupPath));
+    await copyFile(targets.hooksConfigPath, backupPath);
+    uninstallBackups.push(backupPath);
+    uninstallState.backups.hooksConfig = backupPath;
   }
 
   if (agentsMdPresentBefore) {
-    await copyFile(targets.agentsMdPath, agentsMdBackupPath);
-    uninstallBackups.push(agentsMdBackupPath);
-    uninstallState.backups.agentsMd = agentsMdBackupPath;
+    const backupPath = backupDestinationFor(targets.agentsMdPath);
+    await ensureDir(dirname(backupPath));
+    await copyFile(targets.agentsMdPath, backupPath);
+    uninstallBackups.push(backupPath);
+    uninstallState.backups.agentsMd = backupPath;
   }
 
   for (const path of managedPromptPaths) {
