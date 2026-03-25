@@ -17,6 +17,7 @@ import {
   probeCodexHooksSupport,
   readJsonIfExists,
   readTextIfExists,
+  removeTree,
   renderUninstallNote,
   roleNames,
   staleGeneratedAgents,
@@ -42,6 +43,7 @@ const managedAgentPaths = roleNames().map((name) => join(targets.agentsDir, `${n
 const managedSkillPaths = listSkills().map((name) => join(targets.skillsDir, name));
 const managedHookPaths = (await listRelativeFiles(manifest.hooksDir)).map((relativePath) => join(targets.hookAssetsDir, relativePath));
 const currentHooksConfig = await readJsonIfExists(targets.hooksConfigPath, { hooks: {} });
+const previousUninstallState = await readJsonIfExists(targets.uninstallStatePath, null);
 const hookProbe = probeCodexHooksSupport();
 const uninstallBackups = [];
 const uninstallState = {
@@ -65,6 +67,16 @@ const uninstallState = {
     hooks: [],
   },
 };
+
+function unionManagedPaths(currentPaths, recordedEntries) {
+  const allPaths = new Set(currentPaths);
+  for (const entry of recordedEntries || []) {
+    if (entry?.target_path) {
+      allPaths.add(entry.target_path);
+    }
+  }
+  return [...allPaths];
+}
 
 function backupDestinationFor(targetPath) {
   const relativePath = relative(targets.codexHome, targetPath);
@@ -143,25 +155,41 @@ if (!dryRun) {
     uninstallState.backups.agentsMd = backupPath;
   }
 
-  for (const path of managedPromptPaths) {
+  for (const path of unionManagedPaths(managedPromptPaths, previousUninstallState?.managed_paths?.prompts)) {
     await backupManagedPath(path, 'prompts');
   }
 
-  for (const path of managedAgentPaths) {
+  for (const path of unionManagedPaths(managedAgentPaths, previousUninstallState?.managed_paths?.agents)) {
     await backupManagedPath(path, 'agents');
   }
 
-  for (const path of managedSkillPaths) {
+  for (const path of unionManagedPaths(managedSkillPaths, previousUninstallState?.managed_paths?.skills)) {
     await backupManagedPath(path, 'skills');
   }
 
-  for (const path of managedHookPaths) {
+  for (const path of unionManagedPaths(managedHookPaths, previousUninstallState?.managed_paths?.hooks)) {
     await backupManagedPath(path, 'hooks');
   }
 
   // Persist rollback metadata before managed files are copied so a later
   // install failure still leaves enough state for `uninstall:user`.
   await writeJsonIfChanged(targets.uninstallStatePath, uninstallState);
+
+  for (const path of unionManagedPaths(managedPromptPaths, previousUninstallState?.managed_paths?.prompts)) {
+    await removeTree(path);
+  }
+
+  for (const path of unionManagedPaths(managedAgentPaths, previousUninstallState?.managed_paths?.agents)) {
+    await removeTree(path);
+  }
+
+  for (const path of unionManagedPaths(managedSkillPaths, previousUninstallState?.managed_paths?.skills)) {
+    await removeTree(path);
+  }
+
+  for (const path of unionManagedPaths(managedHookPaths, previousUninstallState?.managed_paths?.hooks)) {
+    await removeTree(path);
+  }
 }
 
 const templateContent = await readTextIfExists(manifest.templateAgents);

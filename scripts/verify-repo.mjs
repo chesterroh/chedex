@@ -7,6 +7,8 @@ import {
   anyMissing,
   buildAgentToml,
   buildManagedHooksConfig,
+  chedexLatestVerifiedCodexVersion,
+  chedexMinimumCodexVersion,
   generatedAgentPath,
   installManifestPaths,
   listRelativeFiles,
@@ -141,9 +143,9 @@ const explicitCallerModelIntentPromptSnippet = 'Honor any explicit caller-specif
 const explicitCallerFallbackPromptSnippet = 'Treat built-in agent defaults as fallback only, and say so before using the closest compliant fallback.';
 
 const governorSurfaceChecks = [
-  [repoPath('README.md'), ['codex_hooks', 'multi_agent', 'child_agents_md', 'hooks.json', '_active.json', 'handoff.json', '0.115.0', 'durable evidence log', 'override repo defaults unless unavailable or incompatible']],
-  [repoPath('docs', 'install.md'), ['codex_hooks', 'multi_agent', 'child_agents_md', 'hooks.json', '0.114.0', '0.115.0', '_codex_release_audit.json']],
-  [repoPath('docs', 'governor.md'), ['workflow-sync', 'SessionStart', 'Stop', 'handoff.json', 'risks', 'release audit', 'multi_agent', 'child_agents_md', 'durable evidence log', 'autoresearch-plan and the compatibility `autoresearch` router are not governed modes']],
+  [repoPath('README.md'), ['codex_hooks', 'multi_agent', 'child_agents_md', 'hooks.json', '_active.json', 'handoff.json', chedexLatestVerifiedCodexVersion, 'durable evidence log', 'override repo defaults unless unavailable or incompatible']],
+  [repoPath('docs', 'install.md'), ['codex_hooks', 'multi_agent', 'child_agents_md', 'hooks.json', chedexMinimumCodexVersion, chedexLatestVerifiedCodexVersion, '_codex_release_audit.json']],
+  [repoPath('docs', 'governor.md'), ['workflow-sync', 'SessionStart', 'Stop', 'handoff.json', 'risks', 'release audit', 'multi_agent', 'child_agents_md', 'durable evidence log', 'autoresearch-plan and the compatibility `autoresearch` router are not governed modes', chedexMinimumCodexVersion, chedexLatestVerifiedCodexVersion]],
   [repoPath('README.md'), ['~/.codex/workflows/deep-interview/', 'interview.md', 'not governed by `progress.json` or `handoff.json` by default']],
   [repoPath('docs', 'install.md'), ['~/.codex/workflows/deep-interview/', 'interview.md', 'does not require `progress.json` or `handoff.json` by default']],
   [repoPath('README.md'), ['~/.codex/workflows/autoresearch-plan/', '~/.codex/workflows/autoresearch-loop/', 'results.tsv', 'compatibility router']],

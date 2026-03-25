@@ -257,18 +257,12 @@ assert(await pathMissing(join(legacyStateHome, 'skills', 'legacy-skill', 'SKILL.
 
 const failingInstallHome = await mkdtemp(join(tmpdir(), 'chedex-install-failing-'));
 await mkdir(join(failingInstallHome, 'prompts', 'explore.md'), { recursive: true });
-let failingInstallErrored = false;
-try {
-  runNodeScript(repoRoot, 'scripts/install-user.mjs', { ...process.env, CODEX_HOME: failingInstallHome });
-} catch {
-  failingInstallErrored = true;
-}
-assert(failingInstallErrored, 'install should surface a late failure when a managed target path blocks copy');
-assert(!(await pathMissing(join(failingInstallHome, 'CHEDEX_UNINSTALL.json'))), 'late install failures should still leave uninstall state metadata behind');
+runNodeScript(repoRoot, 'scripts/install-user.mjs', { ...process.env, CODEX_HOME: failingInstallHome });
+assert(!(await pathMissing(join(failingInstallHome, 'CHEDEX_UNINSTALL.json'))), 'install should still persist uninstall state metadata before replacing a managed path conflict');
 runNodeScript(repoRoot, 'scripts/uninstall-user.mjs', { ...process.env, CODEX_HOME: failingInstallHome });
-assert(await pathMissing(join(failingInstallHome, 'AGENTS.md')), 'uninstall should remove AGENTS.md written before a failed install');
-assert(await pathExists(join(failingInstallHome, 'prompts', 'explore.md')), 'uninstall should restore pre-existing managed path conflicts after a failed install');
-assert(await pathMissing(join(failingInstallHome, 'CHEDEX_UNINSTALL.json')), 'uninstall should clear uninstall state after recovering from a failed install');
+assert(await pathMissing(join(failingInstallHome, 'AGENTS.md')), 'uninstall should remove AGENTS.md written during managed-path conflict replacement');
+assert(await pathExists(join(failingInstallHome, 'prompts', 'explore.md')), 'uninstall should restore pre-existing managed path conflicts after a successful install');
+assert(await pathMissing(join(failingInstallHome, 'CHEDEX_UNINSTALL.json')), 'uninstall should clear uninstall state after restoring a managed path conflict');
 
 const installCheckRepoRoot = await mkdtemp(join(tmpdir(), 'chedex-install-check-repo-'));
 await cp(repoRoot, installCheckRepoRoot, {
@@ -326,6 +320,17 @@ try {
     || error.message.includes('Run npm run generate:agents before install.');
 }
 assert(staleInstallFailed, 'install:user:dry should fail with guidance when generated agents are stale');
+
+const reinstallDriftHome = await mkdtemp(join(tmpdir(), 'chedex-install-reinstall-drift-'));
+const reinstallDriftEnv = { ...process.env, CODEX_HOME: reinstallDriftHome };
+runNodeScript(repoRoot, 'scripts/install-user.mjs', reinstallDriftEnv);
+await writeFile(join(reinstallDriftHome, 'skills', 'autopilot', 'STALE.md'), '# stale managed file\n');
+runNodeScript(repoRoot, 'scripts/install-user.mjs', reinstallDriftEnv);
+assert(
+  await pathMissing(join(reinstallDriftHome, 'skills', 'autopilot', 'STALE.md')),
+  'reinstall should remove stale files inside managed skill directories',
+);
+runNodeScript(repoRoot, 'scripts/uninstall-user.mjs', reinstallDriftEnv);
 
 await rm(installCheckRepoRoot, { recursive: true, force: true });
 await rm(staleInstallRepoRoot, { recursive: true, force: true });

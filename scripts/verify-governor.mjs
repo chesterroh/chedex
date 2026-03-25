@@ -15,6 +15,11 @@ import {
   buildReleaseAudit,
   releaseAuditCachePath,
 } from '../hooks/codex-release-audit.mjs';
+import {
+  chedexLatestVerifiedCodexVersion,
+  chedexMinimumCodexVersion,
+  parseSemver,
+} from './lib.mjs';
 
 function assert(condition, message) {
   if (!condition) {
@@ -113,6 +118,12 @@ function sleep(ms) {
     setTimeout(resolvePromise, ms);
   });
 }
+
+const latestVerifiedSemver = parseSemver(chedexLatestVerifiedCodexVersion);
+const minimumSupportedSemver = parseSemver(chedexMinimumCodexVersion);
+
+assert(latestVerifiedSemver, 'expected latest verified Codex version to be valid semver');
+assert(minimumSupportedSemver, 'expected minimum supported Codex version to be valid semver');
 
 const home = await mkdtemp(join(tmpdir(), 'chedex-governor-'));
 const cwd = join(home, 'workspace');
@@ -602,14 +613,14 @@ const currentReleaseAudit = await buildReleaseAudit({
   codexHome: home,
   readInstalledVersion() {
     return {
-      raw: 'codex-cli 0.115.0',
-      normalized: '0.115.0',
-      semver: [0, 115, 0],
+      raw: `codex-cli ${chedexLatestVerifiedCodexVersion}`,
+      normalized: chedexLatestVerifiedCodexVersion,
+      semver: latestVerifiedSemver,
     };
   },
   async getLatestReleaseInfo() {
     return {
-      latest_version: '0.115.0',
+      latest_version: chedexLatestVerifiedCodexVersion,
       published_at: '2026-03-16T00:00:00Z',
       checked_at: '2026-03-17T00:00:00Z',
       source: 'npm-registry',
@@ -624,14 +635,14 @@ const releaseAuditOnlyContext = await sessionStartHook({
   releaseAudit: {
     readInstalledVersion() {
       return {
-        raw: 'codex-cli 0.114.0',
-        normalized: '0.114.0',
-        semver: [0, 114, 0],
+        raw: `codex-cli ${chedexMinimumCodexVersion}`,
+        normalized: chedexMinimumCodexVersion,
+        semver: minimumSupportedSemver,
       };
     },
     async getLatestReleaseInfo() {
       return {
-        latest_version: '0.115.0',
+        latest_version: chedexLatestVerifiedCodexVersion,
         published_at: '2026-03-16T00:00:00Z',
         checked_at: '2026-03-17T00:00:00Z',
         source: 'npm-registry',
@@ -662,14 +673,14 @@ const workflowAndAuditContext = await sessionStartHook({
   releaseAudit: {
     readInstalledVersion() {
       return {
-        raw: 'codex-cli 0.114.0',
-        normalized: '0.114.0',
-        semver: [0, 114, 0],
+        raw: `codex-cli ${chedexMinimumCodexVersion}`,
+        normalized: chedexMinimumCodexVersion,
+        semver: minimumSupportedSemver,
       };
     },
     async getLatestReleaseInfo() {
       return {
-        latest_version: '0.115.0',
+        latest_version: chedexLatestVerifiedCodexVersion,
         published_at: '2026-03-16T00:00:00Z',
         checked_at: '2026-03-17T00:00:00Z',
         source: 'npm-registry',
@@ -686,9 +697,9 @@ const releaseAuditFailureContext = await sessionStartHook({
   releaseAudit: {
     readInstalledVersion() {
       return {
-        raw: 'codex-cli 0.114.0',
-        normalized: '0.114.0',
-        semver: [0, 114, 0],
+        raw: `codex-cli ${chedexMinimumCodexVersion}`,
+        normalized: chedexMinimumCodexVersion,
+        semver: minimumSupportedSemver,
       };
     },
     async getLatestReleaseInfo() {
@@ -700,7 +711,7 @@ assert(releaseAuditFailureContext === '', 'release audit failures should fail op
 
 await writeJson(releaseAuditCachePath(home), {
   schema_version: 1,
-  latest_version: '0.115.0',
+  latest_version: chedexLatestVerifiedCodexVersion,
   published_at: '2026-03-16T00:00:00Z',
   checked_at: '2026-03-16T00:00:00Z',
   source: 'npm-registry',
@@ -710,9 +721,9 @@ const staleCacheAudit = await buildReleaseAudit({
   codexHome: home,
   readInstalledVersion() {
     return {
-      raw: 'codex-cli 0.114.0',
-      normalized: '0.114.0',
-      semver: [0, 114, 0],
+      raw: `codex-cli ${chedexMinimumCodexVersion}`,
+      normalized: chedexMinimumCodexVersion,
+      semver: minimumSupportedSemver,
     };
   },
   async getLatestReleaseInfo({ codexHome }) {
