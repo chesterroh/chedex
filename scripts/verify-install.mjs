@@ -100,12 +100,12 @@ assert(installedSessionStartCommand.includes('session-start'), 'install should w
 if (hookProbe.supportedHookEvents.includes('UserPromptSubmit')) {
   const installedUserPromptSubmitCommand = installedHooksConfig.hooks.UserPromptSubmit[0].hooks[0].command;
   assert(installedUserPromptSubmitCommand.includes('user-prompt-submit'), 'install should wire UserPromptSubmit to the governor prompt-submit command');
-  const promptSubmitVerdict = JSON.parse(runShellCommand(
+  const promptSubmitOutput = runShellCommand(
     installedUserPromptSubmitCommand,
     freshEnv,
     `${JSON.stringify({ cwd: join(freshHome, 'workspace-empty'), prompt: 'smoke test' })}\n`,
-  ));
-  assert(promptSubmitVerdict.decision === 'allow', 'user-prompt-submit should allow prompts when no governed workflow is active');
+  );
+  assert(promptSubmitOutput === '', 'user-prompt-submit should stay quiet when no governed workflow is active');
 }
 
 const emptySessionStartOutput = runShellCommand(
@@ -171,12 +171,12 @@ assert(governedSessionStartOutput.includes('mode: ralph'), 'installed session-st
 assert(governedSessionStartOutput.includes('task: install smoke task'), 'installed session-start hook should render the governed workflow summary');
 if (hookProbe.supportedHookEvents.includes('UserPromptSubmit')) {
   const installedUserPromptSubmitCommand = installedHooksConfig.hooks.UserPromptSubmit[0].hooks[0].command;
-  const governedPromptVerdict = JSON.parse(runShellCommand(
+  const governedPromptOutput = runShellCommand(
     installedUserPromptSubmitCommand,
     freshEnv,
     `${JSON.stringify({ cwd: governedCwd, prompt: 'continue' })}\n`,
-  ));
-  assert(governedPromptVerdict.decision === 'allow', 'user-prompt-submit should allow prompts when governed state is valid');
+  );
+  assert(governedPromptOutput === '', 'user-prompt-submit should stay quiet when governed state is valid');
 }
 
 runNodeScript(repoRoot, 'scripts/uninstall-user.mjs', freshEnv);

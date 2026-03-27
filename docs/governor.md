@@ -41,7 +41,7 @@ Within one workspace, `autopilot` may remain the governed owner while nested `ra
 - `UserPromptSubmit` fails closed when the indexed governed state for the current workspace is unreadable or invalid, instead of letting prompt submission continue on top of broken workflow state.
 - `Stop` blocks ambiguous or unreadable governed state until the current workflow is terminal or explicitly repaired/cleared.
 
-`SessionStart` does not auto-upgrade Codex CLI. It stays advisory, short-timeout, and fail-open. `UserPromptSubmit` stays intentionally narrow and does not rewrite prompts.
+`SessionStart` does not auto-upgrade Codex CLI. It stays advisory, short-timeout, and fail-open. `UserPromptSubmit` stays intentionally narrow and does not rewrite prompts; on allow it emits no JSON output, and on block it emits the hook JSON verdict.
 
 ## Active Workflow Index
 

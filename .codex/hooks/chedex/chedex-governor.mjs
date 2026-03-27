@@ -801,12 +801,6 @@ export function blockResponse(reason) {
   });
 }
 
-export function allowResponse() {
-  return JSON.stringify({
-    decision: 'allow',
-  });
-}
-
 export async function userPromptSubmitHook({
   codexHome = defaultCodexHome(),
   cwd = process.cwd(),
@@ -917,7 +911,9 @@ async function runCli() {
         codexHome,
         cwd: input.cwd || process.cwd(),
       });
-      process.stdout.write(verdict.decision === 'allow' ? allowResponse() : blockResponse(verdict.reason));
+      if (verdict.decision === 'block') {
+        process.stdout.write(blockResponse(verdict.reason));
+      }
       return;
     }
     case 'workflow-sync': {

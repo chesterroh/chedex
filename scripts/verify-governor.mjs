@@ -755,6 +755,14 @@ const emptyPromptVerdict = await userPromptSubmitHook({
 });
 assert(emptyPromptVerdict.decision === 'allow', 'user-prompt-submit should allow prompts when no governed workflow is active');
 
+const emptyPromptCli = execFileSync(process.execPath, [join(process.cwd(), 'hooks', 'chedex-governor.mjs'), 'user-prompt-submit', '--codex-home', home], {
+  cwd: process.cwd(),
+  env: process.env,
+  input: `${JSON.stringify({ cwd: join(home, 'prompt-submit-empty'), prompt: 'smoke test' })}\n`,
+  encoding: 'utf8',
+});
+assert(emptyPromptCli === '', 'user-prompt-submit CLI should stay quiet when no governed workflow is active');
+
 const malformedSessionStartCli = execFileSync(process.execPath, [join(process.cwd(), 'hooks', 'chedex-governor.mjs'), 'session-start', '--codex-home', home], {
   cwd: process.cwd(),
   env: process.env,
