@@ -1,4 +1,4 @@
-# Chedex v0.117.0
+# Chedex v0.117.1
 
 An homage to preceding projects such as Oh My OpenAgent, Oh My Codex, and Ouroboros.
 
@@ -18,9 +18,9 @@ It intentionally excludes external orchestration machinery such as:
 - legacy external state systems
 - HUD, mailboxing, linked mode state, and runtime overlays
 
-## v0.117.0 Shape
+## v0.117.1 Shape
 
-`0.117.0` keeps the current Chedex shape verified against Codex `0.117.0` and records the official `0.116.0` / `0.117.0` release-surface upgrades in the startup release audit.
+`0.117.1` keeps the current Chedex shape verified against Codex `0.117.0` and records the official `0.116.0` / `0.117.0` release-surface upgrades in the startup release audit.
 
 - ordinary turns stay lightweight and native
 - selected governed lanes and artifact-backed planning/requirements lanes keep durable state under `~/.codex/workflows/`

@@ -2,7 +2,10 @@
 
 Use this template to convert a loose optimization task into a compact research plan that can hand off cleanly to `autoresearch-loop`.
 
-## Minimum Spec
+## Minimum Required Spec
+
+This is the default planning shape for `autoresearch-plan`.
+Before handoff, `spec.md` should cover these fields directly or explain why a field is intentionally unavailable.
 
 ```yaml
 objective: >
@@ -58,6 +61,18 @@ decision_rule:
   discard_when: ""
   crash_when: ""
 ```
+
+## Handoff-Ready Checklist
+
+The plan is ready for `autoresearch-loop` only if you can answer yes to all of these:
+
+- Is the primary metric observable from a stable baseline path?
+- Is the fixed layer explicit enough for fair comparison?
+- Is the mutable layer narrow enough for a first bounded experiment?
+- Is there a concrete experiment command or equivalent run path?
+- Are per-run budget and hard limits visible?
+- Is there a ledger with explicit path and fields?
+- Are keep, discard, and crash rules explicit?
 
 ## Normalization Rules
 
