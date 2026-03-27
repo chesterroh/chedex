@@ -5,10 +5,11 @@ The Chedex governor is the native lifecycle layer for governed workflows.
 ## Requirements
 
 - Codex CLI `>= 0.114.0`
-- Latest verified Codex CLI: `0.115.0`
+- Latest verified Codex CLI: `0.117.0`
 - `codex_hooks` feature available in `codex features list`
 
 Install enables `multi_agent = true`, `child_agents_md = true`, and `codex_hooks = true`, and writes a managed `hooks.json` beside `config.toml`.
+On Codex `>= 0.116.0`, the managed hook set also includes `UserPromptSubmit`.
 
 ## Installed Paths
 
@@ -29,16 +30,18 @@ These workflows are governed:
 - direct top-level `ultrawork`
 
 Plain direct turns and small `execute` tasks are not governed unless they explicitly opt into the workflow contract.
-autoresearch-plan and the compatibility `autoresearch` router are not governed modes.
+autoresearch-plan is not a governed mode.
+Within one workspace, `autopilot` may remain the governed owner while nested `ralph` or `ultrawork` execution slices report through it instead of syncing competing active entries.
 
 ## Hook Responsibilities
 
 - `SessionStart` restores compact workflow context only for workflows whose governed state still validates.
 - `SessionStart` warns instead of silently dropping the current workspace's indexed workflow when governed state is unreadable or malformed, so stop protection is preserved until repair or explicit clear.
 - `SessionStart` also runs a non-blocking release audit. If the installed Codex CLI is behind the latest published `@openai/codex` release, it appends a short upgrade advisory and repo follow-up plan.
+- `UserPromptSubmit` fails closed when the indexed governed state for the current workspace is unreadable or invalid, instead of letting prompt submission continue on top of broken workflow state.
 - `Stop` blocks ambiguous or unreadable governed state until the current workflow is terminal or explicitly repaired/cleared.
 
-`SessionStart` does not auto-upgrade Codex CLI. It stays advisory, short-timeout, and fail-open.
+`SessionStart` does not auto-upgrade Codex CLI. It stays advisory, short-timeout, and fail-open. `UserPromptSubmit` stays intentionally narrow and does not rewrite prompts.
 
 ## Active Workflow Index
 
@@ -98,7 +101,7 @@ Stop-gate rules:
 
 ## `handoff.json`
 
-Governed plans and richer governed workflows such as `ralph`, `autopilot`, and `autoresearch-loop` must provide `handoff.json` with:
+Governed plans and richer governed workflows such as `autopilot`, `ralph`, and `autoresearch-loop` must provide `handoff.json` with:
 
 - `task`
 - `acceptance_criteria`
@@ -136,5 +139,4 @@ If `CODEX_HOME` is unset, replace it with `~/.codex`.
 
 ## Future Enhancements
 
-- Deprecate the compatibility `autoresearch` router once callers have moved to explicit `autoresearch-plan` / `autoresearch-loop` invocation.
 - Extend `scripts/verify-governor.mjs` to exercise every admitted governed mode automatically rather than relying on a hand-maintained test list.

@@ -39,7 +39,6 @@ Recommended files:
 - Use native Codex agents and repo-local commands only.
 - Do not depend on tmux, HUD state, notify hooks, or custom state servers.
 - Ralph owns persistence and verification; `ultrawork` owns parallel fan-out inside the execution slice.
-- When `ralph` runs inside an existing governed `autopilot` workflow in the same workspace, reuse the parent governed state instead of syncing a competing `ralph` workflow entry.
 - Ralph is a governed workflow owner; assume native `SessionStart` and `Stop` hooks will restore and gate it.
 - Prefer the smallest execution slice that produces fresh evidence.
 - Keep artifacts short and update them in place rather than creating throwaway copies.

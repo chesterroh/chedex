@@ -1,12 +1,12 @@
 ---
 name: autopilot
-description: End-to-end delivery workflow from idea to verified implementation
-argument-hint: "<brief product idea or broad task>"
+description: Strict operator-facing shell for broad iterative work
+argument-hint: "<brief idea, broad task, or evolving objective>"
 ---
 
 # Autopilot
 
-Use this for broad, multi-phase requests where the user wants the system to carry the work from idea to verified result.
+Use this when you want one high-iteration entrypoint for broad work and you want the broader loop itself to stay stop-gated and resumable.
 
 ## Artifact Root
 
@@ -15,77 +15,78 @@ If `CODEX_HOME` is unset, default to `~/.codex/workflows/autopilot/<slug>/`.
 
 Recommended files:
 - `context.md` for grounded facts and constraints
-- `spec.md` for the execution-ready spec
-- `plan.md` for the implementation plan
-- `handoff.json` for the governed execution handoff
+- `spec.md` for the current execution-ready shape
+- `plan.md` for the current implementation plan
+- `handoff.json` for governed execution admission
 - `progress.json` for phase and status tracking
-- `verify.md` for final evidence
+- `verify.md` for current proof, rejections, and closeout evidence
+
+## Workflow Contract
+
+`autopilot` is an operator shell and a governed workflow owner.
+
+- It may iterate aggressively across clarify, specify, plan, execute, and verify.
+- It should keep the working contract tight as the task evolves.
+- It should use native `SessionStart`, `UserPromptSubmit`, and `Stop` hook behavior through the same governed contract as the narrower lanes.
+- It should not invent extra runtime semantics beyond the native governor contract and the narrower lanes already present in Chedex.
+- Within one workspace, `autopilot` remains the governed owner by default. Nested `ralph` or `ultrawork` execution slices should report through the current `autopilot` workflow instead of syncing competing governed state.
+- If the task resolves into a pure governed research loop, explicitly hand governed ownership to `autoresearch-loop` instead of keeping `autopilot` active in the same workspace.
 
 ## Phases
 
 1. Clarify
-   - If the request is vague, run `clarify` to close the biggest gaps.
-   - If ambiguity remains high or the task needs durable requirements artifacts, run `deep-interview` and reuse its `context.md`, `interview.md`, and `spec.md`.
-   - Ground the work in `context.md`.
+   - If the request is vague, run `clarify` to close the biggest ambiguity first.
+   - If ambiguity remains high, use `deep-interview` and reuse its artifacts instead of rediscovering them.
+   - Update `context.md` with grounded repo facts, user constraints, `Non-goals`, and `Decision boundaries`.
 2. Specify
-   - Turn the request into a compact spec in `spec.md`.
-   - Record acceptance criteria and non-goals.
+   - Keep `spec.md` compact and current.
+   - Record acceptance criteria, proof expectations, and explicit restrictions before broad execution continues.
 3. Plan
-   - Build an actionable plan in `plan.md`.
+   - Build or refresh `plan.md`.
+   - Tighten sequencing, dependencies, rollback boundaries, and verification steps.
    - Produce or refresh `handoff.json`.
-   - Note risks, dependencies, and proof steps before execution starts.
-   - Run an `architect` pass and a `verifier` pass before handoff to harden the governed plan and confirm it is grounded enough to execute.
+   - For broad or high-risk work, run an `architect` pass and a `verifier` pass before deep execution.
 4. Execute
-   - Use `autoresearch-plan` when a research-shaped task still needs a grounded metric, fixed layer, mutable layer, or experiment queue.
-   - Hand research execution to `autoresearch-loop` when the task is a stable-metric optimization loop and broader `autopilot` lifecycle ownership is no longer the right control model.
-   - Hand off general implementation to `ralph` only after the plan-hardening pass agrees the work is execution-ready.
-   - Let `ralph` use `ultrawork` for parallel execution only when the work splits cleanly.
-   - Reuse the same facts, plan, and verification targets instead of re-deriving them.
+   - Drop to `execute` for small direct work.
+   - Hand durable implementation slices to `ralph` when resumable governed execution is needed, but keep `autopilot` as the parent owner unless you are explicitly handing off the whole workflow.
+   - Use `autoresearch-plan` while a metric-driven task still needs a grounded research contract.
+   - Hand stable governed optimization to `autoresearch-loop` when the work has clearly become a research loop rather than a broad delivery loop.
+   - Let `ralph` use `ultrawork` only when lanes are truly independent.
 5. Verify
-   - Run the relevant diagnostics, tests, and review passes.
-   - Capture completion evidence in `verify.md`.
-6. Validate
-   - Run an independent completion pass before marking the workflow complete.
-   - Default to a `verifier` pass, and include `architect` for broad or high-risk work.
+   - Refresh `verify.md` with tests, diagnostics, rejections, and remaining risk.
+   - Loop back to clarify, specify, or plan when evidence shows the contract is still weak.
 
 ## Rules
 
-- Complete phases in order; skip only when an earlier artifact is already good enough.
+- Keep iteration high, but keep the contract tight.
+- Do not allow broad execution to outrun `spec.md`, `plan.md`, or the current proof path.
+- Treat `autopilot` as the operator-facing owner for broad governed work, not as a substitute runtime beneath Codex.
+- Reuse existing artifacts when they are still accurate instead of restarting phases.
 - Prefer native roles already present in Chedex: `explore`, `planner`, `executor`, `architect`, `verifier`, `debugger`, and `test-engineer`.
-- `autopilot` owns the lifecycle for broad work, `autoresearch-plan` grounds research specs, `autoresearch-loop` owns governed research execution, `ralph` owns general persistence and verification, and `ultrawork` owns parallel fan-out.
-- Reuse existing `clarify` or `deep-interview` artifacts when they are still accurate instead of re-deriving them.
-- `autopilot` is a governed workflow owner; assume native `SessionStart` and `Stop` hooks will restore and gate it.
-- Within one workspace, `autopilot` remains the governed owner by default. If it uses `ralph` or nested `ultrawork` in the same `cwd`, those lanes should report through the current `autopilot` workflow rather than sync competing governed state.
-- Governed execution should not be treated as ready to run until the `architect` and `verifier` plan-hardening passes both agree the work is grounded enough to execute.
-- The current governor runtime admits execution by validating governed artifacts such as `progress.json` and `handoff.json`; it does not yet record plan-hardening approval provenance itself.
-- If the task resolves into a pure governed research loop, prefer handing off to `autoresearch-loop` instead of keeping `autopilot` as the long-running owner in the same workspace.
-- Use parallel delegation only inside a grounded phase.
+- Use native Codex agents and repo-local commands only.
 - Do not depend on tmux workers, custom state servers, or non-native orchestration commands.
-- If execution becomes a single focused change, drop down to `ralph` or `execute`.
-- If repeated verification failures indicate a real blocker, stop and report it instead of looping blindly.
+- If the task narrows enough, drop down to `execute`, hand controlled execution slices to `ralph`, or explicitly transfer ownership to `autoresearch-loop` instead of keeping the broader shell in control longer than necessary.
+- `autopilot` is a governed workflow owner; keep `progress.json` current after meaningful steps and require verification before completion.
+- If repeated verification failures expose a real blocker, report it plainly instead of looping blindly.
 
-## Progress Shape
+## Iteration Boundaries
 
-`progress.json` should include at least:
-- `schema_version`
-- `mode`
-- `task`
-- `phase`
-- `active`
-- `status`
-- `updated_at`
-- `workflow_root`
-- `next_step`
-- `artifacts`
-- `verification`
-- `blocker`
-- `risks`
+Allowed loops:
+- `clarify -> specify`
+- `specify -> plan`
+- `plan -> execute`
+- `execute -> verify`
+- `verify -> clarify|specify|plan|execute` when new evidence invalidates the current contract
 
-`phase` and `risks` are required fields, not optional hints.
+Disallowed defaults:
+- skipping straight to broad execution without current acceptance criteria
+- parallel fan-out before the dependency edges are explicit
+- allowing nested governed lanes in the same workspace to steal runtime ownership from the current `autopilot` workflow without an explicit handoff
 
 ## Output
 
 - Current phase
-- Artifacts produced
+- Current contract status
+- Artifacts produced or refreshed
 - Verification evidence
-- Remaining risks or blocker
+- Next narrow handoff or next iteration step

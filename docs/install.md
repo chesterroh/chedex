@@ -3,11 +3,12 @@
 ## Requirements
 
 - Codex CLI `>= 0.114.0`
-- Latest verified Codex CLI: `0.115.0`
+- Latest verified Codex CLI: `0.117.0`
 - `codex features list` must expose `codex_hooks`
 - Node `>= 20`
 
 Chedex now fails install if the native lifecycle hook surface is unavailable.
+On Codex `>= 0.116.0`, install also wires a managed `UserPromptSubmit` hook for minimal governed-workflow preflight.
 
 ## Global Install
 
@@ -25,7 +26,7 @@ This installs:
 
 - `AGENTS.template.md` into `~/.codex/AGENTS.md`
 - `prompts/*.md` into `~/.codex/prompts/`
-- the registered `skills/<name>/` directories into `~/.codex/skills/`: `clarify`, `deep-interview`, `autoresearch`, `autoresearch-plan`, `autoresearch-loop`, `plan`, `review`, `execute`, `tdd`, `ultrawork`, `ralph`, and `autopilot`
+- the registered `skills/<name>/` directories into `~/.codex/skills/`: `clarify`, `deep-interview`, `autoresearch-plan`, `autoresearch-loop`, `plan`, `review`, `execute`, `tdd`, `ultrawork`, `ralph`, and `autopilot`
 - `agents/*.toml` into `~/.codex/agents/`
 - `hooks/*` into `~/.codex/hooks/chedex/`
 - a managed `hooks.json` into `~/.codex/hooks.json`
@@ -33,27 +34,28 @@ This installs:
 - `CHEDEX_UNINSTALL.md` and `CHEDEX_UNINSTALL.json` into `~/.codex/` for reversible uninstall metadata
 - `multi_agent = true`, `child_agents_md = true`, and `codex_hooks = true` inside the `~/.codex/config.toml` `[features]` section
 
+Managed hook events:
+
+- `SessionStart`
+- `Stop`
+- `UserPromptSubmit` when the installed Codex CLI supports it (`>= 0.116.0`)
+
 Chedex writes native agent files only under `~/.codex` unless `CODEX_HOME` is set.
 Artifact-backed workflow skills keep their artifacts under `~/.codex/workflows/`.
 `deep-interview` keeps durable `context.md`, `interview.md`, and `spec.md` artifacts under `~/.codex/workflows/deep-interview/` and does not require `progress.json` or `handoff.json` by default.
 `autoresearch-plan` may keep `context.md`, `spec.md`, and optionally `results.tsv` under `~/.codex/workflows/autoresearch-plan/`, and does not require `progress.json` or `handoff.json` by default.
+`autopilot` keeps governed broad-work artifacts under `~/.codex/workflows/autopilot/`, including `context.md`, `spec.md`, `plan.md`, `handoff.json`, `progress.json`, and `verify.md`; nested `ralph` and `ultrawork` slices should report through the current `autopilot` workflow unless ownership is explicitly transferred.
 `autoresearch-loop` keeps governed research artifacts under `~/.codex/workflows/autoresearch-loop/`, including `results.tsv`, `handoff.json`, `progress.json`, and `verify.md`.
-Governed workflows such as `ralph`, `autopilot`, and `autoresearch-loop` keep their execution state under `~/.codex/workflows/`.
+Governed workflows such as `autopilot`, `ralph`, and `autoresearch-loop` keep their execution state under `~/.codex/workflows/`.
 Direct top-level `ultrawork` uses a minimal workflow root under `~/.codex/workflows/ultrawork/` with `progress.json`, active index sync, and `verify.md` when it needs a durable evidence log; it may omit `handoff.json`.
 `SessionStart` also performs a best-effort release audit against the published `@openai/codex` package and caches the result in `~/.codex/workflows/_codex_release_audit.json`.
-
-Governed workflow state now includes:
-
-- `~/.codex/workflows/_active.json`
-- `progress.json`
-- `verify.md`
-
-`handoff.json` is required for governed plans and the richer `ralph` / `autopilot` / `autoresearch-loop` workflows, but direct top-level `ultrawork` may omit it.
+`handoff.json` is required for governed plans and the richer `autopilot` / `ralph` / `autoresearch-loop` workflows, but direct top-level `ultrawork` may omit it.
 The release audit is advisory only: it does not auto-upgrade Codex CLI.
 
 ## Notes
 
-- `autoresearch` remains installed as a compatibility router. Prefer `autoresearch-plan` when the research spec is still forming and `autoresearch-loop` when the governed loop is ready to run.
+- Use `autopilot` when you want one strict broad-work entrypoint that should stay governed across clarify/spec/plan/execute/verify while nested execution slices report through it.
+- Use `autoresearch-plan` when the research spec is still forming and `autoresearch-loop` when the governed loop is ready to run.
 
 ## Dry Run
 

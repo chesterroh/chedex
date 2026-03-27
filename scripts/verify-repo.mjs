@@ -143,20 +143,19 @@ const explicitCallerModelIntentPromptSnippet = 'Honor any explicit caller-specif
 const explicitCallerFallbackPromptSnippet = 'Treat built-in agent defaults as fallback only, and say so before using the closest compliant fallback.';
 
 const governorSurfaceChecks = [
-  [repoPath('README.md'), ['codex_hooks', 'multi_agent', 'child_agents_md', 'hooks.json', '_active.json', 'handoff.json', chedexLatestVerifiedCodexVersion, 'durable evidence log', 'override repo defaults unless unavailable or incompatible']],
-  [repoPath('docs', 'install.md'), ['codex_hooks', 'multi_agent', 'child_agents_md', 'hooks.json', chedexMinimumCodexVersion, chedexLatestVerifiedCodexVersion, '_codex_release_audit.json']],
-  [repoPath('docs', 'governor.md'), ['workflow-sync', 'SessionStart', 'Stop', 'handoff.json', 'risks', 'release audit', 'multi_agent', 'child_agents_md', 'durable evidence log', 'autoresearch-plan and the compatibility `autoresearch` router are not governed modes', chedexMinimumCodexVersion, chedexLatestVerifiedCodexVersion]],
+  [repoPath('README.md'), ['codex_hooks', 'multi_agent', 'child_agents_md', 'hooks.json', '_active.json', 'handoff.json', 'UserPromptSubmit', chedexLatestVerifiedCodexVersion, 'durable evidence log', 'override repo defaults unless unavailable or incompatible']],
+  [repoPath('docs', 'install.md'), ['codex_hooks', 'multi_agent', 'child_agents_md', 'hooks.json', 'UserPromptSubmit', chedexMinimumCodexVersion, chedexLatestVerifiedCodexVersion, '_codex_release_audit.json']],
+  [repoPath('docs', 'governor.md'), ['workflow-sync', 'SessionStart', 'UserPromptSubmit', 'Stop', 'handoff.json', 'risks', 'release audit', 'multi_agent', 'child_agents_md', 'durable evidence log', 'autoresearch-plan is not a governed mode', chedexMinimumCodexVersion, chedexLatestVerifiedCodexVersion]],
   [repoPath('README.md'), ['~/.codex/workflows/deep-interview/', 'interview.md', 'not governed by `progress.json` or `handoff.json` by default']],
   [repoPath('docs', 'install.md'), ['~/.codex/workflows/deep-interview/', 'interview.md', 'does not require `progress.json` or `handoff.json` by default']],
-  [repoPath('README.md'), ['~/.codex/workflows/autoresearch-plan/', '~/.codex/workflows/autoresearch-loop/', 'results.tsv', 'compatibility router']],
-  [repoPath('docs', 'install.md'), ['~/.codex/workflows/autoresearch-plan/', '~/.codex/workflows/autoresearch-loop/', 'results.tsv', 'compatibility router']],
+  [repoPath('README.md'), ['~/.codex/workflows/autoresearch-plan/', '~/.codex/workflows/autoresearch-loop/', 'results.tsv']],
+  [repoPath('docs', 'install.md'), ['~/.codex/workflows/autoresearch-plan/', '~/.codex/workflows/autoresearch-loop/', 'results.tsv']],
   [repoPath('docs', 'guidance-schema.md'), ['Role And Intent', 'Execution Protocol', 'Verification And Completion', 'explicitly invoked by name first', 'behavioral contract needs surface-specific wording', 'make it explicit in the prompts and their verification', 'fallback only']],
   [repoPath('docs', 'prompt-contract.md'), ['Compact, Evidence-Dense Output', 'Local Task Updates Override Locally', 'Persist With Tools Until The Claim Is Grounded', 'explicit invocation', 'Respect Explicit User Model Intent', explicitUserModelIntentDocSnippet, explicitUserFallbackDocSnippet, explicitUserDefaultsAreFallbackDocSnippet, 'Must preserve the same behaviors in role-appropriate wording.', 'explicit caller-specified sub-agent model or reasoning settings over inherited or default settings unless unavailable or incompatible', 'fallback only']],
   [repoPath('docs', 'customizing.md'), ['docs/guidance-schema.md', 'docs/prompt-contract.md', 'explicit invocation by name', 'binding over inherited or default settings unless unavailable or incompatible', 'relevant files under `prompts/`', 'generated files under `agents/` when prompts change', 'mirrored files under `.codex/` when mirrored source surfaces change', 'npm run generate:agents', 'npm run refresh:mirror', 'npm run verify', 'fallback only']],
   [repoPath('skills', 'clarify', 'SKILL.md'), ['Recommended next step', 'ralph', 'autopilot']],
   [repoPath('skills', 'clarify', 'SKILL.md'), ['Decision boundaries']],
   [repoPath('skills', 'deep-interview', 'SKILL.md'), ['$CODEX_HOME/workflows/deep-interview', 'context.md', 'interview.md', 'spec.md', 'Decision boundaries', 'Do not implement directly inside `deep-interview`', 'source of truth']],
-  [repoPath('skills', 'autoresearch', 'SKILL.md'), ['autoresearch-plan', 'autoresearch-loop', 'governed loop', 'compatibility']],
   [repoPath('skills', 'autoresearch-plan', 'SKILL.md'), ['$CODEX_HOME/workflows/autoresearch-plan', 'spec.md', 'results.tsv', 'research spec']],
   [repoPath('skills', 'autoresearch-loop', 'SKILL.md'), ['$CODEX_HOME/workflows/autoresearch-loop', 'results.tsv', 'handoff.json', 'progress.json', 'Use `mode: "autoresearch-loop"`']],
   [repoPath('skills', 'execute', 'SKILL.md'), ['Escalate to `plan`', 'Escalate to `ralph`', 'Escalate to `autopilot`']],
@@ -164,7 +163,7 @@ const governorSurfaceChecks = [
   [repoPath('skills', 'tdd', 'SKILL.md'), ['Use this only when', 'execute` or `review`']],
   [repoPath('skills', 'plan', 'SKILL.md'), ['handoff.json', 'architect', 'verifier', 'Decision boundaries', 'loop contract']],
   [repoPath('skills', 'ralph', 'SKILL.md'), ['schema_version', 'workflow_root', 'verification', 'risks']],
-  [repoPath('skills', 'autopilot', 'SKILL.md'), ['handoff.json', 'architect', 'verifier', 'verification', 'autoresearch-plan', 'autoresearch-loop']],
+  [repoPath('skills', 'autopilot', 'SKILL.md'), ['governed workflow owner', 'Iteration Boundaries', 'progress.json', 'handoff.json', 'autoresearch-loop']],
   [repoPath('skills', 'ultrawork', 'SKILL.md'), ['$CODEX_HOME/workflows/ultrawork', 'verify.md', 'handoff.json', 'autoresearch-loop']],
   [repoPath('AGENTS.template.md'), ['SessionStart', 'Stop', 'terminal', 'docs/guidance-schema.md', 'docs/prompt-contract.md', 'explicitly invoked by name first', 'If the user explicitly specifies a sub-agent model, treat that choice as binding over inherited or default settings unless the requested model is unavailable or incompatible.', 'If the user explicitly specifies sub-agent reasoning effort, treat that choice as binding over inherited or default settings unless the requested setting is unavailable or incompatible.', 'Do not override, downgrade, or swap', 'fallback only; they never justify silently overriding an explicit user request', 'Non-governed requirements workflows such as `deep-interview` may persist durable artifacts there without `progress.json` or `handoff.json`.', '`autoresearch-loop` is the governed research execution mode']],
 ];
@@ -262,6 +261,10 @@ const quotedHookCommand = buildManagedHooksConfig({
 }).hooks.SessionStart[0].hooks[0].command;
 assert(quotedHookCommand.startsWith("'"), 'managed hook commands must shell-quote the node executable');
 assert(quotedHookCommand.includes("'/tmp/Codex Home/hooks/chedex/chedex-governor.mjs'"), 'managed hook commands must shell-quote governor paths');
+const quotedUserPromptSubmitCommand = buildManagedHooksConfig({
+  hookRuntimePath: '/tmp/Codex Home/hooks/chedex/chedex-governor.mjs',
+}).hooks.UserPromptSubmit[0].hooks[0].command;
+assert(quotedUserPromptSubmitCommand.includes(' user-prompt-submit'), 'managed hook config should expose the prompt-submit governor command');
 
 for (const path of [repoPath('README.md'), repoPath('docs', 'customizing.md')]) {
   const content = await readFile(path, 'utf8');
@@ -304,6 +307,9 @@ const installedHooksConfig = JSON.parse(await readFile(join(installHome, 'hooks.
 const sessionStartCommand = installedHooksConfig.hooks.SessionStart[0].hooks[0].command;
 assert(sessionStartCommand.includes(`'${join(installHome, 'hooks', 'chedex', 'chedex-governor.mjs')}'`), 'install-user should quote managed hook runtime paths');
 assert(installedHooksConfig.hooks.SessionStart[0].matcher === '^(startup|resume)$', 'install-user should preserve the SessionStart startup/resume matcher');
+if (hookProbe.supportedHookEvents.includes('UserPromptSubmit')) {
+  assert(installedHooksConfig.hooks.UserPromptSubmit[0].hooks[0].command.includes('user-prompt-submit'), 'install-user should wire the prompt-submit governor command when supported');
+}
 
 execFileSync(process.execPath, [repoPath('scripts', 'uninstall-user.mjs')], {
   cwd: repoPath(),

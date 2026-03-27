@@ -28,7 +28,7 @@ Turn a vague request into a compact, execution-ready spec without assuming hidde
   - `autoresearch-loop` when the research spec already exists and the governed loop is ready to run
   - `plan` for scoped but still multi-step work
   - `ralph` for substantial resumable execution with governed artifacts
-  - `autopilot` for broad end-to-end clarify/spec/plan/execute/verify work
+  - `autopilot` for broad iterative work that needs one strict operator-facing shell before handing off to narrower lanes
 - If the user explicitly wants to skip clarification, stop and hand off with visible assumptions.
 
 ## Output

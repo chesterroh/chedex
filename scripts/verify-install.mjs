@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { cp, mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { repoRoot } from './lib.mjs';
+import { probeCodexHooksSupport, repoRoot } from './lib.mjs';
 
 function assert(condition, message) {
   if (!condition) {
@@ -55,7 +55,7 @@ async function writeJson(path, value) {
 const installProbeHome = await mkdtemp(join(tmpdir(), 'chedex-install-verify-'));
 await mkdir(join(installProbeHome, 'hooks', 'chedex'), { recursive: true });
 await mkdir(join(installProbeHome, 'prompts'), { recursive: true });
-await mkdir(join(installProbeHome, 'skills', 'autopilot'), { recursive: true });
+await mkdir(join(installProbeHome, 'skills', 'ralph'), { recursive: true });
 await mkdir(join(installProbeHome, 'agents'), { recursive: true });
 await writeFile(join(installProbeHome, 'AGENTS.md'), '# custom agents\n');
 await writeFile(join(installProbeHome, 'config.toml'), '[features]\nfoo = true\n');
@@ -63,7 +63,7 @@ await writeFile(join(installProbeHome, 'hooks.json'), `${JSON.stringify({ hooks:
 await writeFile(join(installProbeHome, 'hooks', 'chedex', 'chedex-governor.mjs'), '# custom runtime\n');
 await writeFile(join(installProbeHome, 'hooks', 'chedex', 'codex-release-audit.mjs'), '# custom release audit\n');
 await writeFile(join(installProbeHome, 'prompts', 'architect.md'), '# custom prompt\n');
-await writeFile(join(installProbeHome, 'skills', 'autopilot', 'SKILL.md'), '# custom skill\n');
+await writeFile(join(installProbeHome, 'skills', 'ralph', 'SKILL.md'), '# custom skill\n');
 await writeFile(join(installProbeHome, 'agents', 'architect.toml'), '# custom agent\n');
 
 const installProbeEnv = { ...process.env, CODEX_HOME: installProbeHome };
@@ -76,12 +76,13 @@ assert((await readFile(join(installProbeHome, 'hooks.json'), 'utf8')).includes('
 assert((await readFile(join(installProbeHome, 'hooks', 'chedex', 'chedex-governor.mjs'), 'utf8')) === '# custom runtime\n', 'uninstall should restore pre-existing hook runtime');
 assert((await readFile(join(installProbeHome, 'hooks', 'chedex', 'codex-release-audit.mjs'), 'utf8')) === '# custom release audit\n', 'uninstall should restore pre-existing managed hook assets');
 assert((await readFile(join(installProbeHome, 'prompts', 'architect.md'), 'utf8')) === '# custom prompt\n', 'uninstall should restore pre-existing managed prompts');
-assert((await readFile(join(installProbeHome, 'skills', 'autopilot', 'SKILL.md'), 'utf8')) === '# custom skill\n', 'uninstall should restore pre-existing managed skills');
+assert((await readFile(join(installProbeHome, 'skills', 'ralph', 'SKILL.md'), 'utf8')) === '# custom skill\n', 'uninstall should restore pre-existing managed skills');
 assert((await readFile(join(installProbeHome, 'agents', 'architect.toml'), 'utf8')) === '# custom agent\n', 'uninstall should restore pre-existing managed agent TOMLs');
 assert(await pathMissing(join(installProbeHome, 'CHEDEX_UNINSTALL.json')), 'uninstall should remove uninstall state metadata');
 
 const freshHome = await mkdtemp(join(tmpdir(), 'chedex-install-fresh-'));
 const freshEnv = { ...process.env, CODEX_HOME: freshHome };
+const hookProbe = probeCodexHooksSupport();
 runNodeScript(repoRoot, 'scripts/install-user.mjs', freshEnv);
 
 const freshUninstallState = JSON.parse(await readFile(join(freshHome, 'CHEDEX_UNINSTALL.json'), 'utf8'));
@@ -96,6 +97,16 @@ assert(
 const installedHooksConfig = JSON.parse(await readFile(join(freshHome, 'hooks.json'), 'utf8'));
 const installedSessionStartCommand = installedHooksConfig.hooks.SessionStart[0].hooks[0].command;
 assert(installedSessionStartCommand.includes('session-start'), 'install should wire SessionStart to the governor session-start command');
+if (hookProbe.supportedHookEvents.includes('UserPromptSubmit')) {
+  const installedUserPromptSubmitCommand = installedHooksConfig.hooks.UserPromptSubmit[0].hooks[0].command;
+  assert(installedUserPromptSubmitCommand.includes('user-prompt-submit'), 'install should wire UserPromptSubmit to the governor prompt-submit command');
+  const promptSubmitVerdict = JSON.parse(runShellCommand(
+    installedUserPromptSubmitCommand,
+    freshEnv,
+    `${JSON.stringify({ cwd: join(freshHome, 'workspace-empty'), prompt: 'smoke test' })}\n`,
+  ));
+  assert(promptSubmitVerdict.decision === 'allow', 'user-prompt-submit should allow prompts when no governed workflow is active');
+}
 
 const emptySessionStartOutput = runShellCommand(
   installedSessionStartCommand,
@@ -158,6 +169,15 @@ const governedSessionStartOutput = runShellCommand(
 );
 assert(governedSessionStartOutput.includes('mode: ralph'), 'installed session-start hook should restore governed workflow context');
 assert(governedSessionStartOutput.includes('task: install smoke task'), 'installed session-start hook should render the governed workflow summary');
+if (hookProbe.supportedHookEvents.includes('UserPromptSubmit')) {
+  const installedUserPromptSubmitCommand = installedHooksConfig.hooks.UserPromptSubmit[0].hooks[0].command;
+  const governedPromptVerdict = JSON.parse(runShellCommand(
+    installedUserPromptSubmitCommand,
+    freshEnv,
+    `${JSON.stringify({ cwd: governedCwd, prompt: 'continue' })}\n`,
+  ));
+  assert(governedPromptVerdict.decision === 'allow', 'user-prompt-submit should allow prompts when governed state is valid');
+}
 
 runNodeScript(repoRoot, 'scripts/uninstall-user.mjs', freshEnv);
 
@@ -324,10 +344,10 @@ assert(staleInstallFailed, 'install:user:dry should fail with guidance when gene
 const reinstallDriftHome = await mkdtemp(join(tmpdir(), 'chedex-install-reinstall-drift-'));
 const reinstallDriftEnv = { ...process.env, CODEX_HOME: reinstallDriftHome };
 runNodeScript(repoRoot, 'scripts/install-user.mjs', reinstallDriftEnv);
-await writeFile(join(reinstallDriftHome, 'skills', 'autopilot', 'STALE.md'), '# stale managed file\n');
+await writeFile(join(reinstallDriftHome, 'skills', 'ralph', 'STALE.md'), '# stale managed file\n');
 runNodeScript(repoRoot, 'scripts/install-user.mjs', reinstallDriftEnv);
 assert(
-  await pathMissing(join(reinstallDriftHome, 'skills', 'autopilot', 'STALE.md')),
+  await pathMissing(join(reinstallDriftHome, 'skills', 'ralph', 'STALE.md')),
   'reinstall should remove stale files inside managed skill directories',
 );
 runNodeScript(repoRoot, 'scripts/uninstall-user.mjs', reinstallDriftEnv);

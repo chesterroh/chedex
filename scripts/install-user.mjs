@@ -207,7 +207,9 @@ if (!dryRun) {
 let nextConfig = upsertFeaturesSection(existingConfig || '');
 nextConfig = stripChedexBlock(nextConfig).trimEnd();
 nextConfig = `${nextConfig}\n\n${buildAgentConfigBlock(targets.agentsDir)}\n`;
-const nextHooksConfig = mergeManagedHooksConfig(currentHooksConfig, targets);
+const nextHooksConfig = mergeManagedHooksConfig(currentHooksConfig, targets, {
+  supportedHookEvents: hookProbe.supportedHookEvents,
+});
 
 if (!dryRun) {
   await writeFileIfChanged(targets.configPath, nextConfig);
@@ -227,6 +229,7 @@ const summary = [
   `codex_version=${hookProbe.version}`,
   `codex_hooks_feature_stage=${hookProbe.feature.stage}`,
   `codex_hooks_feature_enabled_before_install=${hookProbe.feature.enabled ? 'true' : 'false'}`,
+  `managed_hook_events=${hookProbe.supportedHookEvents.join(',')}`,
   `hooks_config=${targets.hooksConfigPath}`,
   `hook_runtime=${targets.hookRuntimePath}`,
   `uninstall_state=${targets.uninstallStatePath}`,

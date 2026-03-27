@@ -83,9 +83,16 @@ Update together:
 - `scripts/install-user.mjs`
 - `scripts/uninstall-user.mjs`
 - `docs/governor.md`
+- `skills/autopilot/SKILL.md`
 - `skills/plan/SKILL.md`
 - `skills/ralph/SKILL.md`
-- `skills/autopilot/SKILL.md`
 - `skills/ultrawork/SKILL.md`
 - `scripts/verify-governor.mjs`
 - `scripts/refresh-repo-mirror.mjs`
+
+If the change affects the operator-facing `autopilot` shell beyond governor-owned behavior, update:
+
+- `skills/autopilot/SKILL.md`
+- `README.md`
+- `docs/install.md`
+- `scripts/verify-repo.mjs`

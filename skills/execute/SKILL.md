@@ -19,7 +19,7 @@ Use this when the task is clear enough to act on directly.
 - Escalate to `autoresearch-loop` when the task is already a governed baseline/experiment/ledger loop with a stable evaluation path and explicit keep-or-revert decisions.
 - Escalate to `plan` when scope or sequencing needs to be made explicit before acting.
 - Escalate to `ralph` when the task needs resumable artifacts, governed progress tracking, or a hard verification loop.
-- Escalate to `autopilot` when the task needs the full clarify/spec/plan/execute/verify lifecycle.
+- Escalate to `autopilot` when the task needs a stricter broad-work shell across clarify/spec/plan/execute before dropping into a narrower execution lane.
 - If blocked, try another grounded approach before escalating.
 
 ## Completion Gate

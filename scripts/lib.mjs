@@ -17,9 +17,11 @@ export const uninstallStateFileName = 'CHEDEX_UNINSTALL.json';
 export const backupsDirName = '.chedex-backups';
 export const chedexHooksFeature = 'codex_hooks';
 export const chedexMinimumCodexVersion = '0.114.0';
-export const chedexLatestVerifiedCodexVersion = '0.115.0';
+export const chedexUserPromptSubmitMinimumCodexVersion = '0.116.0';
+export const chedexLatestVerifiedCodexVersion = '0.117.0';
 export const chedexHookStatusPrefix = 'Chedex governor:';
 export const chedexSessionStartStatusMessage = `${chedexHookStatusPrefix} restore governed workflow context`;
+export const chedexUserPromptSubmitStatusMessage = `${chedexHookStatusPrefix} guard governed prompt submission`;
 export const chedexStopStatusMessage = `${chedexHookStatusPrefix} enforce terminal workflow state`;
 
 export function codexHome() {
@@ -363,7 +365,7 @@ export function installManifestPaths() {
 }
 
 export function listSkills() {
-  return ['clarify', 'deep-interview', 'autoresearch', 'autoresearch-plan', 'autoresearch-loop', 'plan', 'review', 'execute', 'tdd', 'ultrawork', 'ralph', 'autopilot'];
+  return ['clarify', 'deep-interview', 'autoresearch-plan', 'autoresearch-loop', 'plan', 'review', 'execute', 'tdd', 'ultrawork', 'ralph', 'autopilot'];
 }
 
 export async function writeFileIfChanged(path, content) {
@@ -414,6 +416,10 @@ export function isManagedHookHandler(handler) {
     return handler.type === 'command' && command.includes(' session-start');
   }
 
+  if (statusMessage === chedexUserPromptSubmitStatusMessage) {
+    return handler.type === 'command' && command.includes(' user-prompt-submit');
+  }
+
   if (statusMessage === chedexStopStatusMessage) {
     return handler.type === 'command' && command.includes(' stop');
   }
@@ -460,43 +466,84 @@ export function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\"'\"'`)}'`;
 }
 
-export function buildManagedHooksConfig(targets) {
-  const nodeCommand = shellQuote(process.execPath);
-  const governorCommand = shellQuote(targets.hookRuntimePath);
-  return {
-    hooks: {
-      SessionStart: [
-        {
-          matcher: '^(startup|resume)$',
-          hooks: [
-            {
-              type: 'command',
-              command: `${nodeCommand} ${governorCommand} session-start`,
-              timeout: 5,
-              statusMessage: chedexSessionStartStatusMessage,
-            },
-          ],
-        },
-      ],
-      Stop: [
-        {
-          hooks: [
-            {
-              type: 'command',
-              command: `${nodeCommand} ${governorCommand} stop`,
-              timeout: 5,
-              statusMessage: chedexStopStatusMessage,
-            },
-          ],
-        },
-      ],
-    },
-  };
+export function managedHookEventsForCodexVersion(rawVersion) {
+  const installed = parseSemver(rawVersion);
+  const userPromptSubmitMinimum = parseSemver(chedexUserPromptSubmitMinimumCodexVersion);
+  const supportsUserPromptSubmit = Boolean(
+    installed
+    && userPromptSubmitMinimum
+    && compareSemver(installed, userPromptSubmitMinimum) >= 0,
+  );
+
+  return [
+    'SessionStart',
+    ...(supportsUserPromptSubmit ? ['UserPromptSubmit'] : []),
+    'Stop',
+  ];
 }
 
-export function mergeManagedHooksConfig(existing, targets) {
+export function buildManagedHooksConfig(targets, options = {}) {
+  const nodeCommand = shellQuote(process.execPath);
+  const governorCommand = shellQuote(targets.hookRuntimePath);
+  const supportedHookEvents = new Set(
+    Array.isArray(options.supportedHookEvents) && options.supportedHookEvents.length > 0
+      ? options.supportedHookEvents
+      : ['SessionStart', 'UserPromptSubmit', 'Stop'],
+  );
+  const hooks = {};
+
+  if (supportedHookEvents.has('SessionStart')) {
+    hooks.SessionStart = [
+      {
+        matcher: '^(startup|resume)$',
+        hooks: [
+          {
+            type: 'command',
+            command: `${nodeCommand} ${governorCommand} session-start`,
+            timeout: 5,
+            statusMessage: chedexSessionStartStatusMessage,
+          },
+        ],
+      },
+    ];
+  }
+
+  if (supportedHookEvents.has('UserPromptSubmit')) {
+    hooks.UserPromptSubmit = [
+      {
+        hooks: [
+          {
+            type: 'command',
+            command: `${nodeCommand} ${governorCommand} user-prompt-submit`,
+            timeout: 5,
+            statusMessage: chedexUserPromptSubmitStatusMessage,
+          },
+        ],
+      },
+    ];
+  }
+
+  if (supportedHookEvents.has('Stop')) {
+    hooks.Stop = [
+      {
+        hooks: [
+          {
+            type: 'command',
+            command: `${nodeCommand} ${governorCommand} stop`,
+            timeout: 5,
+            statusMessage: chedexStopStatusMessage,
+          },
+        ],
+      },
+    ];
+  }
+
+  return { hooks };
+}
+
+export function mergeManagedHooksConfig(existing, targets, options = {}) {
   const stripped = stripManagedHooksConfig(existing);
-  const managed = buildManagedHooksConfig(targets);
+  const managed = buildManagedHooksConfig(targets, options);
   const merged = normalizeManagedHooksConfig(stripped);
 
   for (const [eventName, groups] of Object.entries(managed.hooks)) {
@@ -590,6 +637,7 @@ export function probeCodexHooksSupport() {
     ok: true,
     version: installed.raw,
     feature: features[chedexHooksFeature],
+    supportedHookEvents: managedHookEventsForCodexVersion(installed.raw),
   };
 }
 

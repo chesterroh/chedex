@@ -1,4 +1,4 @@
-# Chedex v0.5.5
+# Chedex v0.117.0
 
 An homage to preceding projects such as Oh My OpenAgent, Oh My Codex, and Ouroboros.
 
@@ -18,21 +18,15 @@ It intentionally excludes external orchestration machinery such as:
 - legacy external state systems
 - HUD, mailboxing, linked mode state, and runtime overlays
 
-## v0.5.5 Shape
+## v0.117.0 Shape
 
-`0.5.5` keeps the current Chedex shape verified against Codex `0.115.0` while improving verification consistency and install hygiene introduced during the latest optimization loop.
+`0.117.0` keeps the current Chedex shape verified against Codex `0.117.0` and records the official `0.116.0` / `0.117.0` release-surface upgrades in the startup release audit.
 
-- direct ordinary turns stay lightweight and native
-- `autopilot`, `ralph`, `autoresearch-loop`, and direct top-level `ultrawork` are governed workflows
-- `deep-interview` is an explicit artifact-backed requirements skill, not a governed execution workflow
-- `autoresearch` is now a compatibility router, `autoresearch-plan` is non-governed planning, and `autoresearch-loop` is the governed research execution mode
-- Codex native hooks provide session rehydration and stop gating
-- `SessionStart` can also surface a non-blocking Codex release audit when the installed CLI lags the latest published package release
-- governed workflows persist authoritative state under `~/.codex/workflows/`
-- Chedex currently requires Codex `>= 0.114.0` with the `codex_hooks` feature surface available and is verified against Codex `0.115.0`
-- the governed workflow schema is enforced consistently across docs, skills, and runtime validation
+- ordinary turns stay lightweight and native
+- selected governed lanes and artifact-backed planning/requirements lanes keep durable state under `~/.codex/workflows/`
+- Codex `>= 0.116.0` gets the narrow `UserPromptSubmit` integrity gate in addition to `SessionStart` and `Stop`
+- Chedex currently requires Codex `>= 0.114.0` with `codex_hooks` available and is verified against Codex `0.117.0`
 - the repo keeps a deterministic `.codex/` mirror for installable source surfaces and verifies parity explicitly
-- reinstall now removes stale managed files inside installed skill trees instead of leaving old managed content behind
 
 ## At A Glance
 
@@ -67,7 +61,6 @@ The operating model is simple:
 
 - `clarify` for lightweight one-question-at-a-time requirements clarification
 - `deep-interview` for high-rigor requirements work with durable artifacts
-- `autoresearch` for routing research-shaped work as a compatibility router
 - `autoresearch-plan` for turning an optimization problem into a defensible research spec and handoff
 - `autoresearch-loop` for governed baseline/experiment/ledger optimization work
 - `plan` for producing an actionable work plan
@@ -76,7 +69,7 @@ The operating model is simple:
 - `tdd` for strict failing-test-first work
 - `ultrawork` for parallel execution fan-out
 - `ralph` for persistent multi-step execution with artifacts and verification
-- `autopilot` for end-to-end clarify/spec/plan/execute/verify flow
+- `autopilot` for strict operator-facing clarify/spec/plan/execute iteration as a governed broad-work shell
 
 ## Workflow Map
 
@@ -86,30 +79,22 @@ The operating model is simple:
 - `clarify`: reduce ambiguity quickly
 - `deep-interview`: durable requirements artifacts under `~/.codex/workflows/deep-interview/<slug>/`, typically `context.md`, `interview.md`, and `spec.md`; it is not governed by `progress.json` or `handoff.json` by default
 - `autoresearch-plan`: planning artifacts under `~/.codex/workflows/autoresearch-plan/<slug>/`, typically `context.md`, `spec.md`, and sometimes a seeded `results.tsv`
-- `autoresearch`: compatibility router that helps callers choose between planning and execution
 
 ### Governed Lanes
 
 - `autoresearch-loop`: governed research execution under `~/.codex/workflows/autoresearch-loop/<slug>/`
+- `autopilot`: governed broad-work iteration under `~/.codex/workflows/autopilot/<slug>/`; nested `ralph` and `ultrawork` slices should report through it unless ownership is explicitly transferred
 - `ralph`: persistent execution with resumable artifacts
-- `autopilot`: broader end-to-end governed ownership
 - direct top-level `ultrawork`: minimal governed state for parallel execution
 
 ### Governed Artifact Model
 
-Governed workflow state centers on:
+- `progress.json` is the authoritative workflow record
+- `handoff.json` is the plan-to-execution ratchet when a governed plan is required
+- `verify.md` is the durable evidence log
+- `~/.codex/workflows/_active.json` is the active workflow index
 
-- `progress.json` as the authoritative workflow record
-- `handoff.json` as the plan-to-execution ratchet
-- `verify.md` as the durable evidence log
-- `~/.codex/workflows/_active.json` as the active workflow index
-- `~/.codex/workflows/_codex_release_audit.json` as the startup release-audit cache
-
-For research-shaped work, the lane split is:
-
-- `autoresearch` chooses the lane when the caller has not chosen yet
-- `autoresearch-plan` defines the metric, fixed layer, mutable layer, budget, and decision rule
-- `autoresearch-loop` runs the bounded experiments and maintains `results.tsv`, `verify.md`, and governed progress
+Operational details for `hooks.json`, `UserPromptSubmit`, release audit behavior, and install-owned feature flags belong in [docs/install.md](docs/install.md) and [docs/governor.md](docs/governor.md).
 
 ## Install Model
 
@@ -162,28 +147,23 @@ Use this repo as your own harness base:
 5. Refresh the `.codex/` mirror when mirrored source surfaces change.
 6. Verify before install or release.
 
-This repo reflects the stronger delegation policy currently installed in your global `~/.codex/AGENTS.md`. `AGENTS.template.md`, `prompts/`, and `skills/` should stay aligned with `docs/guidance-schema.md` and `docs/prompt-contract.md`.
+This repo reflects the lighter native-agent guidance currently installed in your global `~/.codex/AGENTS.md`. `AGENTS.template.md`, `prompts/`, and `skills/` should stay aligned with `docs/guidance-schema.md` and `docs/prompt-contract.md`.
 
 Explicit caller-specified sub-agent model or reasoning settings should override repo defaults unless unavailable or incompatible, and prompt changes should preserve that rule through generated agents and mirrors.
 
 ## Workflow Alignment
 
-Chedex keeps a clear native-only execution chain:
+Chedex keeps a small native-first execution chain:
 
-- `clarify` closes a few critical gaps quickly
-- `deep-interview` handles the higher-rigor interview pass when intent, scope, non-goals, or decision rights need a durable artifact trail
-- `autoresearch` routes research-shaped work to the right lane when the user or caller has not chosen yet
-- `autoresearch-plan` turns a stable evaluation target into a defensible research spec, fixed layer, mutable layer, and experiment queue
-- `autoresearch-loop` owns governed research execution, including baseline/experiment/decide/repeat and stop-gated closeout
-- `ultrawork` handles parallel fan-out for independent work, and direct top-level use keeps only the minimum governed state it needs: `progress.json`, active index sync, and `verify.md` when it needs a durable evidence log
-- `ralph` wraps `ultrawork` with resumable artifacts, active workflow registration, and a hard verification loop
-- `autopilot` owns broad clarify/spec/plan/execute/verify/validate work, can use `autoresearch-plan` during planning, and should hand research execution to `autoresearch-loop` when the task resolves into a governed optimization loop
+- `clarify` and `deep-interview` shape requirements
+- `autoresearch-plan` and `autoresearch-loop` own research grounding and governed optimization
+- `ralph` and direct top-level `ultrawork` own the remaining persistent execution cases
+- `autopilot` is the tight governed shell for broad iterative work, while nested `ralph` and `ultrawork` slices still report through it unless ownership is explicitly transferred
 
-The current governor model admits one active governed workflow entry per workspace `cwd`. Within one workspace, nested `ultrawork` lanes and `ralph` execution slices should normally report through the current governed owner instead of syncing competing governed state.
+The governor still admits one active governed workflow entry per workspace `cwd`.
 
 ## Current Gaps
 
-- The legacy `autoresearch` surface remains a compatibility router. Prefer explicit invocation of `autoresearch-plan` or `autoresearch-loop` for new work.
 - Plan-hardening with `architect` and `verifier` is currently a workflow-contract requirement rather than stored governor provenance. Runtime admission still validates governed artifacts such as `handoff.json` and `progress.json`.
 - Repo verification still relies partly on required-text checks in `scripts/verify-repo.mjs`. This is good at catching drift, but it is not full semantic validation.
 - The latest verified Codex CLI version is still maintained as repo metadata plus docs wording, not generated into docs from one canonical source.

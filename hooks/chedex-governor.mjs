@@ -801,13 +801,75 @@ export function blockResponse(reason) {
   });
 }
 
+export function allowResponse() {
+  return JSON.stringify({
+    decision: 'allow',
+  });
+}
+
+export async function userPromptSubmitHook({
+  codexHome = defaultCodexHome(),
+  cwd = process.cwd(),
+} = {}) {
+  const normalizedCwd = resolve(cwd);
+
+  try {
+    return await withActiveIndexLock(codexHome, async () => {
+      const loadResult = await loadActiveIndexResult(codexHome);
+      if (!loadResult.ok) {
+        return {
+          decision: 'block',
+          reason: `Chedex governor blocked prompt submission because the active workflow index is invalid:\n- ${buildIndexInvalidReason(codexHome, loadResult.error)}`,
+        };
+      }
+
+      const index = loadResult.index;
+      const changed = await pruneIndexForSessionStart(index);
+      const entry = index.entries[normalizedCwd];
+
+      if (!entry) {
+        if (changed) {
+          await saveActiveIndex(index, codexHome);
+        }
+        return { decision: 'allow' };
+      }
+
+      const inspection = await inspectIndexedWorkflowEntry(entry);
+      if (!inspection.ok) {
+        if (changed) {
+          await saveActiveIndex(index, codexHome);
+        }
+        return {
+          decision: 'block',
+          reason: `Chedex governor blocked prompt submission because ${inspection.reason}`,
+        };
+      }
+
+      const normalizedEntry = inspection.normalizedEntry;
+      if (JSON.stringify(entry) !== JSON.stringify(normalizedEntry)) {
+        index.entries[normalizedCwd] = normalizedEntry;
+      }
+      if (changed || JSON.stringify(entry) !== JSON.stringify(normalizedEntry)) {
+        await saveActiveIndex(index, codexHome);
+      }
+
+      return { decision: 'allow' };
+    });
+  } catch (error) {
+    return {
+      decision: 'block',
+      reason: `Chedex governor blocked prompt submission because it could not safely access governed state:\n- ${buildLockBusyReason(codexHome, error)}`,
+    };
+  }
+}
+
 async function runCli() {
   const args = parseArgs(process.argv.slice(2));
   const [command] = args._;
   const codexHome = args.codex_home ? resolve(args.codex_home) : defaultCodexHome();
 
   if (!command) {
-    throw new Error('usage: chedex-governor.mjs <session-start|stop|workflow-sync|workflow-clear>');
+    throw new Error('usage: chedex-governor.mjs <session-start|user-prompt-submit|stop|workflow-sync|workflow-clear>');
   }
 
   switch (command) {
@@ -841,6 +903,21 @@ async function runCli() {
       if (verdict.action === 'block') {
         process.stdout.write(blockResponse(verdict.reason));
       }
+      return;
+    }
+    case 'user-prompt-submit': {
+      let input;
+      try {
+        input = await readHookInput();
+      } catch (error) {
+        process.stdout.write(blockResponse(`Chedex governor blocked prompt submission because ${formatErrorReason(error)}`));
+        return;
+      }
+      const verdict = await userPromptSubmitHook({
+        codexHome,
+        cwd: input.cwd || process.cwd(),
+      });
+      process.stdout.write(verdict.decision === 'allow' ? allowResponse() : blockResponse(verdict.reason));
       return;
     }
     case 'workflow-sync': {

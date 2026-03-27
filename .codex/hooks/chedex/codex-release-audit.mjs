@@ -19,6 +19,24 @@ export const KNOWN_CODEX_RELEASE_DELTAS = [
       'Reinstall Chedex with `npm run install:user` if the hook runtime or managed hook config changed.',
     ],
   },
+  {
+    since: '0.116.0',
+    summary: 'Codex 0.116.x adds the `userpromptsubmit` hook, smoother plugin install/sync flows, and app-server TUI ChatGPT sign-in/token refresh support.',
+    checks: [
+      'Review whether Chedex should adopt `UserPromptSubmit` or intentionally stay on `SessionStart` / `Stop` only.',
+      'Recheck plugin/setup assumptions if your workflow depends on plugin suggestions, connector installs, or remote plugin sync.',
+      'Re-run `npm run verify` after upgrading Codex CLI.',
+    ],
+  },
+  {
+    since: '0.117.0',
+    summary: 'Codex 0.117.x makes plugins first-class, enables the app-server-backed TUI by default, and shifts multi-agent workflows toward path-based agent addressing.',
+    checks: [
+      'Review any repo assumptions tied to legacy handlers removed in 0.117.x, including `read_file`, `grep_files`, and the old artifact tool.',
+      'Recheck plugin-first workflows and app-server TUI behavior after upgrading.',
+      'Refresh mirrored hook assets with `npm run refresh:mirror` and reinstall with `npm run install:user` if the managed runtime changed.',
+    ],
+  },
 ];
 
 export function defaultCodexHome() {

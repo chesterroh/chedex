@@ -10,6 +10,7 @@ import {
   sessionStartHook,
   stopHook,
   syncWorkflow,
+  userPromptSubmitHook,
 } from '../hooks/chedex-governor.mjs';
 import {
   buildReleaseAudit,
@@ -444,6 +445,12 @@ const invalidIndexedProgressStop = await stopHook({
 });
 assert(invalidIndexedProgressStop.action === 'block', 'stop should block when indexed progress.json is malformed');
 assert(invalidIndexedProgressStop.reason.includes('progress.json is unreadable'), 'stop should explain malformed progress.json blocks');
+const invalidIndexedProgressPrompt = await userPromptSubmitHook({
+  codexHome: home,
+  cwd: invalidIndexedProgressCwd,
+});
+assert(invalidIndexedProgressPrompt.decision === 'block', 'user-prompt-submit should block when indexed progress.json is malformed');
+assert(invalidIndexedProgressPrompt.reason.includes('progress.json is unreadable'), 'user-prompt-submit should explain malformed progress.json blocks');
 
 const invalidMissingPhase = await makeWorkflow({
   home,
@@ -539,6 +546,12 @@ const invalidIndexStop = await stopHook({
 });
 assert(invalidIndexStop.action === 'block', 'stop should block when _active.json is malformed');
 assert(invalidIndexStop.reason.includes('active workflow index is invalid'), 'stop should explain malformed _active.json blocks');
+const invalidIndexPrompt = await userPromptSubmitHook({
+  codexHome: home,
+  cwd: corruptedIndexCwd,
+});
+assert(invalidIndexPrompt.decision === 'block', 'user-prompt-submit should block when _active.json is malformed');
+assert(invalidIndexPrompt.reason.includes('active workflow index is invalid'), 'user-prompt-submit should explain malformed _active.json blocks');
 await writeJson(activeIndexPath(home), {
   schema_version: GOVERNOR_SCHEMA_VERSION,
   entries: {},
@@ -736,6 +749,12 @@ const staleCacheAudit = await buildReleaseAudit({
 });
 assert(staleCacheAudit.stale, 'release audit should preserve stale cache metadata when live refresh is unavailable');
 
+const emptyPromptVerdict = await userPromptSubmitHook({
+  codexHome: home,
+  cwd: join(home, 'prompt-submit-empty'),
+});
+assert(emptyPromptVerdict.decision === 'allow', 'user-prompt-submit should allow prompts when no governed workflow is active');
+
 const malformedSessionStartCli = execFileSync(process.execPath, [join(process.cwd(), 'hooks', 'chedex-governor.mjs'), 'session-start', '--codex-home', home], {
   cwd: process.cwd(),
   env: process.env,
@@ -753,5 +772,15 @@ const malformedStopCli = execFileSync(process.execPath, [join(process.cwd(), 'ho
 const malformedStopVerdict = JSON.parse(malformedStopCli);
 assert(malformedStopVerdict.decision === 'block', 'stop CLI should block on malformed hook input');
 assert(malformedStopVerdict.reason.includes('invalid hook JSON input'), 'stop CLI should explain malformed hook input blocks');
+
+const malformedPromptSubmitCli = execFileSync(process.execPath, [join(process.cwd(), 'hooks', 'chedex-governor.mjs'), 'user-prompt-submit', '--codex-home', home], {
+  cwd: process.cwd(),
+  env: process.env,
+  input: '{bad json\n',
+  encoding: 'utf8',
+});
+const malformedPromptSubmitVerdict = JSON.parse(malformedPromptSubmitCli);
+assert(malformedPromptSubmitVerdict.decision === 'block', 'user-prompt-submit CLI should block on malformed hook input');
+assert(malformedPromptSubmitVerdict.reason.includes('invalid hook JSON input'), 'user-prompt-submit CLI should explain malformed hook input blocks');
 
 process.stdout.write('verify-governor-ok\n');
