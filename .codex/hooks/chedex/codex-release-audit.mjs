@@ -37,6 +37,15 @@ export const KNOWN_CODEX_RELEASE_DELTAS = [
       'Refresh mirrored hook assets with `npm run refresh:mirror` and reinstall with `npm run install:user` if the managed runtime changed.',
     ],
   },
+  {
+    since: '0.118.0',
+    summary: 'Codex 0.118.x improves sandbox reliability, adds prompt-plus-stdin support to `codex exec`, strengthens first-write protection for project-local `.codex` files, and restores several app-server and MCP workflows.',
+    checks: [
+      'Re-run `npm run verify` after upgrading Codex CLI.',
+      'Re-run `npm run install:user:dry` to confirm the managed hook surface still resolves as expected on 0.118.x.',
+      'If you rely on app-server-backed workflows, smoke-test hook replay, `/copy`, `/resume`, and MCP startup behavior after upgrading.',
+    ],
+  },
 ];
 
 export function defaultCodexHome() {

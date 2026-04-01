@@ -5,7 +5,7 @@ The Chedex governor is the native lifecycle layer for governed workflows.
 ## Requirements
 
 - Codex CLI `>= 0.114.0`
-- Latest verified Codex CLI: `0.117.0`
+- Latest verified Codex CLI: `0.118.0`
 - `codex_hooks` feature available in `codex features list`
 
 Install enables `multi_agent = true`, `child_agents_md = true`, and `codex_hooks = true`, and writes a managed `hooks.json` beside `config.toml`.

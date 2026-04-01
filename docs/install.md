@@ -3,7 +3,7 @@
 ## Requirements
 
 - Codex CLI `>= 0.114.0`
-- Latest verified Codex CLI: `0.117.0`
+- Latest verified Codex CLI: `0.118.0`
 - `codex features list` must expose `codex_hooks`
 - Node `>= 20`
 
