@@ -8,7 +8,7 @@ The Chedex governor is the native lifecycle layer for governed workflows.
 - Latest verified Codex CLI: `0.118.0`
 - `codex_hooks` feature available in `codex features list`
 
-Install enables `multi_agent = true`, `child_agents_md = true`, and `codex_hooks = true`, and writes a managed `hooks.json` beside `config.toml`.
+Install enables `multi_agent = true` and `codex_hooks = true`, and writes a managed `hooks.json` beside `config.toml`.
 On Codex `>= 0.116.0`, the managed hook set also includes `UserPromptSubmit`.
 
 ## Installed Paths
@@ -65,6 +65,8 @@ Each entry records:
 - `phase`
 - `next_step`
 - `updated_at`
+- `completion_token`
+- `cwd`
 
 Governor-managed `_active.json` updates are serialized and written atomically. Per-workflow sync operations also take a workflow-specific lock such as `_lock_<hash(cwd)>`, so unrelated workspaces no longer block one another on a single global runtime lock. If the active index cannot be read safely, `Stop` fails closed and `SessionStart` surfaces a warning instead of silently clearing protection.
 Syncing a different governed workflow from the same `cwd` replaces the previous indexed entry rather than nesting multiple owners.
@@ -149,15 +151,16 @@ Completed workflows must store:
 - `verification.review.role = "verifier"`
 - `verification.review.verdict = "pass"`
 - `verification.review.evidence_ref`
+- `verification.review.completion_token`
 - `verification.review.approved_at`
 
-The helper command below records the independent verifier review in `progress.json`:
+The helper command below records the required verifier review record in `progress.json`:
 
 ```bash
 "$CODEX_HOME/hooks/chedex/chedex-governor.mjs" verification-complete --cwd /abs/path/to/workspace --progress /abs/path/to/progress.json --evidence-ref "verifier: PASS"
 ```
 
-The helper requires the workflow to already be indexed for that workspace and stamps governor-held completion provenance into `verification.review` before closeout.
+The helper requires the workflow to already be indexed for that workspace and stamps a governor-held completion token into `verification.review` before closeout. This prevents hand-written closeout records from passing validation, but it is not yet a native runtime-invoked verifier hook.
 
 ## Helper Commands
 

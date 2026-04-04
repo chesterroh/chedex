@@ -31,6 +31,7 @@ Recommended files:
 - It should not invent extra runtime semantics beyond the native governor contract and the narrower lanes already present in Chedex.
 - Within one workspace, `autopilot` remains the governed owner by default. Nested `ralph` or `ultrawork` execution slices should report through the current `autopilot` workflow instead of syncing competing governed state.
 - If the task resolves into a pure governed research loop, explicitly hand governed ownership to `autoresearch-loop` instead of keeping `autopilot` active in the same workspace.
+- Governor admission for `autopilot` currently enforces `progress.json` plus `artifacts.handoff`; the other recommended artifacts remain workflow guidance rather than hard runtime requirements.
 
 ## Phases
 
@@ -54,7 +55,7 @@ Recommended files:
    - Let `ralph` use `ultrawork` only when lanes are truly independent.
 5. Verify
    - Refresh `verify.md` with tests, diagnostics, rejections, and remaining risk.
-   - Record the independent completion decision in `progress.json.verification.review` before marking the workflow completed.
+   - Record the verifier review record in `progress.json.verification.review` before marking the workflow completed.
    - Loop back to clarify, specify, or plan when evidence shows the contract is still weak.
 
 ## Rules

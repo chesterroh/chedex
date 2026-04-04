@@ -894,7 +894,7 @@ export function renderSessionStartContext(entry, progress) {
     }
   }
 
-  lines.push('closeout rule: do not stop until progress.json is terminal and, when completed, verification is satisfied with an independent verifier pass.');
+  lines.push('closeout rule: do not stop until progress.json is terminal and, when completed, verification is satisfied with a verifier pass carrying the governor-stamped completion token.');
   return `${lines.join('\n')}\n`;
 }
 
@@ -902,7 +902,7 @@ export function renderSessionStartWarning(reason) {
   return [
     'Chedex governor found governed workflow state for this workspace, but it could not restore it safely.',
     reason,
-    'closeout rule: stop will remain blocked until the workflow state is repaired or cleared, and when completed, verification is satisfied with an independent verifier pass.',
+    'closeout rule: stop will remain blocked until the workflow state is repaired or cleared, and when completed, verification is satisfied with a verifier pass carrying the governor-stamped completion token.',
     '',
   ].join('\n');
 }

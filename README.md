@@ -107,7 +107,7 @@ Operational details for `hooks.json`, `UserPromptSubmit`, release audit behavior
 - `~/.codex/hooks/chedex/*`
 - `~/.codex/hooks.json`
 - `[agents.*]` entries in `~/.codex/config.toml`
-- `[features] multi_agent = true`, `child_agents_md = true`, and `codex_hooks = true` in `~/.codex/config.toml`
+- `[features] multi_agent = true` and `codex_hooks = true` in `~/.codex/config.toml`
 
 ### Install And Deploy Commands
 

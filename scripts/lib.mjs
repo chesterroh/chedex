@@ -213,7 +213,6 @@ export function upsertFeaturesSection(config) {
     const featureBlock = [
       '[features]',
       'multi_agent = true',
-      'child_agents_md = true',
       `${chedexHooksFeature} = true`,
     ].join('\n');
     return body ? `${body}\n\n${featureBlock}\n` : `${featureBlock}\n`;
@@ -228,16 +227,12 @@ export function upsertFeaturesSection(config) {
   }
 
   let foundMulti = false;
-  let foundChild = false;
   let foundHooks = false;
 
   for (let i = featuresStart + 1; i < sectionEnd; i++) {
     if (/^\s*multi_agent\s*=/.test(lines[i])) {
       lines[i] = 'multi_agent = true';
       foundMulti = true;
-    } else if (/^\s*child_agents_md\s*=/.test(lines[i])) {
-      lines[i] = 'child_agents_md = true';
-      foundChild = true;
     } else if (new RegExp(`^\\s*${chedexHooksFeature}\\s*=`).test(lines[i])) {
       lines[i] = `${chedexHooksFeature} = true`;
       foundHooks = true;
@@ -247,10 +242,6 @@ export function upsertFeaturesSection(config) {
   const insertAt = sectionEnd;
   if (!foundMulti) {
     lines.splice(insertAt, 0, 'multi_agent = true');
-    sectionEnd += 1;
-  }
-  if (!foundChild) {
-    lines.splice(sectionEnd, 0, 'child_agents_md = true');
     sectionEnd += 1;
   }
   if (!foundHooks) {
@@ -281,7 +272,7 @@ export function stripManagedFeaturesSection(config) {
     }
   }
 
-  const featurePattern = new RegExp(`^\\s*(multi_agent|child_agents_md|${chedexHooksFeature})\\s*=`);
+  const featurePattern = new RegExp(`^\\s*(multi_agent|${chedexHooksFeature})\\s*=`);
   const nextSectionLines = lines.slice(featuresStart + 1, sectionEnd).filter((line) => !featurePattern.test(line));
   const hasMeaningfulFeatureLines = nextSectionLines.some((line) => line.trim().length > 0);
 
@@ -319,7 +310,7 @@ export function renderUninstallNote(targets, options = {}) {
     '',
     `- ${targets.configPath}`,
     `- managed block markers: ${chedexMarkerStart} / ${chedexMarkerEnd}`,
-    '- features enforced: `multi_agent = true`, `child_agents_md = true`, `codex_hooks = true`',
+    '- features enforced: `multi_agent = true`, `codex_hooks = true`',
     '',
     '## Backup Root',
     '',

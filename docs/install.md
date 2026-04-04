@@ -32,7 +32,7 @@ This installs:
 - a managed `hooks.json` into `~/.codex/hooks.json`
 - a managed Chedex agent block into `~/.codex/config.toml`
 - `CHEDEX_UNINSTALL.md` and `CHEDEX_UNINSTALL.json` into `~/.codex/` for reversible uninstall metadata
-- `multi_agent = true`, `child_agents_md = true`, and `codex_hooks = true` inside the `~/.codex/config.toml` `[features]` section
+- `multi_agent = true` and `codex_hooks = true` inside the `~/.codex/config.toml` `[features]` section
 
 Managed hook events:
 
@@ -44,7 +44,8 @@ Chedex writes native agent files only under `~/.codex` unless `CODEX_HOME` is se
 Artifact-backed workflow skills keep their artifacts under `~/.codex/workflows/`.
 `deep-interview` keeps durable `context.md`, `interview.md`, and `spec.md` artifacts under `~/.codex/workflows/deep-interview/` and does not require `progress.json` or `handoff.json` by default.
 `autoresearch-plan` may keep `context.md`, `spec.md`, and optionally `results.tsv` under `~/.codex/workflows/autoresearch-plan/`, and does not require `progress.json` or `handoff.json` by default.
-`autopilot` keeps governed broad-work artifacts under `~/.codex/workflows/autopilot/`, including `context.md`, `spec.md`, `plan.md`, `handoff.json`, `progress.json`, and `verify.md`; nested `ralph` and `ultrawork` slices should report through the current `autopilot` workflow unless ownership is explicitly transferred.
+`autopilot` keeps governed broad-work artifacts under `~/.codex/workflows/autopilot/`, typically including `context.md`, `spec.md`, `plan.md`, `handoff.json`, `progress.json`, and `verify.md`; nested `ralph` and `ultrawork` slices should report through the current `autopilot` workflow unless ownership is explicitly transferred.
+For `autopilot`, the governor currently enforces `progress.json` plus `artifacts.handoff`; the other files remain recommended workflow artifacts rather than hard admission requirements.
 `autoresearch-loop` keeps governed research artifacts under `~/.codex/workflows/autoresearch-loop/`, including `results.tsv`, `handoff.json`, `progress.json`, and `verify.md`.
 Governed workflows such as `autopilot`, `ralph`, and `autoresearch-loop` keep their execution state under `~/.codex/workflows/`.
 Direct top-level `ultrawork` uses a minimal workflow root under `~/.codex/workflows/ultrawork/` with `progress.json`, active index sync, and `verify.md` when it needs a durable evidence log; it may omit `handoff.json`.
