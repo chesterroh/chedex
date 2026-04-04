@@ -18,7 +18,9 @@ On Codex `>= 0.116.0`, the managed hook set also includes `UserPromptSubmit`.
 - `~/.codex/workflows/`
 
 The active index at `~/.codex/workflows/_active.json` is created on first governed workflow sync, not during install.
+The workflow archive at `~/.codex/workflows/_archive.json` is created lazily when the first completed or cancelled workflow is archived.
 The release-audit cache at `~/.codex/workflows/_codex_release_audit.json` is created lazily by `SessionStart` when the audit runs successfully.
+The release-delta cache at `~/.codex/workflows/_codex_release_deltas.json` is created lazily when dynamic delta guidance refreshes successfully.
 
 ## Governed Modes
 
@@ -64,8 +66,10 @@ Each entry records:
 - `next_step`
 - `updated_at`
 
-Governor-managed `_active.json` updates are serialized and written atomically. If the active index cannot be read safely, `Stop` fails closed and `SessionStart` surfaces a warning instead of silently clearing protection.
+Governor-managed `_active.json` updates are serialized and written atomically. Per-workflow sync operations also take a workflow-specific lock such as `_lock_<hash(cwd)>`, so unrelated workspaces no longer block one another on a single global runtime lock. If the active index cannot be read safely, `Stop` fails closed and `SessionStart` surfaces a warning instead of silently clearing protection.
 Syncing a different governed workflow from the same `cwd` replaces the previous indexed entry rather than nesting multiple owners.
+
+When a workflow reaches `completed` or `cancelled` and the runtime clears it from `_active.json`, the governor appends the final entry and progress snapshot to `~/.codex/workflows/_archive.json` instead of deleting the history outright.
 
 ## Governed `progress.json`
 
@@ -96,7 +100,7 @@ Status vocabulary:
 Stop-gate rules:
 
 - `active` always blocks stop
-- `completed` requires `verification.state = "satisfied"` and non-empty evidence
+- `completed` requires `verification.state = "satisfied"`, non-empty evidence, and `verification.review` with a verifier `pass`
 - `paused`, `blocked`, `failed`, and `cancelled` require `next_step` or `blocker`
 
 ## `handoff.json`
@@ -110,13 +114,23 @@ Governed plans and richer governed workflows such as `autopilot`, `ralph`, and `
 - `execution_lane`
 - `source_artifacts`
 - `approved_at`
+- `approvals`
 
 The governor validates the presence and shape of these fields.
-Plan-hardening passes such as `architect` and `verifier` remain workflow-level requirements today; the runtime does not yet store or enforce their approval provenance directly.
+`approvals` is an array of objects with:
+
+- `role`
+- `verdict`
+- `evidence_ref`
+- `approved_at`
+
+Mode schemas declare required admission approvals. Today `autopilot`, `ralph`, and `autoresearch-loop` require stored approved entries for both `architect` and `verifier` before governed admission will succeed.
 
 Direct top-level `ultrawork` may omit `handoff.json` when no governed plan admitted the work. Its minimum governed state is `progress.json` and active index sync, with `verify.md` used when the lane needs a durable evidence log.
 
 ## Mode-Specific Artifact Rules
+
+Workflow mode requirements are declared in `registry/workflow-mode-schemas.mjs` rather than scattered mode-specific governor branches. Each schema declares allowed phases, handoff policy, required artifacts, required approvals, and the completion review role.
 
 `autoresearch-loop` must also provide and keep on disk:
 
@@ -126,6 +140,25 @@ Direct top-level `ultrawork` may omit `handoff.json` when no governed plan admit
 
 This keeps the governed loop tied to its accepted research contract, append-only ledger, and durable closeout evidence instead of treating it as a generic execution lane.
 
+## Completion Review
+
+Completed workflows must store:
+
+- `verification.state = "satisfied"`
+- at least one `verification.evidence` entry
+- `verification.review.role = "verifier"`
+- `verification.review.verdict = "pass"`
+- `verification.review.evidence_ref`
+- `verification.review.approved_at`
+
+The helper command below records the independent verifier review in `progress.json`:
+
+```bash
+"$CODEX_HOME/hooks/chedex/chedex-governor.mjs" verification-complete --cwd /abs/path/to/workspace --progress /abs/path/to/progress.json --evidence-ref "verifier: PASS"
+```
+
+The helper requires the workflow to already be indexed for that workspace and stamps governor-held completion provenance into `verification.review` before closeout.
+
 ## Helper Commands
 
 The installed governor runtime also exposes helper commands:
@@ -133,10 +166,11 @@ The installed governor runtime also exposes helper commands:
 ```bash
 "$CODEX_HOME/hooks/chedex/chedex-governor.mjs" workflow-sync --progress /abs/path/to/progress.json
 "$CODEX_HOME/hooks/chedex/chedex-governor.mjs" workflow-clear --cwd /abs/path/to/workspace
+"$CODEX_HOME/hooks/chedex/chedex-governor.mjs" verification-complete --cwd /abs/path/to/workspace --progress /abs/path/to/progress.json --evidence-ref "verifier: PASS"
 ```
 
 If `CODEX_HOME` is unset, replace it with `~/.codex`.
 
 ## Future Enhancements
 
-- Extend `scripts/verify-governor.mjs` to exercise every admitted governed mode automatically rather than relying on a hand-maintained test list.
+- Revisit whether the completion-review helper should eventually be driven by a first-class native hook once Codex exposes a stable post-verification event.

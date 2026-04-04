@@ -49,7 +49,9 @@ Artifact-backed workflow skills keep their artifacts under `~/.codex/workflows/`
 Governed workflows such as `autopilot`, `ralph`, and `autoresearch-loop` keep their execution state under `~/.codex/workflows/`.
 Direct top-level `ultrawork` uses a minimal workflow root under `~/.codex/workflows/ultrawork/` with `progress.json`, active index sync, and `verify.md` when it needs a durable evidence log; it may omit `handoff.json`.
 `SessionStart` also performs a best-effort release audit against the published `@openai/codex` package and caches the result in `~/.codex/workflows/_codex_release_audit.json`.
-`handoff.json` is required for governed plans and the richer `autopilot` / `ralph` / `autoresearch-loop` workflows, but direct top-level `ultrawork` may omit it.
+Dynamic release-delta guidance is cached separately in `~/.codex/workflows/_codex_release_deltas.json`.
+Completed and cancelled governed workflows are archived into `~/.codex/workflows/_archive.json` when they leave the active index.
+`handoff.json` is required for governed plans and the richer `autopilot` / `ralph` / `autoresearch-loop` workflows, and those handoffs now require stored `architect` and `verifier` approval entries under `approvals`; direct top-level `ultrawork` may omit `handoff.json`.
 The release audit is advisory only: it does not auto-upgrade Codex CLI.
 
 ## Notes

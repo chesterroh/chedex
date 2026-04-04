@@ -4,49 +4,12 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 export const RELEASE_AUDIT_SCHEMA_VERSION = 1;
+export const RELEASE_DELTA_SCHEMA_VERSION = 1;
 export const DEFAULT_RELEASE_AUDIT_TIMEOUT_MS = 1500;
 export const DEFAULT_RELEASE_AUDIT_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 export const CODEX_PACKAGE_REGISTRY_URL = 'https://registry.npmjs.org/@openai%2Fcodex';
 export const CODEX_CHANGELOG_URL = 'https://developers.openai.com/codex/changelog/';
-
-export const KNOWN_CODEX_RELEASE_DELTAS = [
-  {
-    since: '0.115.0',
-    summary: 'Codex 0.115.x changes the visible feature surface and promotes `multi_agent` to stable.',
-    checks: [
-      'Re-run `npm run verify` after upgrading Codex CLI.',
-      'Recheck `hooks.json` and the `SessionStart` / `Stop` hook smoke path after upgrading.',
-      'Reinstall Chedex with `npm run install:user` if the hook runtime or managed hook config changed.',
-    ],
-  },
-  {
-    since: '0.116.0',
-    summary: 'Codex 0.116.x adds the `userpromptsubmit` hook, smoother plugin install/sync flows, and app-server TUI ChatGPT sign-in/token refresh support.',
-    checks: [
-      'Review whether Chedex should adopt `UserPromptSubmit` or intentionally stay on `SessionStart` / `Stop` only.',
-      'Recheck plugin/setup assumptions if your workflow depends on plugin suggestions, connector installs, or remote plugin sync.',
-      'Re-run `npm run verify` after upgrading Codex CLI.',
-    ],
-  },
-  {
-    since: '0.117.0',
-    summary: 'Codex 0.117.x makes plugins first-class, enables the app-server-backed TUI by default, and shifts multi-agent workflows toward path-based agent addressing.',
-    checks: [
-      'Review any repo assumptions tied to legacy handlers removed in 0.117.x, including `read_file`, `grep_files`, and the old artifact tool.',
-      'Recheck plugin-first workflows and app-server TUI behavior after upgrading.',
-      'Refresh mirrored hook assets with `npm run refresh:mirror` and reinstall with `npm run install:user` if the managed runtime changed.',
-    ],
-  },
-  {
-    since: '0.118.0',
-    summary: 'Codex 0.118.x improves sandbox reliability, adds prompt-plus-stdin support to `codex exec`, strengthens first-write protection for project-local `.codex` files, and restores several app-server and MCP workflows.',
-    checks: [
-      'Re-run `npm run verify` after upgrading Codex CLI.',
-      'Re-run `npm run install:user:dry` to confirm the managed hook surface still resolves as expected on 0.118.x.',
-      'If you rely on app-server-backed workflows, smoke-test hook replay, `/copy`, `/resume`, and MCP startup behavior after upgrading.',
-    ],
-  },
-];
+export const CODEX_RELEASE_DELTAS_URL = 'https://raw.githubusercontent.com/chesterroh/chedex/main/hooks/codex-release-deltas.json';
 
 export function defaultCodexHome() {
   return process.env.CODEX_HOME || join(homedir(), '.codex');
@@ -54,6 +17,10 @@ export function defaultCodexHome() {
 
 export function releaseAuditCachePath(codexHome = defaultCodexHome()) {
   return join(codexHome, 'workflows', '_codex_release_audit.json');
+}
+
+export function releaseDeltaCachePath(codexHome = defaultCodexHome()) {
+  return join(codexHome, 'workflows', '_codex_release_deltas.json');
 }
 
 export function parseSemver(text) {
@@ -109,6 +76,30 @@ export function readInstalledCodexVersion({ execFileSyncImpl = execFileSync } = 
   return normalizeInstalledVersion(stdout);
 }
 
+function normalizeDelta(delta) {
+  if (!delta || typeof delta !== 'object' || Array.isArray(delta)) {
+    return null;
+  }
+
+  if (!parseSemver(delta.since)) {
+    return null;
+  }
+
+  if (typeof delta.summary !== 'string' || !delta.summary.trim()) {
+    return null;
+  }
+
+  if (!Array.isArray(delta.checks) || delta.checks.some((check) => typeof check !== 'string' || !check.trim())) {
+    return null;
+  }
+
+  return {
+    since: delta.since.trim(),
+    summary: delta.summary.trim(),
+    checks: delta.checks.map((check) => check.trim()),
+  };
+}
+
 export function normalizeReleaseAuditCache(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return null;
@@ -130,9 +121,35 @@ export function normalizeReleaseAuditCache(raw) {
   };
 }
 
+export function normalizeReleaseDeltaBundle(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return null;
+  }
+
+  const deltas = Array.isArray(raw.deltas)
+    ? raw.deltas.map(normalizeDelta).filter(Boolean)
+    : [];
+  if (deltas.length === 0) {
+    return null;
+  }
+
+  return {
+    schema_version: RELEASE_DELTA_SCHEMA_VERSION,
+    deltas,
+    checked_at: typeof raw.checked_at === 'string' ? raw.checked_at : null,
+    source: typeof raw.source === 'string' ? raw.source : null,
+    stale: Boolean(raw.stale),
+  };
+}
+
 export async function readReleaseAuditCache(codexHome = defaultCodexHome()) {
   const cache = await readJsonIfExists(releaseAuditCachePath(codexHome), null);
   return normalizeReleaseAuditCache(cache);
+}
+
+export async function readReleaseDeltaCache(codexHome = defaultCodexHome()) {
+  const cache = await readJsonIfExists(releaseDeltaCachePath(codexHome), null);
+  return normalizeReleaseDeltaBundle(cache);
 }
 
 export async function writeReleaseAuditCache(codexHome, payload) {
@@ -142,12 +159,18 @@ export async function writeReleaseAuditCache(codexHome, payload) {
   });
 }
 
-export async function fetchLatestCodexRelease({
+export async function writeReleaseDeltaCache(codexHome, payload) {
+  await writeJson(releaseDeltaCachePath(codexHome), {
+    schema_version: RELEASE_DELTA_SCHEMA_VERSION,
+    ...payload,
+  });
+}
+
+async function fetchJsonWithTimeout({
   fetchImpl = globalThis.fetch,
-  registryUrl = CODEX_PACKAGE_REGISTRY_URL,
+  url,
   timeoutMs = DEFAULT_RELEASE_AUDIT_TIMEOUT_MS,
-  now = new Date(),
-} = {}) {
+}) {
   if (typeof fetchImpl !== 'function') {
     throw new Error('fetch is unavailable for release audit');
   }
@@ -156,7 +179,7 @@ export async function fetchLatestCodexRelease({
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetchImpl(registryUrl, {
+    const response = await fetchImpl(url, {
       headers: {
         accept: 'application/json',
       },
@@ -164,25 +187,72 @@ export async function fetchLatestCodexRelease({
     });
 
     if (!response.ok) {
-      throw new Error(`registry request failed with status ${response.status}`);
+      throw new Error(`request failed with status ${response.status}`);
     }
 
-    const payload = await response.json();
-    const latestVersion = payload?.['dist-tags']?.latest;
-    const parsedLatestVersion = parseSemver(latestVersion);
-    if (!parsedLatestVersion) {
-      throw new Error('registry payload did not include a valid latest Codex version');
-    }
-
-    return {
-      latest_version: parsedLatestVersion.join('.'),
-      published_at: payload?.time?.[latestVersion] || null,
-      checked_at: now.toISOString(),
-      source: 'npm-registry',
-    };
+    return response.json();
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export async function fetchLatestCodexRelease({
+  fetchImpl = globalThis.fetch,
+  registryUrl = CODEX_PACKAGE_REGISTRY_URL,
+  timeoutMs = DEFAULT_RELEASE_AUDIT_TIMEOUT_MS,
+  now = new Date(),
+} = {}) {
+  const payload = await fetchJsonWithTimeout({
+    fetchImpl,
+    url: registryUrl,
+    timeoutMs,
+  });
+  const latestVersion = payload?.['dist-tags']?.latest;
+  const parsedLatestVersion = parseSemver(latestVersion);
+  if (!parsedLatestVersion) {
+    throw new Error('registry payload did not include a valid latest Codex version');
+  }
+
+  return {
+    latest_version: parsedLatestVersion.join('.'),
+    published_at: payload?.time?.[latestVersion] || null,
+    checked_at: now.toISOString(),
+    source: 'npm-registry',
+  };
+}
+
+export async function fetchReleaseDeltas({
+  fetchImpl = globalThis.fetch,
+  deltasUrl = CODEX_RELEASE_DELTAS_URL,
+  timeoutMs = DEFAULT_RELEASE_AUDIT_TIMEOUT_MS,
+  now = new Date(),
+} = {}) {
+  const payload = normalizeReleaseDeltaBundle(await fetchJsonWithTimeout({
+    fetchImpl,
+    url: deltasUrl,
+    timeoutMs,
+  }));
+
+  if (!payload) {
+    throw new Error('release delta payload was invalid');
+  }
+
+  return {
+    schema_version: RELEASE_DELTA_SCHEMA_VERSION,
+    deltas: payload.deltas,
+    checked_at: now.toISOString(),
+    source: deltasUrl,
+  };
+}
+
+export async function readBundledReleaseDeltas() {
+  const bundled = normalizeReleaseDeltaBundle(JSON.parse(
+    await readFile(new URL('./codex-release-deltas.json', import.meta.url), 'utf8'),
+  ));
+  if (!bundled) {
+    throw new Error('bundled release deltas are invalid');
+  }
+  return bundled;
 }
 
 export function isFreshReleaseAudit(cache, { now = new Date(), ttlMs = DEFAULT_RELEASE_AUDIT_CACHE_TTL_MS } = {}) {
@@ -225,14 +295,64 @@ export async function getLatestCodexReleaseInfo({
   }
 }
 
-export function collectKnownReleaseDeltas({ installedVersion, latestVersion }) {
+export async function getReleaseDeltas({
+  codexHome = defaultCodexHome(),
+  now = new Date(),
+  cacheTtlMs = DEFAULT_RELEASE_AUDIT_CACHE_TTL_MS,
+  fetchDynamicDeltas = fetchReleaseDeltas,
+  readBundledDeltas = readBundledReleaseDeltas,
+} = {}) {
+  let cached = null;
+  try {
+    cached = await readReleaseDeltaCache(codexHome);
+    if (cached && isFreshReleaseAudit(cached, { now, ttlMs: cacheTtlMs })) {
+      return cached;
+    }
+  } catch {
+    cached = null;
+  }
+
+  try {
+    const refreshed = await fetchDynamicDeltas({ now });
+    await writeReleaseDeltaCache(codexHome, refreshed);
+    return refreshed;
+  } catch (error) {
+    if (cached) {
+      return {
+        ...cached,
+        stale: true,
+        fetch_error: error.message,
+      };
+    }
+    try {
+      return {
+        ...(await readBundledDeltas()),
+        checked_at: now.toISOString(),
+        source: 'bundled',
+        stale: true,
+        fetch_error: error.message,
+      };
+    } catch {
+      return {
+        schema_version: RELEASE_DELTA_SCHEMA_VERSION,
+        deltas: [],
+        checked_at: now.toISOString(),
+        source: 'unavailable',
+        stale: true,
+        fetch_error: error.message,
+      };
+    }
+  }
+}
+
+export function collectKnownReleaseDeltas({ installedVersion, latestVersion, deltas = [] }) {
   const installed = parseSemver(installedVersion);
   const latest = parseSemver(latestVersion);
   if (!installed || !latest) {
     return [];
   }
 
-  return KNOWN_CODEX_RELEASE_DELTAS.filter((delta) => {
+  return deltas.filter((delta) => {
     const since = parseSemver(delta.since);
     return since && compareSemver(installed, since) < 0 && compareSemver(since, latest) <= 0;
   });
@@ -260,6 +380,7 @@ export async function buildReleaseAudit({
   now = new Date(),
   readInstalledVersion = readInstalledCodexVersion,
   getLatestReleaseInfo = getLatestCodexReleaseInfo,
+  getDynamicReleaseDeltas = getReleaseDeltas,
 } = {}) {
   let installed;
   try {
@@ -279,6 +400,13 @@ export async function buildReleaseAudit({
     return null;
   }
 
+  let releaseDeltas = null;
+  try {
+    releaseDeltas = await getDynamicReleaseDeltas({ codexHome, now });
+  } catch {
+    releaseDeltas = null;
+  }
+
   if (compareSemver(installed.semver, parseSemver(latest.latest_version)) >= 0) {
     return {
       state: 'current',
@@ -288,12 +416,15 @@ export async function buildReleaseAudit({
       checked_at: latest.checked_at,
       source: latest.source,
       stale: Boolean(latest.stale),
+      delta_source: releaseDeltas?.source || 'unavailable',
+      delta_stale: Boolean(releaseDeltas?.stale),
     };
   }
 
   const deltaNotes = collectKnownReleaseDeltas({
     installedVersion: installed.normalized,
     latestVersion: latest.latest_version,
+    deltas: releaseDeltas?.deltas || [],
   });
 
   return {
@@ -304,6 +435,8 @@ export async function buildReleaseAudit({
     checked_at: latest.checked_at,
     source: latest.source,
     stale: Boolean(latest.stale),
+    delta_source: releaseDeltas?.source || 'unavailable',
+    delta_stale: Boolean(releaseDeltas?.stale),
     delta_notes: deltaNotes,
     upgrade_steps: buildUpgradeSteps({
       latestVersion: latest.latest_version,
@@ -329,6 +462,10 @@ export function renderReleaseAuditAdvisory(audit) {
 
   if (audit.stale) {
     lines.push('note: latest release metadata came from a stale cache because the live refresh failed.');
+  }
+
+  if (audit.delta_stale) {
+    lines.push(`note: release delta guidance came from a stale or bundled source: ${audit.delta_source}.`);
   }
 
   if (Array.isArray(audit.delta_notes) && audit.delta_notes.length > 0) {

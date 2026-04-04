@@ -160,11 +160,10 @@ Chedex keeps a small native-first execution chain:
 - `ralph` and direct top-level `ultrawork` own the remaining persistent execution cases
 - `autopilot` is the tight governed shell for broad iterative work, while nested `ralph` and `ultrawork` slices still report through it unless ownership is explicitly transferred
 
-The governor still admits one active governed workflow entry per workspace `cwd`.
+The governor still admits one active governed workflow entry per workspace `cwd`, but workflow synchronization now uses per-workflow locks so separate workspaces do not contend on one global runtime lock.
 
 ## Current Gaps
 
-- Plan-hardening with `architect` and `verifier` is currently a workflow-contract requirement rather than stored governor provenance. Runtime admission still validates governed artifacts such as `handoff.json` and `progress.json`.
 - Repo verification still relies partly on required-text checks in `scripts/verify-repo.mjs`. This is good at catching drift, but it is not full semantic validation.
 - The latest verified Codex CLI version is still maintained as repo metadata plus docs wording, not generated into docs from one canonical source.
 - Hook asset cleanup is still path-based rather than whole-tree cleanup, so nested stale hook assets remain a reasonable follow-up sweep.
@@ -172,6 +171,7 @@ The governor still admits one active governed workflow entry per workspace `cwd`
 ## Notes
 
 - The prompts are the primary role surfaces. The registry is the structured metadata layer.
+- Governed workflow mode requirements live in `registry/workflow-mode-schemas.mjs`, and governed handoffs now store approval provenance that the runtime validates before admission.
 - `agents/*.toml` are generated artifacts. Re-run `npm run generate:agents` after changing `registry/agent-definitions.mjs` or any prompt.
 - `.codex/` is a checked-in mirror of deterministic installable surfaces only. Refresh it with `npm run refresh:mirror` after changing mirrored source files.
-- The governor runtime lives in [`hooks/chedex-governor.mjs`](hooks/chedex-governor.mjs), and the startup release-audit helper lives in [`hooks/codex-release-audit.mjs`](hooks/codex-release-audit.mjs). See [`docs/governor.md`](docs/governor.md) for the governed workflow contract.
+- The governor runtime lives in [`hooks/chedex-governor.mjs`](hooks/chedex-governor.mjs), the startup release-audit helper lives in [`hooks/codex-release-audit.mjs`](hooks/codex-release-audit.mjs), and terminal workflow history is preserved in `~/.codex/workflows/_archive.json`. See [`docs/governor.md`](docs/governor.md) for the governed workflow contract.

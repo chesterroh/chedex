@@ -131,6 +131,20 @@ await writeJson(join(workflowRoot, 'handoff.json'), {
   execution_lane: 'default',
   source_artifacts: [],
   approved_at: '2026-03-17T00:00:00Z',
+  approvals: [
+    {
+      role: 'architect',
+      verdict: 'approved',
+      evidence_ref: 'architect: install-smoke grounded',
+      approved_at: '2026-03-17T00:00:00Z',
+    },
+    {
+      role: 'verifier',
+      verdict: 'approved',
+      evidence_ref: 'verifier: install-smoke admission',
+      approved_at: '2026-03-17T00:00:00Z',
+    },
+  ],
 });
 await writeJson(progressPath, {
   schema_version: 1,

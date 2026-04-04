@@ -16,7 +16,7 @@ If `CODEX_HOME` is unset, default to `~/.codex/workflows/ralph/<slug>/`.
 Recommended files:
 - `context.md` for grounded facts, constraints, and touchpoints
 - `plan.md` for the current execution plan
-- `handoff.json` for execution admission, including `task`, `acceptance_criteria`, `verification_targets`, `delegation_roster`, `execution_lane`, `source_artifacts`, and `approved_at`
+- `handoff.json` for execution admission, including `task`, `acceptance_criteria`, `verification_targets`, `delegation_roster`, `execution_lane`, `source_artifacts`, `approved_at`, and stored `approvals`
 - `progress.json` for task status and next step
 - `verify.md` for verification evidence
 - `prd.md` only when the user explicitly wants a PRD-style definition of done
@@ -28,11 +28,11 @@ Recommended files:
 3. If the task is still ambiguous, run `clarify` first, or `deep-interview` when the work needs a more durable requirements artifact.
 4. If the task is really a repeatable metric-driven experiment loop, use `autoresearch-plan` while the spec is still forming and `autoresearch-loop` once the governed loop is ready to own execution.
 5. If there is no usable plan yet, create or refresh `plan.md`.
-6. Refuse deep execution until `handoff.json` declares the task, acceptance criteria, verification targets, delegation roster, intended execution lane, source artifacts, and approval timestamp.
+6. Refuse deep execution until `handoff.json` declares the task, acceptance criteria, verification targets, delegation roster, intended execution lane, source artifacts, approval timestamp, and approved `architect` plus `verifier` provenance entries.
 7. Use `ultrawork` as the parallel execution layer when the task splits into independent lanes.
 8. Keep `progress.json` current after each meaningful step and sync the active workflow index when the governor is installed.
 9. Verify with fresh evidence before claiming progress or completion.
-10. Run an `architect` or `verifier` pass before closeout, and re-open the loop if they reject the result.
+10. Run an independent `verifier` pass before closeout, record it in `progress.json.verification.review`, and re-open the loop if it rejects the result.
 
 ## Rules
 
@@ -43,7 +43,7 @@ Recommended files:
 - Prefer the smallest execution slice that produces fresh evidence.
 - Keep artifacts short and update them in place rather than creating throwaway copies.
 - On pause or cancellation, mark the current state in `progress.json` instead of deleting artifacts.
-- `completed` is not enough by itself. The stop gate allows completion only when verification is satisfied.
+- `completed` is not enough by itself. The stop gate allows completion only when verification is satisfied and `progress.json.verification.review` records a verifier `pass`.
 
 ## Progress Shape
 

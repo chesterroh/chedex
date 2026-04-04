@@ -20,7 +20,7 @@ Use this when the user explicitly wants a plan, or when the task is broad enough
 - If the plan is meant to flow into `ralph`, treat it as a governed plan.
 - Governed plans must produce both `plan.md` and `handoff.json`.
 - Governed plans should not be treated as execution-ready until an `architect` pass and a `verifier` pass agree the plan is grounded enough to run.
-- Current governor admission still flows through governed artifact validation rather than stored reviewer sign-off, so plans should make that proof path explicit instead of assuming runtime provenance.
+- Governed handoffs must store that reviewer sign-off in `handoff.json.approvals` so runtime admission can verify the approval provenance directly.
 - If the task is stable-metric optimization over a fixed comparison boundary, prefer `autoresearch-plan` while the research spec is still forming and `autoresearch-loop` once the governed loop contract is ready to run.
 - If `Non-goals` or `Decision boundaries` are still unclear, run `clarify` first, or `deep-interview` when the work needs a durable requirements artifact rather than hand off guesswork.
 
@@ -34,7 +34,8 @@ Every plan should include:
 - Verification steps
 
 Governed plans should also include or produce:
-- a `handoff.json` with `task`, `acceptance_criteria`, `verification_targets`, `delegation_roster`, `execution_lane`, `source_artifacts`, and `approved_at`
+- a `handoff.json` with `task`, `acceptance_criteria`, `verification_targets`, `delegation_roster`, `execution_lane`, `source_artifacts`, `approved_at`, and `approvals`
+- `handoff.json.approvals` entries for both `architect` and `verifier`, each with `role`, `verdict`, `evidence_ref`, and `approved_at`
 - the intended workflow owner: `ralph` or `autoresearch-loop`
 - the proof path that the governor will later use to allow completion
 

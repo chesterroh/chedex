@@ -17,6 +17,7 @@ Use this when the task has multiple independent lanes and parallel execution is 
 - Direct top-level `ultrawork` should create only the minimum governed state it needs under `$CODEX_HOME/workflows/ultrawork/<slug>/`.
 - That minimum state is: `progress.json` with the governed schema, active workflow registration when the governor is installed, and `verify.md` only when the lane needs a durable evidence log.
 - Direct top-level `ultrawork` does not require `handoff.json`; if the task needs a plan ratchet or resumable execution artifacts beyond that minimum, escalate to `ralph`.
+- Even without `handoff.json`, a completed top-level `ultrawork` still needs `progress.json.verification.review` with an independent verifier `pass` before stop will clear it.
 - If the task is a sequential baseline/experiment/ledger loop rather than independent parallel lanes, prefer `autoresearch-plan`, `autoresearch-loop`, or `ralph` over `ultrawork`.
 - If the task needs resumable artifacts or a hard completion loop beyond a direct top-level fan-out, escalate to `ralph`.
 

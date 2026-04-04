@@ -4,16 +4,21 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
   acquireActiveIndexLock,
+  acquireWorkflowLock,
   GOVERNOR_SCHEMA_VERSION,
   activeIndexPath,
+  archivePath,
   clearWorkflow,
   sessionStartHook,
   stopHook,
   syncWorkflow,
   userPromptSubmitHook,
+  verificationComplete,
 } from '../hooks/chedex-governor.mjs';
 import {
   buildReleaseAudit,
+  getReleaseDeltas,
+  releaseDeltaCachePath,
   releaseAuditCachePath,
 } from '../hooks/codex-release-audit.mjs';
 import {
@@ -45,6 +50,28 @@ async function makeWorkflow({
   blocker = null,
   risks = ['Pending verification'],
   includeHandoff = true,
+  approvals = includeHandoff ? [
+    {
+      role: 'architect',
+      verdict: 'approved',
+      evidence_ref: 'architect: grounded plan',
+      approved_at: '2026-03-16T00:00:00Z',
+    },
+    {
+      role: 'verifier',
+      verdict: 'approved',
+      evidence_ref: 'verifier: admission check',
+      approved_at: '2026-03-16T00:00:00Z',
+    },
+  ] : [],
+  review = status === 'completed' && verificationState === 'satisfied'
+    ? {
+      role: 'verifier',
+      verdict: 'pass',
+      evidence_ref: evidence[0] || 'npm run verify',
+      approved_at: '2026-03-16T00:00:00Z',
+    }
+    : null,
 }) {
   const workflowRoot = join(home, 'workflows', mode, slug);
   await mkdir(workflowRoot, { recursive: true });
@@ -70,6 +97,7 @@ async function makeWorkflow({
       execution_lane: 'default',
       source_artifacts: [],
       approved_at: '2026-03-16T00:00:00Z',
+      approvals,
     });
   }
 
@@ -90,6 +118,7 @@ async function makeWorkflow({
     verification: {
       state: verificationState,
       evidence,
+      ...(review ? { review } : {}),
     },
     blocker,
     risks,
@@ -114,10 +143,74 @@ async function makeWorkflow({
   };
 }
 
+async function markWorkflowCompleted({
+  codexHome,
+  cwd,
+  workflowRoot,
+  progressPath,
+  mode,
+  task,
+  includeHandoff,
+  evidenceRef = 'npm run verify',
+}) {
+  await writeJson(progressPath, {
+    schema_version: GOVERNOR_SCHEMA_VERSION,
+    mode,
+    task,
+    active: false,
+    status: 'completed',
+    phase: 'validate',
+    updated_at: '2026-03-16T00:00:00Z',
+    workflow_root: workflowRoot,
+    next_step: 'Report results',
+    artifacts: {
+      plan: join(workflowRoot, 'plan.md'),
+      verify: join(workflowRoot, 'verify.md'),
+      ...(includeHandoff ? { handoff: join(workflowRoot, 'handoff.json') } : {}),
+      ...(mode === 'autoresearch-loop'
+        ? {
+          spec: join(workflowRoot, 'spec.md'),
+          results: join(workflowRoot, 'results.tsv'),
+        }
+        : {}),
+    },
+    verification: {
+      state: 'pending',
+      evidence: [],
+    },
+    blocker: null,
+    risks: [],
+  });
+
+  await verificationComplete({
+    codexHome,
+    cwd,
+    progressPath,
+    evidenceRef,
+    approvedAt: '2026-03-16T00:00:00Z',
+  });
+}
+
 function sleep(ms) {
   return new Promise((resolvePromise) => {
     setTimeout(resolvePromise, ms);
   });
+}
+
+function dynamicReleaseDeltasPayload(source = 'test-deltas') {
+  return {
+    schema_version: 1,
+    checked_at: '2026-03-17T00:00:00Z',
+    source,
+    stale: false,
+    deltas: [
+      {
+        since: '0.118.0',
+        summary: 'Test delta for current release audit coverage.',
+        checks: ['Re-run `npm run verify` after upgrading Codex CLI.'],
+      },
+    ],
+  };
 }
 
 const latestVerifiedSemver = parseSemver(chedexLatestVerifiedCodexVersion);
@@ -193,6 +286,28 @@ for (const mode of ['ralph', 'autopilot', 'autoresearch-loop']) {
   assert(missingHandoffFailed, `${mode} should require a handoff artifact`);
 }
 
+for (const mode of ['ralph', 'autopilot', 'autoresearch-loop']) {
+  const missingApprovalsWorkflow = await makeWorkflow({
+    home,
+    slug: `${mode}-missing-approvals`,
+    mode,
+    approvals: [],
+  });
+
+  let missingApprovalsFailed = false;
+  try {
+    await syncWorkflow({
+      codexHome: home,
+      cwd,
+      progressPath: missingApprovalsWorkflow.progressPath,
+    });
+  } catch (error) {
+    missingApprovalsFailed = error.message.includes('handoff.approvals must include an approved architect entry')
+      || error.message.includes('handoff.approvals must include an approved verifier entry');
+  }
+  assert(missingApprovalsFailed, `${mode} should require stored approval provenance`);
+}
+
 const completedWorkflow = await makeWorkflow({
   home,
   slug: 'completed-missing-proof',
@@ -236,19 +351,111 @@ const completedBlocked = await stopHook({
 });
 assert(completedBlocked.action === 'block', 'completed workflow without satisfied verification should block');
 
+const forgedCompletionWorkflow = await makeWorkflow({
+  home,
+  slug: 'completed-forged-review',
+  mode: 'ultrawork',
+  includeHandoff: false,
+});
+await syncWorkflow({
+  codexHome: home,
+  cwd,
+  progressPath: forgedCompletionWorkflow.progressPath,
+});
+await writeJson(forgedCompletionWorkflow.progressPath, {
+  schema_version: GOVERNOR_SCHEMA_VERSION,
+  mode: 'ultrawork',
+  task: 'completed-forged-review task',
+  active: false,
+  status: 'completed',
+  phase: 'validate',
+  updated_at: '2026-03-16T00:00:00Z',
+  workflow_root: forgedCompletionWorkflow.workflowRoot,
+  next_step: 'Report results',
+  artifacts: {
+    plan: join(forgedCompletionWorkflow.workflowRoot, 'plan.md'),
+    verify: join(forgedCompletionWorkflow.workflowRoot, 'verify.md'),
+  },
+  verification: {
+    state: 'satisfied',
+    evidence: ['manually typed proof'],
+    review: {
+      role: 'verifier',
+      verdict: 'pass',
+      evidence_ref: 'manually typed proof',
+      completion_token: 'forged-token',
+      approved_at: '2026-03-16T00:00:00Z',
+    },
+  },
+  blocker: null,
+  risks: [],
+});
+let forgedCompletionFailed = false;
+try {
+  await syncWorkflow({
+    codexHome: home,
+    cwd,
+    progressPath: forgedCompletionWorkflow.progressPath,
+  });
+} catch (error) {
+  forgedCompletionFailed = error.message.includes('completed workflow verification provenance does not match')
+    || error.message.includes('completion token');
+}
+assert(forgedCompletionFailed, 'completed workflows should reject forged verifier reviews that do not carry the governor token');
+
+const verificationReviewWorkflow = await makeWorkflow({
+  home,
+  slug: 'verification-complete-helper',
+  mode: 'ultrawork',
+  includeHandoff: false,
+});
+await syncWorkflow({
+  codexHome: home,
+  cwd,
+  progressPath: verificationReviewWorkflow.progressPath,
+});
+await markWorkflowCompleted({
+  codexHome: home,
+  cwd,
+  workflowRoot: verificationReviewWorkflow.workflowRoot,
+  progressPath: verificationReviewWorkflow.progressPath,
+  mode: 'ultrawork',
+  task: 'verification-complete-helper task',
+  includeHandoff: false,
+  evidenceRef: 'verifier: independent pass',
+});
+await syncWorkflow({
+  codexHome: home,
+  cwd,
+  progressPath: verificationReviewWorkflow.progressPath,
+});
+const verificationReviewAllowed = await stopHook({
+  codexHome: home,
+  cwd,
+});
+assert(verificationReviewAllowed.action === 'allow', 'verification-complete should produce a stop-allowing verifier review');
+
 const completedValid = await makeWorkflow({
   home,
   slug: 'completed-verified',
   mode: 'ultrawork',
-  status: 'completed',
-  phase: 'validate',
-  verificationState: 'satisfied',
-  evidence: ['npm run verify'],
-  nextStep: 'Report results',
-  risks: [],
   includeHandoff: false,
 });
 
+await syncWorkflow({
+  codexHome: home,
+  cwd,
+  progressPath: completedValid.progressPath,
+});
+await markWorkflowCompleted({
+  codexHome: home,
+  cwd,
+  workflowRoot: completedValid.workflowRoot,
+  progressPath: completedValid.progressPath,
+  mode: 'ultrawork',
+  task: 'completed-verified task',
+  includeHandoff: false,
+});
 await syncWorkflow({
   codexHome: home,
   cwd,
@@ -263,20 +470,30 @@ assert(completedAllowed.action === 'allow', 'completed workflow with satisfied v
 
 const indexAfterCompleted = JSON.parse(await readFile(activeIndexPath(home), 'utf8'));
 assert(!(cwd in indexAfterCompleted.entries), 'completed workflow should be cleared from the active index');
+const archiveAfterCompleted = JSON.parse(await readFile(archivePath(home), 'utf8'));
+assert(archiveAfterCompleted.entries.some((entry) => entry.progress.task === 'completed-verified task'), 'completed workflows should move into the workflow archive');
 
 const completedResearchLoop = await makeWorkflow({
   home,
   slug: 'completed-autoresearch-loop',
   mode: 'autoresearch-loop',
-  status: 'completed',
-  phase: 'validate',
-  verificationState: 'satisfied',
-  evidence: ['npm run verify'],
-  nextStep: 'Report results',
-  risks: [],
   includeHandoff: true,
 });
 
+await syncWorkflow({
+  codexHome: home,
+  cwd,
+  progressPath: completedResearchLoop.progressPath,
+});
+await markWorkflowCompleted({
+  codexHome: home,
+  cwd,
+  workflowRoot: completedResearchLoop.workflowRoot,
+  progressPath: completedResearchLoop.progressPath,
+  mode: 'autoresearch-loop',
+  task: 'completed-autoresearch-loop task',
+  includeHandoff: true,
+});
 await syncWorkflow({
   codexHome: home,
   cwd,
@@ -288,6 +505,8 @@ const completedResearchAllowed = await stopHook({
   cwd,
 });
 assert(completedResearchAllowed.action === 'allow', 'completed autoresearch-loop with satisfied verification should allow stop');
+const archiveAfterResearchComplete = JSON.parse(await readFile(archivePath(home), 'utf8'));
+assert(archiveAfterResearchComplete.entries.some((entry) => entry.progress.task === 'completed-autoresearch-loop task'), 'completed autoresearch-loop workflows should archive on stop');
 
 const missingResearchSpecWorkflow = await makeWorkflow({
   home,
@@ -471,6 +690,24 @@ try {
 }
 assert(missingPhaseFailed, 'missing phase should fail governed validation');
 
+const invalidUnsupportedPhase = await makeWorkflow({
+  home,
+  slug: 'invalid-unsupported-phase',
+  mode: 'autopilot',
+  phase: 'baseline',
+});
+let unsupportedPhaseFailed = false;
+try {
+  await syncWorkflow({
+    codexHome: home,
+    cwd,
+    progressPath: invalidUnsupportedPhase.progressPath,
+  });
+} catch (error) {
+  unsupportedPhaseFailed = error.message.includes('unsupported autopilot phase: baseline');
+}
+assert(unsupportedPhaseFailed, 'mode schemas should reject unsupported phases');
+
 const invalidMissingRisks = await makeWorkflow({
   home,
   slug: 'invalid-missing-risks',
@@ -598,6 +835,29 @@ const lockedWorkflowB = await makeWorkflow({
   slug: 'locked-b',
   mode: 'ralph',
 });
+const heldWorkflowLock = await acquireWorkflowLock(lockedHome, lockedCwdA);
+const blockedByWorkflowLock = syncWorkflow({
+  codexHome: lockedHome,
+  cwd: lockedCwdA,
+  progressPath: lockedWorkflowA.progressPath,
+});
+const otherWorkflowSync = syncWorkflow({
+  codexHome: lockedHome,
+  cwd: lockedCwdB,
+  progressPath: lockedWorkflowB.progressPath,
+});
+await Promise.race([
+  otherWorkflowSync,
+  sleep(500).then(() => {
+    throw new Error('per-workflow locking should not block unrelated syncs');
+  }),
+]);
+const indexDuringWorkflowLock = JSON.parse(await readFile(activeIndexPath(lockedHome), 'utf8'));
+assert(!(lockedCwdA in indexDuringWorkflowLock.entries), 'a held per-workflow lock should block sync for that workflow');
+assert(lockedCwdB in indexDuringWorkflowLock.entries, 'a held per-workflow lock should not block a different workflow from syncing');
+await heldWorkflowLock.release();
+await blockedByWorkflowLock;
+
 const heldLock = await acquireActiveIndexLock(lockedHome);
 const blockedSyncA = syncWorkflow({
   codexHome: lockedHome,
@@ -609,13 +869,10 @@ const blockedSyncB = syncWorkflow({
   cwd: lockedCwdB,
   progressPath: lockedWorkflowB.progressPath,
 });
-await sleep(100);
-let lockHeldObserved = false;
-try {
-  await readFile(activeIndexPath(lockedHome), 'utf8');
-} catch {
-  lockHeldObserved = true;
-}
+const lockHeldObserved = await Promise.race([
+  Promise.all([blockedSyncA, blockedSyncB]).then(() => false),
+  sleep(100).then(() => true),
+]);
 assert(lockHeldObserved, 'sync should wait for the active index lock before writing');
 await heldLock.release();
 await Promise.all([blockedSyncA, blockedSyncB]);
@@ -639,6 +896,9 @@ const currentReleaseAudit = await buildReleaseAudit({
       source: 'npm-registry',
     };
   },
+  async getDynamicReleaseDeltas() {
+    return dynamicReleaseDeltasPayload();
+  },
 });
 assert(currentReleaseAudit.state === 'current', 'matching installed/latest versions should report current');
 
@@ -660,6 +920,9 @@ const releaseAuditOnlyContext = await sessionStartHook({
         checked_at: '2026-03-17T00:00:00Z',
         source: 'npm-registry',
       };
+    },
+    async getDynamicReleaseDeltas() {
+      return dynamicReleaseDeltasPayload();
     },
   },
 });
@@ -699,6 +962,9 @@ const workflowAndAuditContext = await sessionStartHook({
         source: 'npm-registry',
       };
     },
+    async getDynamicReleaseDeltas() {
+      return dynamicReleaseDeltasPayload();
+    },
   },
 });
 assert(workflowAndAuditContext.includes('mode: ralph'), 'workflow context should still render when a release advisory is present');
@@ -722,12 +988,45 @@ const releaseAuditFailureContext = await sessionStartHook({
 });
 assert(releaseAuditFailureContext === '', 'release audit failures should fail open on session start');
 
+await writeFile(releaseDeltaCachePath(home), '{bad json\n');
+const malformedDeltaCacheContext = await sessionStartHook({
+  codexHome: home,
+  cwd: join(home, 'release-audit-malformed-delta-cache'),
+  releaseAudit: {
+    readInstalledVersion() {
+      return {
+        raw: `codex-cli ${chedexMinimumCodexVersion}`,
+        normalized: chedexMinimumCodexVersion,
+        semver: minimumSupportedSemver,
+      };
+    },
+    async getLatestReleaseInfo() {
+      return {
+        latest_version: chedexLatestVerifiedCodexVersion,
+        published_at: '2026-03-16T00:00:00Z',
+        checked_at: '2026-03-17T00:00:00Z',
+        source: 'npm-registry',
+      };
+    },
+    async getDynamicReleaseDeltas() {
+      return dynamicReleaseDeltasPayload();
+    },
+  },
+});
+assert(malformedDeltaCacheContext.includes('Chedex release audit detected a newer Codex CLI release.'), 'malformed release delta cache should not crash session-start or suppress the fail-open advisory');
+
 await writeJson(releaseAuditCachePath(home), {
   schema_version: 1,
   latest_version: chedexLatestVerifiedCodexVersion,
   published_at: '2026-03-16T00:00:00Z',
   checked_at: '2026-03-16T00:00:00Z',
   source: 'npm-registry',
+});
+await writeJson(releaseDeltaCachePath(home), {
+  schema_version: 1,
+  checked_at: '2026-03-16T00:00:00Z',
+  source: 'cached-deltas',
+  deltas: dynamicReleaseDeltasPayload('cached-deltas').deltas,
 });
 
 const staleCacheAudit = await buildReleaseAudit({
@@ -746,8 +1045,37 @@ const staleCacheAudit = await buildReleaseAudit({
       stale: true,
     };
   },
+  async getDynamicReleaseDeltas({ codexHome }) {
+    const cache = JSON.parse(await readFile(releaseDeltaCachePath(codexHome), 'utf8'));
+    return {
+      ...cache,
+      stale: true,
+    };
+  },
 });
 assert(staleCacheAudit.stale, 'release audit should preserve stale cache metadata when live refresh is unavailable');
+assert(staleCacheAudit.delta_stale, 'release audit should preserve stale release delta metadata when live refresh is unavailable');
+
+const fetchedDeltas = await getReleaseDeltas({
+  codexHome: home,
+  now: new Date('2026-03-17T00:00:00Z'),
+  fetchDynamicDeltas: async ({ now }) => ({
+    ...dynamicReleaseDeltasPayload('remote-deltas'),
+    checked_at: now.toISOString(),
+  }),
+});
+assert(fetchedDeltas.source === 'remote-deltas', 'dynamic release deltas should prefer the fetched source when it succeeds');
+
+const cachedDeltasFallback = await getReleaseDeltas({
+  codexHome: home,
+  now: new Date('2026-03-18T00:00:00Z'),
+  cacheTtlMs: 0,
+  fetchDynamicDeltas: async () => {
+    throw new Error('network down');
+  },
+});
+assert(cachedDeltasFallback.stale, 'release deltas should fall back to stale cache when refresh fails');
+assert(cachedDeltasFallback.deltas[0].summary === fetchedDeltas.deltas[0].summary, 'release deltas should return cached guidance on fetch failure');
 
 const emptyPromptVerdict = await userPromptSubmitHook({
   codexHome: home,
@@ -762,6 +1090,57 @@ const emptyPromptCli = execFileSync(process.execPath, [join(process.cwd(), 'hook
   encoding: 'utf8',
 });
 assert(emptyPromptCli === '', 'user-prompt-submit CLI should stay quiet when no governed workflow is active');
+
+const verificationCompleteCliWorkflow = await makeWorkflow({
+  home,
+  slug: 'verification-complete-cli',
+  mode: 'ultrawork',
+  includeHandoff: false,
+});
+await syncWorkflow({
+  codexHome: home,
+  cwd,
+  progressPath: verificationCompleteCliWorkflow.progressPath,
+});
+await writeJson(verificationCompleteCliWorkflow.progressPath, {
+  schema_version: GOVERNOR_SCHEMA_VERSION,
+  mode: 'ultrawork',
+  task: 'verification-complete-cli task',
+  active: false,
+  status: 'completed',
+  phase: 'validate',
+  updated_at: '2026-03-16T00:00:00Z',
+  workflow_root: verificationCompleteCliWorkflow.workflowRoot,
+  next_step: 'Report results',
+  artifacts: {
+    plan: join(verificationCompleteCliWorkflow.workflowRoot, 'plan.md'),
+    verify: join(verificationCompleteCliWorkflow.workflowRoot, 'verify.md'),
+  },
+  verification: {
+    state: 'pending',
+    evidence: [],
+  },
+  blocker: null,
+  risks: [],
+});
+const verificationCompleteCli = execFileSync(process.execPath, [
+  join(process.cwd(), 'hooks', 'chedex-governor.mjs'),
+  'verification-complete',
+  '--codex-home',
+  home,
+  '--cwd',
+  cwd,
+  '--progress',
+  verificationCompleteCliWorkflow.progressPath,
+  '--evidence-ref',
+  'verifier: cli pass',
+], {
+  cwd: process.cwd(),
+  env: process.env,
+  encoding: 'utf8',
+});
+const verificationCompleteReview = JSON.parse(verificationCompleteCli);
+assert(verificationCompleteReview.role === 'verifier', 'verification-complete CLI should emit the verifier review record');
 
 const malformedSessionStartCli = execFileSync(process.execPath, [join(process.cwd(), 'hooks', 'chedex-governor.mjs'), 'session-start', '--codex-home', home], {
   cwd: process.cwd(),

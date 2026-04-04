@@ -16,7 +16,7 @@ If `CODEX_HOME` is unset, default to `~/.codex/workflows/autoresearch-loop/<slug
 Recommended files:
 - `context.md` for grounded repo facts, constraints, and touchpoints
 - `spec.md` for the accepted research spec
-- `handoff.json` for governed execution admission
+- `handoff.json` for governed execution admission, including stored `architect` and `verifier` approvals
 - `progress.json` for loop status and next step
 - `results.tsv` for the append-only experiment ledger
 - `verify.md` for baseline, best-run, and closeout evidence
@@ -30,7 +30,7 @@ Recommended files:
 5. Keep the fixed layer stable for fair comparison.
 6. Update `results.tsv`, `verify.md`, and `progress.json` after each meaningful step.
 7. Keep the loop active until it is completed, paused, blocked, failed, or cancelled with explicit evidence.
-8. Mark `completed` only after the best-known state and closeout evidence are recorded and verification is satisfied.
+8. Mark `completed` only after the best-known state and closeout evidence are recorded, verification is satisfied, and `progress.json.verification.review` records a verifier `pass`.
 
 ## Rules
 

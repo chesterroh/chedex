@@ -44,7 +44,7 @@ Recommended files:
 3. Plan
    - Build or refresh `plan.md`.
    - Tighten sequencing, dependencies, rollback boundaries, and verification steps.
-   - Produce or refresh `handoff.json`.
+   - Produce or refresh `handoff.json`, including stored `architect` and `verifier` approvals in `approvals`.
    - For broad or high-risk work, run an `architect` pass and a `verifier` pass before deep execution.
 4. Execute
    - Drop to `execute` for small direct work.
@@ -54,6 +54,7 @@ Recommended files:
    - Let `ralph` use `ultrawork` only when lanes are truly independent.
 5. Verify
    - Refresh `verify.md` with tests, diagnostics, rejections, and remaining risk.
+   - Record the independent completion decision in `progress.json.verification.review` before marking the workflow completed.
    - Loop back to clarify, specify, or plan when evidence shows the contract is still weak.
 
 ## Rules

@@ -1,18 +1,24 @@
 #!/usr/bin/env node
 
+import { createHash, randomUUID } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  APPROVAL_VERDICTS,
+  MODE_SCHEMAS,
+  VERIFICATION_REVIEW_VERDICTS,
+} from './workflow-mode-schemas.mjs';
 import { buildReleaseAudit, renderReleaseAuditAdvisory } from './codex-release-audit.mjs';
 
 export const GOVERNOR_SCHEMA_VERSION = 1;
+export const GOVERNOR_ARCHIVE_SCHEMA_VERSION = 1;
 export const ACTIVE_STATUS = 'active';
 export const TERMINAL_STATUSES = new Set(['completed', 'paused', 'blocked', 'failed', 'cancelled']);
-export const GOVERNED_MODES = new Set(['ralph', 'autopilot', 'ultrawork', 'autoresearch-loop']);
+export const GOVERNED_MODES = new Set(Object.keys(MODE_SCHEMAS));
 export const VERIFICATION_SATISFIED = 'satisfied';
-export const HANDOFF_REQUIRED_MODES = new Set(['ralph', 'autopilot', 'autoresearch-loop']);
 export const ACTIVE_INDEX_LOCK_TIMEOUT_MS = 5000;
 export const ACTIVE_INDEX_LOCK_RETRY_MS = 25;
 
@@ -28,8 +34,24 @@ export function activeIndexPath(codexHome = defaultCodexHome()) {
   return join(workflowsRoot(codexHome), '_active.json');
 }
 
+export function archivePath(codexHome = defaultCodexHome()) {
+  return join(workflowsRoot(codexHome), '_archive.json');
+}
+
 export function activeIndexLockPath(codexHome = defaultCodexHome()) {
   return join(workflowsRoot(codexHome), '_active.lock');
+}
+
+export function archiveLockPath(codexHome = defaultCodexHome()) {
+  return join(workflowsRoot(codexHome), '_archive.lock');
+}
+
+export function workflowLockId(input) {
+  return createHash('sha1').update(String(input)).digest('hex').slice(0, 16);
+}
+
+export function workflowLockPath(codexHome = defaultCodexHome(), workflowId) {
+  return join(workflowsRoot(codexHome), `_lock_${workflowLockId(workflowId)}`);
 }
 
 export async function pathExists(path) {
@@ -78,15 +100,7 @@ function sleep(ms) {
   });
 }
 
-export async function acquireActiveIndexLock(
-  codexHome = defaultCodexHome(),
-  {
-    timeoutMs = ACTIVE_INDEX_LOCK_TIMEOUT_MS,
-    retryMs = ACTIVE_INDEX_LOCK_RETRY_MS,
-  } = {},
-) {
-  await mkdir(workflowsRoot(codexHome), { recursive: true });
-  const lockPath = activeIndexLockPath(codexHome);
+async function acquireDirectoryLock(lockPath, { timeoutMs, retryMs }) {
   const deadline = Date.now() + timeoutMs;
 
   for (;;) {
@@ -113,8 +127,60 @@ export async function acquireActiveIndexLock(
   }
 }
 
+export async function acquireActiveIndexLock(
+  codexHome = defaultCodexHome(),
+  {
+    timeoutMs = ACTIVE_INDEX_LOCK_TIMEOUT_MS,
+    retryMs = ACTIVE_INDEX_LOCK_RETRY_MS,
+  } = {},
+) {
+  await mkdir(workflowsRoot(codexHome), { recursive: true });
+  return acquireDirectoryLock(activeIndexLockPath(codexHome), { timeoutMs, retryMs });
+}
+
+export async function acquireArchiveLock(
+  codexHome = defaultCodexHome(),
+  {
+    timeoutMs = ACTIVE_INDEX_LOCK_TIMEOUT_MS,
+    retryMs = ACTIVE_INDEX_LOCK_RETRY_MS,
+  } = {},
+) {
+  await mkdir(workflowsRoot(codexHome), { recursive: true });
+  return acquireDirectoryLock(archiveLockPath(codexHome), { timeoutMs, retryMs });
+}
+
+export async function acquireWorkflowLock(
+  codexHome = defaultCodexHome(),
+  workflowId,
+  {
+    timeoutMs = ACTIVE_INDEX_LOCK_TIMEOUT_MS,
+    retryMs = ACTIVE_INDEX_LOCK_RETRY_MS,
+  } = {},
+) {
+  await mkdir(workflowsRoot(codexHome), { recursive: true });
+  return acquireDirectoryLock(workflowLockPath(codexHome, workflowId), { timeoutMs, retryMs });
+}
+
 export async function withActiveIndexLock(codexHome, fn, options) {
   const lock = await acquireActiveIndexLock(codexHome, options);
+  try {
+    return await fn();
+  } finally {
+    await lock.release();
+  }
+}
+
+export async function withArchiveLock(codexHome, fn, options) {
+  const lock = await acquireArchiveLock(codexHome, options);
+  try {
+    return await fn();
+  } finally {
+    await lock.release();
+  }
+}
+
+export async function withWorkflowLock(codexHome, workflowId, fn, options) {
+  const lock = await acquireWorkflowLock(codexHome, workflowId, options);
   try {
     return await fn();
   } finally {
@@ -140,6 +206,20 @@ export function normalizeActiveIndex(raw) {
   };
 }
 
+export function normalizeArchive(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return {
+      schema_version: GOVERNOR_ARCHIVE_SCHEMA_VERSION,
+      entries: [],
+    };
+  }
+
+  return {
+    schema_version: GOVERNOR_ARCHIVE_SCHEMA_VERSION,
+    entries: Array.isArray(raw.entries) ? raw.entries : [],
+  };
+}
+
 export function validateActiveIndexEntry(entry) {
   const errors = [];
   if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
@@ -153,6 +233,10 @@ export function validateActiveIndexEntry(entry) {
     if (typeof entry[field] !== 'string' || !entry[field].trim()) {
       errors.push(`active index entry field ${field} must be a non-empty string`);
     }
+  }
+
+  if (typeof entry.completion_token !== 'string' || !entry.completion_token.trim()) {
+    errors.push('active index entry field completion_token must be a non-empty string');
   }
 
   if (entry.handoff_path != null && (typeof entry.handoff_path !== 'string' || !entry.handoff_path.trim())) {
@@ -183,8 +267,50 @@ export function parseIsoDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+export function modeSchemaFor(mode) {
+  return mode ? MODE_SCHEMAS[mode] || null : null;
+}
+
+export function validateVerificationReview(review, { requiredRole = 'verifier' } = {}) {
+  const errors = [];
+  if (!review || typeof review !== 'object' || Array.isArray(review)) {
+    return {
+      ok: false,
+      errors: ['verification.review must be an object'],
+    };
+  }
+
+  if (typeof review.role !== 'string' || !review.role.trim()) {
+    errors.push('verification.review.role must be a non-empty string');
+  } else if (review.role !== requiredRole) {
+    errors.push(`verification.review.role must be "${requiredRole}"`);
+  }
+
+  if (typeof review.verdict !== 'string' || !VERIFICATION_REVIEW_VERDICTS.has(review.verdict)) {
+    errors.push('verification.review.verdict must be one of: pass, fail, incomplete');
+  }
+
+  if (typeof review.evidence_ref !== 'string' || !review.evidence_ref.trim()) {
+    errors.push('verification.review.evidence_ref must be a non-empty string');
+  }
+
+  if (typeof review.completion_token !== 'string' || !review.completion_token.trim()) {
+    errors.push('verification.review.completion_token must be a non-empty string');
+  }
+
+  if (!parseIsoDate(review.approved_at)) {
+    errors.push('verification.review.approved_at must be ISO-8601');
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors,
+  };
+}
+
 export function validateGovernedProgress(progress) {
   const errors = [];
+  const schema = modeSchemaFor(progress?.mode);
   const baseFields = [
     'schema_version',
     'mode',
@@ -211,7 +337,7 @@ export function validateGovernedProgress(progress) {
     errors.push(`unsupported schema_version: ${progress.schema_version}`);
   }
 
-  if (!GOVERNED_MODES.has(progress.mode)) {
+  if (!schema) {
     errors.push(`unsupported mode: ${progress.mode}`);
   }
 
@@ -242,6 +368,8 @@ export function validateGovernedProgress(progress) {
 
   if (typeof progress.phase !== 'string' || !progress.phase.trim()) {
     errors.push('phase must be a non-empty string');
+  } else if (schema && !schema.phases.includes(progress.phase)) {
+    errors.push(`unsupported ${progress.mode} phase: ${progress.phase}`);
   }
 
   if (progress.next_step != null && typeof progress.next_step !== 'string') {
@@ -256,11 +384,7 @@ export function validateGovernedProgress(progress) {
     errors.push('artifacts must be an object');
   }
 
-  const requiredArtifactFieldsByMode = {
-    'autoresearch-loop': ['spec', 'results', 'verify'],
-  };
-
-  const modeRequiredArtifacts = requiredArtifactFieldsByMode[progress.mode] || [];
+  const modeRequiredArtifacts = schema?.required_artifacts || [];
   for (const field of modeRequiredArtifacts) {
     const artifactPath = progress.artifacts?.[field];
     if (typeof artifactPath !== 'string' || !artifactPath.trim()) {
@@ -272,7 +396,7 @@ export function validateGovernedProgress(progress) {
   if (handoff != null && (typeof handoff !== 'string' || !handoff.trim())) {
     errors.push('artifacts.handoff must be a non-empty string when present');
   }
-  if (HANDOFF_REQUIRED_MODES.has(progress.mode) && (typeof handoff !== 'string' || !handoff.trim())) {
+  if (schema?.handoff_policy === 'required' && (typeof handoff !== 'string' || !handoff.trim())) {
     errors.push(`${progress.mode} workflows require artifacts.handoff`);
   }
 
@@ -300,6 +424,14 @@ export function validateGovernedProgress(progress) {
     if (!Array.isArray(evidence) || evidence.length === 0) {
       errors.push('completed workflows require at least one verification evidence entry');
     }
+    const reviewValidation = validateVerificationReview(progress.verification?.review, {
+      requiredRole: schema?.completion_review_role || 'verifier',
+    });
+    if (!reviewValidation.ok) {
+      errors.push(...reviewValidation.errors);
+    } else if (progress.verification.review.verdict !== 'pass') {
+      errors.push('completed workflows require verification.review.verdict = "pass"');
+    }
   }
 
   if (TERMINAL_STATUSES.has(status) && status !== 'completed') {
@@ -316,13 +448,46 @@ export function validateGovernedProgress(progress) {
   };
 }
 
-export function validateHandoff(handoff) {
+export function validateHandoffApproval(approval) {
   const errors = [];
+  if (!approval || typeof approval !== 'object' || Array.isArray(approval)) {
+    return {
+      ok: false,
+      errors: ['handoff.approvals entries must be objects'],
+    };
+  }
+
+  if (typeof approval.role !== 'string' || !approval.role.trim()) {
+    errors.push('handoff.approvals.role must be a non-empty string');
+  }
+
+  if (typeof approval.verdict !== 'string' || !APPROVAL_VERDICTS.has(approval.verdict)) {
+    errors.push('handoff.approvals.verdict must be one of: approved, rejected, incomplete');
+  }
+
+  if (typeof approval.evidence_ref !== 'string' || !approval.evidence_ref.trim()) {
+    errors.push('handoff.approvals.evidence_ref must be a non-empty string');
+  }
+
+  if (!parseIsoDate(approval.approved_at)) {
+    errors.push('handoff.approvals.approved_at must be ISO-8601');
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors,
+  };
+}
+
+export function validateHandoff(handoff, { mode } = {}) {
+  const errors = [];
+  const schema = modeSchemaFor(mode);
   const requiredArrayFields = [
     'acceptance_criteria',
     'verification_targets',
     'delegation_roster',
     'source_artifacts',
+    'approvals',
   ];
 
   if (!handoff || typeof handoff !== 'object' || Array.isArray(handoff)) {
@@ -350,6 +515,22 @@ export function validateHandoff(handoff) {
     errors.push('handoff.approved_at must be ISO-8601');
   }
 
+  if (Array.isArray(handoff.approvals)) {
+    for (const approval of handoff.approvals) {
+      const approvalValidation = validateHandoffApproval(approval);
+      if (!approvalValidation.ok) {
+        errors.push(...approvalValidation.errors);
+      }
+    }
+
+    for (const role of schema?.required_handoff_approvals || []) {
+      const approved = handoff.approvals.some((approval) => approval?.role === role && approval?.verdict === 'approved');
+      if (!approved) {
+        errors.push(`handoff.approvals must include an approved ${role} entry`);
+      }
+    }
+  }
+
   return {
     ok: errors.length === 0,
     errors,
@@ -357,6 +538,7 @@ export function validateHandoff(handoff) {
 }
 
 export async function validateGovernedWorkflow(progress, progressPath) {
+  const schema = modeSchemaFor(progress?.mode);
   const errors = [...validateGovernedProgress(progress).errors];
   const progressDir = dirname(progressPath);
   const workflowRoot = resolvePathFrom(progressDir, progress.workflow_root || null);
@@ -371,15 +553,14 @@ export async function validateGovernedWorkflow(progress, progressPath) {
     errors.push('workflow_root must resolve to the directory that contains progress.json');
   }
 
-  const requiredArtifactPathsByMode = {
-    'autoresearch-loop': [
-      ['spec', specPath],
-      ['results', resultsPath],
-      ['verify', verifyPath],
-    ],
+  const requiredArtifactPaths = {
+    spec: specPath,
+    results: resultsPath,
+    verify: verifyPath,
   };
 
-  for (const [field, artifactPath] of requiredArtifactPathsByMode[progress.mode] || []) {
+  for (const field of schema?.required_disk_artifacts || []) {
+    const artifactPath = requiredArtifactPaths[field];
     if (!artifactPath) {
       continue;
     }
@@ -400,7 +581,7 @@ export async function validateGovernedWorkflow(progress, progressPath) {
     if (!handoff) {
       errors.push(`missing handoff.json at ${handoffPath}`);
     } else {
-      const handoffValidation = validateHandoff(handoff);
+      const handoffValidation = validateHandoff(handoff, { mode: progress.mode });
       if (!handoffValidation.ok) {
         errors.push(...handoffValidation.errors);
       }
@@ -423,7 +604,7 @@ export async function readProgress(progressPath) {
   return progress;
 }
 
-export function deriveActiveEntry({ cwd, progressPath, progress }) {
+export function deriveActiveEntry({ cwd, progressPath, progress, completionToken }) {
   const progressDir = dirname(progressPath);
   const workflowRoot = resolvePathFrom(progressDir, progress.workflow_root);
   const verifyPath = resolvePathFrom(progressDir, progress.artifacts?.verify || join(workflowRoot, 'verify.md'));
@@ -440,6 +621,7 @@ export function deriveActiveEntry({ cwd, progressPath, progress }) {
     phase: progress.phase ?? null,
     next_step: progress.next_step ?? null,
     updated_at: progress.updated_at,
+    completion_token: completionToken,
     cwd,
   };
 }
@@ -449,8 +631,17 @@ export async function loadActiveIndex(codexHome = defaultCodexHome()) {
   return normalizeActiveIndex(raw);
 }
 
+export async function loadArchive(codexHome = defaultCodexHome()) {
+  const raw = await readJsonIfExists(archivePath(codexHome), null);
+  return normalizeArchive(raw);
+}
+
 export async function saveActiveIndex(index, codexHome = defaultCodexHome()) {
   await writeJson(activeIndexPath(codexHome), index);
+}
+
+export async function saveArchive(archive, codexHome = defaultCodexHome()) {
+  await writeJson(archivePath(codexHome), archive);
 }
 
 export async function loadActiveIndexResult(codexHome = defaultCodexHome()) {
@@ -469,6 +660,40 @@ export async function loadActiveIndexResult(codexHome = defaultCodexHome()) {
   }
 }
 
+export function buildArchiveEntry({ cwd, entry, progress, archivedAt = new Date().toISOString() }) {
+  return {
+    archive_key: workflowLockId(`${entry.workflow_root}:${progress.status}:${progress.updated_at}`),
+    archived_at: archivedAt,
+    cwd,
+    entry,
+    progress,
+  };
+}
+
+export async function archiveWorkflow({
+  codexHome = defaultCodexHome(),
+  cwd,
+  entry,
+  progress,
+  archivedAt = new Date().toISOString(),
+}) {
+  return withArchiveLock(codexHome, async () => {
+    const archive = await loadArchive(codexHome);
+    const archiveEntry = buildArchiveEntry({
+      cwd,
+      entry,
+      progress,
+      archivedAt,
+    });
+    const alreadyArchived = archive.entries.some((item) => item?.archive_key === archiveEntry.archive_key);
+    if (!alreadyArchived) {
+      archive.entries.push(archiveEntry);
+      await saveArchive(archive, codexHome);
+    }
+    return archiveEntry;
+  });
+}
+
 function formatErrorReason(error) {
   return error instanceof Error ? error.message : String(error);
 }
@@ -477,8 +702,16 @@ function buildIndexInvalidReason(codexHome, error) {
   return `Chedex governor could not read the active workflow index at ${activeIndexPath(codexHome)}.\nReason: ${formatErrorReason(error)}`;
 }
 
-function buildLockBusyReason(codexHome, error) {
-  return `Chedex governor could not safely access the active workflow index lock at ${activeIndexLockPath(codexHome)}.\nReason: ${formatErrorReason(error)}`;
+function buildLockBusyReason(codexHome, error, workflowId = null) {
+  const lockPaths = [
+    workflowId ? workflowLockPath(codexHome, workflowId) : null,
+    activeIndexLockPath(codexHome),
+  ].filter(Boolean);
+  return `Chedex governor could not safely access governed state locks at ${lockPaths.join(', ')}.\nReason: ${formatErrorReason(error)}`;
+}
+
+export function shouldArchiveWorkflow(progress) {
+  return progress?.status === 'completed' || progress?.status === 'cancelled';
 }
 
 export async function inspectIndexedWorkflowEntry(entry) {
@@ -519,11 +752,22 @@ export async function inspectIndexedWorkflowEntry(entry) {
     cwd: entry.cwd,
     progressPath: entry.progress_path,
     progress,
+    completionToken: entry.completion_token,
   });
   if (!(await pathExists(normalizedEntry.workflow_root))) {
     return {
       ok: false,
       reason: `the active workflow root is missing at ${normalizedEntry.workflow_root}. Restore the workflow directory or clear the workflow explicitly.`,
+    };
+  }
+
+  if (
+    progress.status === 'completed'
+    && progress.verification?.review?.completion_token !== normalizedEntry.completion_token
+  ) {
+    return {
+      ok: false,
+      reason: 'completed workflow verification provenance does not match the governor-issued completion token. Re-run verification-complete before closeout.',
     };
   }
 
@@ -537,39 +781,58 @@ export async function inspectIndexedWorkflowEntry(entry) {
 export async function syncWorkflow({ codexHome = defaultCodexHome(), cwd = process.cwd(), progressPath }) {
   const normalizedCwd = resolve(cwd);
   const normalizedProgressPath = resolve(progressPath);
-  const progress = await readProgress(normalizedProgressPath);
-  const validation = await validateGovernedWorkflow(progress, normalizedProgressPath);
-  if (!validation.ok) {
-    throw new Error(`invalid governed progress:\n${validation.errors.join('\n')}`);
-  }
+  return withWorkflowLock(codexHome, normalizedCwd, async () => {
+    const progress = await readProgress(normalizedProgressPath);
+    const validation = await validateGovernedWorkflow(progress, normalizedProgressPath);
+    if (!validation.ok) {
+      throw new Error(`invalid governed progress:\n${validation.errors.join('\n')}`);
+    }
 
-  return withActiveIndexLock(codexHome, async () => {
-    const index = await loadActiveIndex(codexHome);
-    index.entries[normalizedCwd] = deriveActiveEntry({
-      cwd: normalizedCwd,
-      progressPath: normalizedProgressPath,
-      progress,
+    return withActiveIndexLock(codexHome, async () => {
+      const index = await loadActiveIndex(codexHome);
+      const existingEntry = index.entries[normalizedCwd] || null;
+      if (
+        progress.status === 'completed'
+        && (!existingEntry || existingEntry.progress_path !== normalizedProgressPath)
+      ) {
+        throw new Error('completed workflows must transition from an already indexed governed workflow and finalize through verification-complete');
+      }
+      if (
+        progress.status === 'completed'
+        && progress.verification?.review?.completion_token !== existingEntry?.completion_token
+      ) {
+        throw new Error('completed workflow verification provenance does not match the governor-issued completion token. Re-run verification-complete before syncing closeout state.');
+      }
+      const completionToken = existingEntry?.completion_token || randomUUID();
+      index.entries[normalizedCwd] = deriveActiveEntry({
+        cwd: normalizedCwd,
+        progressPath: normalizedProgressPath,
+        progress,
+        completionToken,
+      });
+
+      await saveActiveIndex(index, codexHome);
+      return index.entries[normalizedCwd];
     });
-
-    await saveActiveIndex(index, codexHome);
-    return index.entries[normalizedCwd];
   });
 }
 
 export async function clearWorkflow({ codexHome = defaultCodexHome(), cwd = process.cwd() }) {
   const normalizedCwd = resolve(cwd);
-  return withActiveIndexLock(codexHome, async () => {
-    const index = await loadActiveIndex(codexHome);
-    if (!(normalizedCwd in index.entries)) {
-      return false;
-    }
-    delete index.entries[normalizedCwd];
-    await saveActiveIndex(index, codexHome);
-    return true;
+  return withWorkflowLock(codexHome, normalizedCwd, async () => {
+    return withActiveIndexLock(codexHome, async () => {
+      const index = await loadActiveIndex(codexHome);
+      if (!(normalizedCwd in index.entries)) {
+        return false;
+      }
+      delete index.entries[normalizedCwd];
+      await saveActiveIndex(index, codexHome);
+      return true;
+    });
   });
 }
 
-export async function pruneIndexForSessionStart(index) {
+export async function pruneIndexForSessionStart(index, { codexHome = defaultCodexHome() } = {}) {
   let changed = false;
   for (const [cwd, entry] of Object.entries(index.entries)) {
     const inspection = await inspectIndexedWorkflowEntry(entry);
@@ -578,7 +841,13 @@ export async function pruneIndexForSessionStart(index) {
     }
 
     const { progress, normalizedEntry } = inspection;
-    if (progress.status === 'completed' || progress.status === 'cancelled') {
+    if (shouldArchiveWorkflow(progress)) {
+      await archiveWorkflow({
+        codexHome,
+        cwd,
+        entry: normalizedEntry,
+        progress,
+      });
       delete index.entries[cwd];
       changed = true;
       continue;
@@ -625,7 +894,7 @@ export function renderSessionStartContext(entry, progress) {
     }
   }
 
-  lines.push('closeout rule: do not stop until progress.json is terminal and, when completed, verification is satisfied.');
+  lines.push('closeout rule: do not stop until progress.json is terminal and, when completed, verification is satisfied with an independent verifier pass.');
   return `${lines.join('\n')}\n`;
 }
 
@@ -633,7 +902,7 @@ export function renderSessionStartWarning(reason) {
   return [
     'Chedex governor found governed workflow state for this workspace, but it could not restore it safely.',
     reason,
-    'closeout rule: stop will remain blocked until the workflow state is repaired or cleared, and when completed, verification is satisfied.',
+    'closeout rule: stop will remain blocked until the workflow state is repaired or cleared, and when completed, verification is satisfied with an independent verifier pass.',
     '',
   ].join('\n');
 }
@@ -647,42 +916,44 @@ export async function sessionStartHook({
   let workflowContext = '';
 
   try {
-    workflowContext = await withActiveIndexLock(codexHome, async () => {
-      const loadResult = await loadActiveIndexResult(codexHome);
-      if (!loadResult.ok) {
-        return renderSessionStartWarning(buildIndexInvalidReason(codexHome, loadResult.error));
-      }
+    workflowContext = await withWorkflowLock(codexHome, normalizedCwd, async () => {
+      return withActiveIndexLock(codexHome, async () => {
+        const loadResult = await loadActiveIndexResult(codexHome);
+        if (!loadResult.ok) {
+          return renderSessionStartWarning(buildIndexInvalidReason(codexHome, loadResult.error));
+        }
 
-      const index = loadResult.index;
-      const changed = await pruneIndexForSessionStart(index);
-      const entry = index.entries[normalizedCwd];
+        const index = loadResult.index;
+        const changed = await pruneIndexForSessionStart(index, { codexHome });
+        const entry = index.entries[normalizedCwd];
 
-      if (!entry) {
-        if (changed) {
+        if (!entry) {
+          if (changed) {
+            await saveActiveIndex(index, codexHome);
+          }
+          return '';
+        }
+
+        const inspection = await inspectIndexedWorkflowEntry(entry);
+        if (!inspection.ok) {
+          if (changed) {
+            await saveActiveIndex(index, codexHome);
+          }
+          return renderSessionStartWarning(inspection.reason);
+        }
+
+        const normalizedEntry = inspection.normalizedEntry;
+        if (JSON.stringify(entry) !== JSON.stringify(normalizedEntry)) {
+          index.entries[normalizedCwd] = normalizedEntry;
+        }
+        if (changed || JSON.stringify(entry) !== JSON.stringify(normalizedEntry)) {
           await saveActiveIndex(index, codexHome);
         }
-        return '';
-      }
-
-      const inspection = await inspectIndexedWorkflowEntry(entry);
-      if (!inspection.ok) {
-        if (changed) {
-          await saveActiveIndex(index, codexHome);
-        }
-        return renderSessionStartWarning(inspection.reason);
-      }
-
-      const normalizedEntry = inspection.normalizedEntry;
-      if (JSON.stringify(entry) !== JSON.stringify(normalizedEntry)) {
-        index.entries[normalizedCwd] = normalizedEntry;
-      }
-      if (changed || JSON.stringify(entry) !== JSON.stringify(normalizedEntry)) {
-        await saveActiveIndex(index, codexHome);
-      }
-      return renderSessionStartContext(normalizedEntry, inspection.progress);
+        return renderSessionStartContext(normalizedEntry, inspection.progress);
+      });
     });
   } catch (error) {
-    workflowContext = renderSessionStartWarning(buildLockBusyReason(codexHome, error));
+    workflowContext = renderSessionStartWarning(buildLockBusyReason(codexHome, error, normalizedCwd));
   }
 
   let releaseAuditContext = '';
@@ -692,6 +963,7 @@ export async function sessionStartHook({
       now: releaseAudit.now || new Date(),
       readInstalledVersion: releaseAudit.readInstalledVersion,
       getLatestReleaseInfo: releaseAudit.getLatestReleaseInfo,
+      getDynamicReleaseDeltas: releaseAudit.getDynamicReleaseDeltas,
     });
     releaseAuditContext = renderReleaseAuditAdvisory(audit);
   }
@@ -705,51 +977,59 @@ export async function sessionStartHook({
 export async function stopHook({ codexHome = defaultCodexHome(), cwd = process.cwd() }) {
   const normalizedCwd = resolve(cwd);
   try {
-    return await withActiveIndexLock(codexHome, async () => {
-      const loadResult = await loadActiveIndexResult(codexHome);
-      if (!loadResult.ok) {
-        return {
-          action: 'block',
-          reason: `Chedex governor blocked stop because the active workflow index is invalid:\n- ${buildIndexInvalidReason(codexHome, loadResult.error)}`,
-        };
-      }
+    return await withWorkflowLock(codexHome, normalizedCwd, async () => {
+      return withActiveIndexLock(codexHome, async () => {
+        const loadResult = await loadActiveIndexResult(codexHome);
+        if (!loadResult.ok) {
+          return {
+            action: 'block',
+            reason: `Chedex governor blocked stop because the active workflow index is invalid:\n- ${buildIndexInvalidReason(codexHome, loadResult.error)}`,
+          };
+        }
 
-      const index = loadResult.index;
-      const entry = index.entries[normalizedCwd];
-      if (!entry) {
+        const index = loadResult.index;
+        const entry = index.entries[normalizedCwd];
+        if (!entry) {
+          return { action: 'allow' };
+        }
+
+        const inspection = await inspectIndexedWorkflowEntry(entry);
+        if (!inspection.ok) {
+          return {
+            action: 'block',
+            reason: `Chedex governor blocked stop because ${inspection.reason}`,
+          };
+        }
+
+        const progress = inspection.progress;
+        if (progress.status === ACTIVE_STATUS) {
+          const nextStep = typeof progress.next_step === 'string' && progress.next_step.trim()
+            ? progress.next_step.trim()
+            : 'continue the governed workflow';
+          return {
+            action: 'block',
+            reason: `Chedex governor blocked stop because the workflow is still active in phase ${progress.phase || 'unspecified'}. Next step: ${nextStep}.`,
+          };
+        }
+
+        if (shouldArchiveWorkflow(progress)) {
+          await archiveWorkflow({
+            codexHome,
+            cwd: normalizedCwd,
+            entry: inspection.normalizedEntry,
+            progress,
+          });
+          delete index.entries[normalizedCwd];
+          await saveActiveIndex(index, codexHome);
+        }
+
         return { action: 'allow' };
-      }
-
-      const inspection = await inspectIndexedWorkflowEntry(entry);
-      if (!inspection.ok) {
-        return {
-          action: 'block',
-          reason: `Chedex governor blocked stop because ${inspection.reason}`,
-        };
-      }
-
-      const progress = inspection.progress;
-      if (progress.status === ACTIVE_STATUS) {
-        const nextStep = typeof progress.next_step === 'string' && progress.next_step.trim()
-          ? progress.next_step.trim()
-          : 'continue the governed workflow';
-        return {
-          action: 'block',
-          reason: `Chedex governor blocked stop because the workflow is still active in phase ${progress.phase || 'unspecified'}. Next step: ${nextStep}.`,
-        };
-      }
-
-      if (progress.status === 'completed' || progress.status === 'cancelled') {
-        delete index.entries[normalizedCwd];
-        await saveActiveIndex(index, codexHome);
-      }
-
-      return { action: 'allow' };
+      });
     });
   } catch (error) {
     return {
       action: 'block',
-      reason: `Chedex governor blocked stop because it could not safely access governed state:\n- ${buildLockBusyReason(codexHome, error)}`,
+      reason: `Chedex governor blocked stop because it could not safely access governed state:\n- ${buildLockBusyReason(codexHome, error, normalizedCwd)}`,
     };
   }
 }
@@ -801,6 +1081,63 @@ export function blockResponse(reason) {
   });
 }
 
+export async function verificationComplete({
+  codexHome = defaultCodexHome(),
+  cwd = process.cwd(),
+  progressPath,
+  verdict = 'pass',
+  evidenceRef,
+  approvedAt = new Date().toISOString(),
+}) {
+  const normalizedCwd = resolve(cwd);
+  const normalizedProgressPath = resolve(progressPath);
+  return withWorkflowLock(codexHome, normalizedCwd, async () => {
+    return withActiveIndexLock(codexHome, async () => {
+      const loadResult = await loadActiveIndexResult(codexHome);
+      if (!loadResult.ok) {
+        throw new Error(buildIndexInvalidReason(codexHome, loadResult.error));
+      }
+
+      const entry = loadResult.index.entries[normalizedCwd];
+      if (!entry || entry.progress_path !== normalizedProgressPath) {
+        throw new Error('verification-complete requires an active indexed workflow for the same cwd and progress path');
+      }
+
+      const progress = await readProgress(normalizedProgressPath);
+      if (progress.status !== 'completed') {
+        throw new Error('verification-complete only applies to completed workflows');
+      }
+
+      const updatedProgress = {
+        ...progress,
+        updated_at: approvedAt,
+        verification: {
+          ...progress.verification,
+          state: verdict === 'pass' ? VERIFICATION_SATISFIED : 'pending',
+          evidence: Array.isArray(progress.verification?.evidence)
+            ? [...new Set([...(progress.verification.evidence || []), evidenceRef].filter(Boolean))]
+            : evidenceRef ? [evidenceRef] : [],
+          review: {
+            role: modeSchemaFor(progress.mode)?.completion_review_role || 'verifier',
+            verdict,
+            evidence_ref: evidenceRef,
+            completion_token: entry.completion_token,
+            approved_at: approvedAt,
+          },
+        },
+      };
+
+      const validation = await validateGovernedWorkflow(updatedProgress, normalizedProgressPath);
+      if (!validation.ok) {
+        throw new Error(`invalid governed progress:\n${validation.errors.join('\n')}`);
+      }
+
+      await writeJson(normalizedProgressPath, updatedProgress);
+      return updatedProgress.verification.review;
+    });
+  });
+}
+
 export async function userPromptSubmitHook({
   codexHome = defaultCodexHome(),
   cwd = process.cwd(),
@@ -808,51 +1145,53 @@ export async function userPromptSubmitHook({
   const normalizedCwd = resolve(cwd);
 
   try {
-    return await withActiveIndexLock(codexHome, async () => {
-      const loadResult = await loadActiveIndexResult(codexHome);
-      if (!loadResult.ok) {
-        return {
-          decision: 'block',
-          reason: `Chedex governor blocked prompt submission because the active workflow index is invalid:\n- ${buildIndexInvalidReason(codexHome, loadResult.error)}`,
-        };
-      }
+    return await withWorkflowLock(codexHome, normalizedCwd, async () => {
+      return withActiveIndexLock(codexHome, async () => {
+        const loadResult = await loadActiveIndexResult(codexHome);
+        if (!loadResult.ok) {
+          return {
+            decision: 'block',
+            reason: `Chedex governor blocked prompt submission because the active workflow index is invalid:\n- ${buildIndexInvalidReason(codexHome, loadResult.error)}`,
+          };
+        }
 
-      const index = loadResult.index;
-      const changed = await pruneIndexForSessionStart(index);
-      const entry = index.entries[normalizedCwd];
+        const index = loadResult.index;
+        const changed = await pruneIndexForSessionStart(index, { codexHome });
+        const entry = index.entries[normalizedCwd];
 
-      if (!entry) {
-        if (changed) {
+        if (!entry) {
+          if (changed) {
+            await saveActiveIndex(index, codexHome);
+          }
+          return { decision: 'allow' };
+        }
+
+        const inspection = await inspectIndexedWorkflowEntry(entry);
+        if (!inspection.ok) {
+          if (changed) {
+            await saveActiveIndex(index, codexHome);
+          }
+          return {
+            decision: 'block',
+            reason: `Chedex governor blocked prompt submission because ${inspection.reason}`,
+          };
+        }
+
+        const normalizedEntry = inspection.normalizedEntry;
+        if (JSON.stringify(entry) !== JSON.stringify(normalizedEntry)) {
+          index.entries[normalizedCwd] = normalizedEntry;
+        }
+        if (changed || JSON.stringify(entry) !== JSON.stringify(normalizedEntry)) {
           await saveActiveIndex(index, codexHome);
         }
+
         return { decision: 'allow' };
-      }
-
-      const inspection = await inspectIndexedWorkflowEntry(entry);
-      if (!inspection.ok) {
-        if (changed) {
-          await saveActiveIndex(index, codexHome);
-        }
-        return {
-          decision: 'block',
-          reason: `Chedex governor blocked prompt submission because ${inspection.reason}`,
-        };
-      }
-
-      const normalizedEntry = inspection.normalizedEntry;
-      if (JSON.stringify(entry) !== JSON.stringify(normalizedEntry)) {
-        index.entries[normalizedCwd] = normalizedEntry;
-      }
-      if (changed || JSON.stringify(entry) !== JSON.stringify(normalizedEntry)) {
-        await saveActiveIndex(index, codexHome);
-      }
-
-      return { decision: 'allow' };
+      });
     });
   } catch (error) {
     return {
       decision: 'block',
-      reason: `Chedex governor blocked prompt submission because it could not safely access governed state:\n- ${buildLockBusyReason(codexHome, error)}`,
+      reason: `Chedex governor blocked prompt submission because it could not safely access governed state:\n- ${buildLockBusyReason(codexHome, error, normalizedCwd)}`,
     };
   }
 }
@@ -863,7 +1202,7 @@ async function runCli() {
   const codexHome = args.codex_home ? resolve(args.codex_home) : defaultCodexHome();
 
   if (!command) {
-    throw new Error('usage: chedex-governor.mjs <session-start|user-prompt-submit|stop|workflow-sync|workflow-clear>');
+    throw new Error('usage: chedex-governor.mjs <session-start|user-prompt-submit|stop|workflow-sync|workflow-clear|verification-complete>');
   }
 
   switch (command) {
@@ -934,6 +1273,27 @@ async function runCli() {
         cwd: args.cwd || process.cwd(),
       });
       process.stdout.write(`removed=${removed ? 'true' : 'false'}\n`);
+      return;
+    }
+    case 'verification-complete': {
+      if (!args.progress) {
+        throw new Error('--progress is required for verification-complete');
+      }
+      if (!args.cwd) {
+        throw new Error('--cwd is required for verification-complete');
+      }
+      if (!args.evidence_ref) {
+        throw new Error('--evidence-ref is required for verification-complete');
+      }
+      const review = await verificationComplete({
+        codexHome,
+        cwd: args.cwd,
+        progressPath: args.progress,
+        verdict: args.verdict || 'pass',
+        evidenceRef: args.evidence_ref,
+        approvedAt: args.approved_at || new Date().toISOString(),
+      });
+      process.stdout.write(`${JSON.stringify(review, null, 2)}\n`);
       return;
     }
     default:
