@@ -9,6 +9,7 @@ import {
   activeIndexPath,
   archivePath,
   clearWorkflow,
+  normalizeTrackedPath,
   sessionStartHook,
   stopHook,
   syncWorkflow,
@@ -818,7 +819,10 @@ const repairedIndexContext = await sessionStartHook({
 });
 assert(repairedIndexContext.includes('mode: ralph'), 'session-start should still rehydrate when active-index workflow_root metadata is stale');
 const repairedIndexAfterSessionStart = JSON.parse(await readFile(activeIndexPath(home), 'utf8'));
-assert(repairedIndexAfterSessionStart.entries[repairedIndexCwd].workflow_root === repairedIndexWorkflow.workflowRoot, 'session-start should repair stale workflow_root metadata in the active index');
+assert(
+  repairedIndexAfterSessionStart.entries[repairedIndexCwd].workflow_root === normalizeTrackedPath(repairedIndexWorkflow.workflowRoot),
+  'session-start should repair stale workflow_root metadata in the active index',
+);
 
 const lockedHome = await mkdtemp(join(tmpdir(), 'chedex-governor-lock-'));
 const lockedCwdA = join(lockedHome, 'workspace-a');
@@ -878,6 +882,36 @@ await heldLock.release();
 await Promise.all([blockedSyncA, blockedSyncB]);
 const lockedIndex = JSON.parse(await readFile(activeIndexPath(lockedHome), 'utf8'));
 assert(Object.keys(lockedIndex.entries).length === 2, 'serialized syncs should preserve both active index entries');
+
+const ownershipHome = await mkdtemp(join(tmpdir(), 'chedex-governor-owner-'));
+const ownerCwdA = join(ownershipHome, 'workspace-a');
+const ownerCwdB = join(ownershipHome, 'workspace-b');
+await mkdir(ownerCwdA, { recursive: true });
+await mkdir(ownerCwdB, { recursive: true });
+const sharedWorkflow = await makeWorkflow({
+  home: ownershipHome,
+  slug: 'shared-workflow',
+  mode: 'ralph',
+});
+await syncWorkflow({
+  codexHome: ownershipHome,
+  cwd: ownerCwdA,
+  progressPath: sharedWorkflow.progressPath,
+});
+let ownershipConflictFailed = false;
+try {
+  await syncWorkflow({
+    codexHome: ownershipHome,
+    cwd: ownerCwdB,
+    progressPath: sharedWorkflow.progressPath,
+  });
+} catch (error) {
+  ownershipConflictFailed = error.message.includes('already indexed for workspace');
+}
+assert(ownershipConflictFailed, 'the same governed workflow should not be indexable under multiple workspaces');
+const ownershipIndex = JSON.parse(await readFile(activeIndexPath(ownershipHome), 'utf8'));
+assert(Object.keys(ownershipIndex.entries).length === 1, 'ownership conflicts should preserve only the original workspace entry');
+assert(ownershipIndex.entries[ownerCwdA].cwd === ownerCwdA, 'the original workflow owner should remain indexed after an ownership conflict');
 
 const currentReleaseAudit = await buildReleaseAudit({
   codexHome: home,

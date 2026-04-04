@@ -262,6 +262,14 @@ export function resolvePathFrom(baseDir, candidate) {
   return resolve(baseDir, candidate);
 }
 
+export function normalizeTrackedPath(path) {
+  try {
+    return realpathSync(path);
+  } catch {
+    return resolve(path);
+  }
+}
+
 export function parseIsoDate(value) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
@@ -541,6 +549,7 @@ export async function validateGovernedWorkflow(progress, progressPath) {
   const schema = modeSchemaFor(progress?.mode);
   const errors = [...validateGovernedProgress(progress).errors];
   const progressDir = dirname(progressPath);
+  const normalizedProgressDir = normalizeTrackedPath(progressDir);
   const workflowRoot = resolvePathFrom(progressDir, progress.workflow_root || null);
   const handoffPath = resolvePathFrom(progressDir, progress.artifacts?.handoff || null);
   const specPath = resolvePathFrom(progressDir, progress.artifacts?.spec || null);
@@ -549,7 +558,7 @@ export async function validateGovernedWorkflow(progress, progressPath) {
 
   if (!workflowRoot) {
     errors.push('workflow_root must resolve to a directory');
-  } else if (workflowRoot !== progressDir) {
+  } else if (normalizeTrackedPath(workflowRoot) !== normalizedProgressDir) {
     errors.push('workflow_root must resolve to the directory that contains progress.json');
   }
 
@@ -606,17 +615,17 @@ export async function readProgress(progressPath) {
 
 export function deriveActiveEntry({ cwd, progressPath, progress, completionToken }) {
   const progressDir = dirname(progressPath);
-  const workflowRoot = resolvePathFrom(progressDir, progress.workflow_root);
-  const verifyPath = resolvePathFrom(progressDir, progress.artifacts?.verify || join(workflowRoot, 'verify.md'));
+  const workflowRoot = normalizeTrackedPath(resolvePathFrom(progressDir, progress.workflow_root));
+  const verifyPath = normalizeTrackedPath(resolvePathFrom(progressDir, progress.artifacts?.verify || join(workflowRoot, 'verify.md')));
   const handoffPath = resolvePathFrom(progressDir, progress.artifacts?.handoff || null);
 
   return {
     mode: progress.mode,
     task: progress.task,
     workflow_root: workflowRoot,
-    progress_path: progressPath,
+    progress_path: normalizeTrackedPath(progressPath),
     verify_path: verifyPath,
-    handoff_path: handoffPath,
+    handoff_path: handoffPath ? normalizeTrackedPath(handoffPath) : null,
     status: progress.status,
     phase: progress.phase ?? null,
     next_step: progress.next_step ?? null,
@@ -714,6 +723,30 @@ export function shouldArchiveWorkflow(progress) {
   return progress?.status === 'completed' || progress?.status === 'cancelled';
 }
 
+export function findWorkflowOwnershipConflict(index, { cwd, progressPath, workflowRoot }) {
+  for (const [entryCwd, entry] of Object.entries(index.entries || {})) {
+    if (entryCwd === cwd || entry?.cwd === cwd) {
+      continue;
+    }
+
+    const indexedProgressPath = typeof entry?.progress_path === 'string'
+      ? normalizeTrackedPath(entry.progress_path)
+      : null;
+    const indexedWorkflowRoot = typeof entry?.workflow_root === 'string'
+      ? normalizeTrackedPath(entry.workflow_root)
+      : null;
+
+    if (
+      (progressPath && indexedProgressPath === progressPath)
+      || (workflowRoot && indexedWorkflowRoot === workflowRoot)
+    ) {
+      return entry;
+    }
+  }
+
+  return null;
+}
+
 export async function inspectIndexedWorkflowEntry(entry) {
   const entryValidation = validateActiveIndexEntry(entry);
   if (!entryValidation.ok) {
@@ -791,9 +824,25 @@ export async function syncWorkflow({ codexHome = defaultCodexHome(), cwd = proce
     return withActiveIndexLock(codexHome, async () => {
       const index = await loadActiveIndex(codexHome);
       const existingEntry = index.entries[normalizedCwd] || null;
+      const nextEntry = deriveActiveEntry({
+        cwd: normalizedCwd,
+        progressPath: normalizedProgressPath,
+        progress,
+        completionToken: existingEntry?.completion_token || randomUUID(),
+      });
+      const conflictingEntry = findWorkflowOwnershipConflict(index, {
+        cwd: normalizedCwd,
+        progressPath: nextEntry.progress_path,
+        workflowRoot: nextEntry.workflow_root,
+      });
+      if (conflictingEntry) {
+        throw new Error(
+          `workflow root ${nextEntry.workflow_root} is already indexed for workspace ${conflictingEntry.cwd}; clear or complete that workflow before reusing it from another workspace.`,
+        );
+      }
       if (
         progress.status === 'completed'
-        && (!existingEntry || existingEntry.progress_path !== normalizedProgressPath)
+        && (!existingEntry || normalizeTrackedPath(existingEntry.progress_path) !== nextEntry.progress_path)
       ) {
         throw new Error('completed workflows must transition from an already indexed governed workflow and finalize through verification-complete');
       }
@@ -803,13 +852,7 @@ export async function syncWorkflow({ codexHome = defaultCodexHome(), cwd = proce
       ) {
         throw new Error('completed workflow verification provenance does not match the governor-issued completion token. Re-run verification-complete before syncing closeout state.');
       }
-      const completionToken = existingEntry?.completion_token || randomUUID();
-      index.entries[normalizedCwd] = deriveActiveEntry({
-        cwd: normalizedCwd,
-        progressPath: normalizedProgressPath,
-        progress,
-        completionToken,
-      });
+      index.entries[normalizedCwd] = nextEntry;
 
       await saveActiveIndex(index, codexHome);
       return index.entries[normalizedCwd];
@@ -1099,7 +1142,7 @@ export async function verificationComplete({
       }
 
       const entry = loadResult.index.entries[normalizedCwd];
-      if (!entry || entry.progress_path !== normalizedProgressPath) {
+      if (!entry || normalizeTrackedPath(entry.progress_path) !== normalizeTrackedPath(normalizedProgressPath)) {
         throw new Error('verification-complete requires an active indexed workflow for the same cwd and progress path');
       }
 
@@ -1301,15 +1344,7 @@ async function runCli() {
   }
 }
 
-function resolveCliPath(path) {
-  try {
-    return realpathSync(path);
-  } catch {
-    return resolve(path);
-  }
-}
-
-const isMain = process.argv[1] && resolveCliPath(process.argv[1]) === resolveCliPath(fileURLToPath(import.meta.url));
+const isMain = process.argv[1] && normalizeTrackedPath(process.argv[1]) === normalizeTrackedPath(fileURLToPath(import.meta.url));
 if (isMain) {
   runCli().catch((error) => {
     process.stderr.write(`${error.message}\n`);

@@ -160,7 +160,7 @@ Chedex keeps a small native-first execution chain:
 - `ralph` and direct top-level `ultrawork` own the remaining persistent execution cases
 - `autopilot` is the tight governed shell for broad iterative work, while nested `ralph` and `ultrawork` slices still report through it unless ownership is explicitly transferred
 
-The governor still admits one active governed workflow entry per workspace `cwd`, but workflow synchronization now uses per-workflow locks so separate workspaces do not contend on one global runtime lock.
+The governor still stores runtime state globally under `$CODEX_HOME/workflows/` and admits one active governed workflow entry per workspace `cwd`, but workflow synchronization now uses per-workflow locks so separate workspaces do not contend on one global runtime lock. A governed `workflow_root` cannot be attached to multiple workspaces at once.
 
 ## Current Gaps
 

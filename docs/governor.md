@@ -53,6 +53,7 @@ The active workflow index lives at:
 
 It is keyed by absolute workspace `cwd`.
 That means the current governor model keeps one active governed workflow entry per workspace.
+The runtime store itself is still global under `$CODEX_HOME/workflows/`; this is workspace-scoped ownership inside a shared index, not repo-local state on disk.
 Each entry records:
 
 - `mode`
@@ -70,6 +71,7 @@ Each entry records:
 
 Governor-managed `_active.json` updates are serialized and written atomically. Per-workflow sync operations also take a workflow-specific lock such as `_lock_<hash(cwd)>`, so unrelated workspaces no longer block one another on a single global runtime lock. If the active index cannot be read safely, `Stop` fails closed and `SessionStart` surfaces a warning instead of silently clearing protection.
 Syncing a different governed workflow from the same `cwd` replaces the previous indexed entry rather than nesting multiple owners.
+A given `workflow_root` / `progress_path` may only be owned by one workspace at a time; reusing the same governed workflow from another workspace is rejected until the original owner clears or completes it.
 
 When a workflow reaches `completed` or `cancelled` and the runtime clears it from `_active.json`, the governor appends the final entry and progress snapshot to `~/.codex/workflows/_archive.json` instead of deleting the history outright.
 
