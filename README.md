@@ -1,4 +1,4 @@
-# Chedex v0.118.0
+# Chedex v0.120.0
 
 An homage to preceding projects such as Oh My OpenAgent, Oh My Codex, and Ouroboros.
 
@@ -18,14 +18,14 @@ It intentionally excludes external orchestration machinery such as:
 - legacy external state systems
 - HUD, mailboxing, linked mode state, and runtime overlays
 
-## v0.118.0 Shape
+## v0.120.0 Shape
 
-`0.118.0` keeps the current Chedex shape verified against Codex `0.118.0` and records the official `0.116.0` / `0.117.0` / `0.118.0` release-surface upgrades in the startup release audit.
+`0.120.0` keeps the current Chedex shape verified against Codex `0.120.0` and records the official `0.116.0` / `0.117.0` / `0.118.0` / `0.119.0` / `0.120.0` release-surface upgrades in the startup release audit.
 
 - ordinary turns stay lightweight and native
 - selected governed lanes and artifact-backed planning/requirements lanes keep durable state under `~/.codex/workflows/`
 - Codex `>= 0.116.0` gets the narrow `UserPromptSubmit` integrity gate in addition to `SessionStart` and `Stop`
-- Chedex currently requires Codex `>= 0.114.0` with `codex_hooks` available and is verified against Codex `0.118.0`
+- Chedex currently requires Codex `>= 0.114.0` with `codex_hooks` available and is verified against Codex `0.120.0`
 - the repo keeps a deterministic `.codex/` mirror for installable source surfaces and verifies parity explicitly
 
 ## At A Glance

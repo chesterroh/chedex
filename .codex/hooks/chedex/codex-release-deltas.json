@@ -36,6 +36,24 @@
         "Re-run `npm run install:user:dry` to confirm the managed hook surface still resolves as expected on 0.118.x.",
         "If you rely on app-server-backed workflows, smoke-test hook replay, `/copy`, `/resume`, and MCP startup behavior after upgrading."
       ]
+    },
+    {
+      "since": "0.119.0",
+      "summary": "Codex 0.119.x expands MCP, plugin-cache, remote/app-server, and TUI resume workflows while keeping the native hook surface unchanged.",
+      "checks": [
+        "Re-run `npm run verify` after upgrading Codex CLI.",
+        "If you rely on MCP apps, custom MCP servers, or plugin-backed workflows, smoke-test those paths after upgrading.",
+        "If you rely on remote/app-server or TUI resume flows, smoke-test `/resume`, remote `--cd`, and any workspace-specific remote setup after upgrading."
+      ]
+    },
+    {
+      "since": "0.120.0",
+      "summary": "Codex 0.120.x improves hook rendering, adds MCP `outputSchema` metadata in code mode, and introduces a distinct `/clear` SessionStart source in addition to startup and resume.",
+      "checks": [
+        "Re-run `npm run verify` after upgrading Codex CLI.",
+        "Re-run `npm run install:user:dry` to confirm the managed hook surface still resolves as expected on 0.120.x.",
+        "Before broadening any managed SessionStart matcher, smoke-test startup, resume, and `/clear` hook payloads on the target Codex build."
+      ]
     }
   ]
 }
