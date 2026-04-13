@@ -114,6 +114,12 @@ const emptySessionStartOutput = runShellCommand(
   `${JSON.stringify({ cwd: join(freshHome, 'workspace-empty') })}\n`,
 );
 assert(emptySessionStartOutput === '', 'session-start should stay quiet when no governed workflow is active');
+const emptyClearSessionStartOutput = runShellCommand(
+  installedSessionStartCommand,
+  { ...freshEnv, CHEDEX_DISABLE_RELEASE_AUDIT: '1' },
+  `${JSON.stringify({ cwd: join(freshHome, 'workspace-empty'), source: 'clear' })}\n`,
+);
+assert(emptyClearSessionStartOutput === '', 'session-start clear should stay quiet when no governed workflow is active');
 
 const installedGovernorPath = join(freshHome, 'hooks', 'chedex', 'chedex-governor.mjs');
 const governedCwd = join(freshHome, 'workspace-governed');
@@ -183,6 +189,14 @@ const governedSessionStartOutput = runShellCommand(
 );
 assert(governedSessionStartOutput.includes('mode: ralph'), 'installed session-start hook should restore governed workflow context');
 assert(governedSessionStartOutput.includes('task: install smoke task'), 'installed session-start hook should render the governed workflow summary');
+const governedClearSessionStartOutput = runShellCommand(
+  installedSessionStartCommand,
+  { ...freshEnv, CHEDEX_DISABLE_RELEASE_AUDIT: '1' },
+  `${JSON.stringify({ cwd: governedCwd, source: 'clear' })}\n`,
+);
+assert(governedClearSessionStartOutput.includes('kept governed workflow protection after chat clear'), 'installed session-start hook should handle clear with a soft-clear notice');
+assert(governedClearSessionStartOutput.includes('mode: ralph'), 'installed session-start clear should still identify the governed workflow');
+assert(!governedClearSessionStartOutput.includes('artifacts:'), 'installed session-start clear should avoid the full restore artifact block');
 if (hookProbe.supportedHookEvents.includes('UserPromptSubmit')) {
   const installedUserPromptSubmitCommand = installedHooksConfig.hooks.UserPromptSubmit[0].hooks[0].command;
   const governedPromptOutput = runShellCommand(

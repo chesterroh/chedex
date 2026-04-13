@@ -610,6 +610,39 @@ const cleared = await clearWorkflow({
 });
 assert(cleared, 'workflow-clear should remove the indexed workflow');
 
+const clearSourceWorkflow = await makeWorkflow({
+  home,
+  slug: 'clear-source-active',
+  mode: 'ralph',
+  status: 'active',
+  phase: 'execute',
+  verificationState: 'pending',
+  nextStep: 'Continue implementation after clear',
+});
+await syncWorkflow({
+  codexHome: home,
+  cwd,
+  progressPath: clearSourceWorkflow.progressPath,
+});
+const clearSourceContext = await sessionStartHook({
+  codexHome: home,
+  cwd,
+  source: 'clear',
+  releaseAudit: {
+    disabled: true,
+  },
+});
+assert(clearSourceContext.includes('kept governed workflow protection after chat clear'), 'clear session-start should emit the clear-specific notice');
+assert(clearSourceContext.includes('mode: ralph'), 'clear session-start should still identify the governed workflow');
+assert(clearSourceContext.includes('task: clear-source-active task'), 'clear session-start should still surface the task summary');
+assert(!clearSourceContext.includes('restored a governed workflow'), 'clear session-start should not masquerade as a restored resume context');
+assert(!clearSourceContext.includes('artifacts:'), 'clear session-start should not emit the full artifact block');
+const clearSourceStop = await stopHook({
+  codexHome: home,
+  cwd,
+});
+assert(clearSourceStop.action === 'block', 'clear session-start should preserve stop protection for active workflows');
+
 const invalidResumeWorkflow = await makeWorkflow({
   home,
   slug: 'invalid-resume',
@@ -1183,6 +1216,34 @@ const malformedSessionStartCli = execFileSync(process.execPath, [join(process.cw
   encoding: 'utf8',
 });
 assert(malformedSessionStartCli.includes('could not restore it safely'), 'session-start CLI should handle malformed hook input without crashing');
+
+const clearCliCwd = join(home, 'clear-cli-workspace');
+await mkdir(clearCliCwd, { recursive: true });
+const clearCliWorkflow = await makeWorkflow({
+  home,
+  slug: 'clear-cli-active',
+  mode: 'ralph',
+  status: 'active',
+  phase: 'execute',
+  verificationState: 'pending',
+  nextStep: 'Continue implementation after CLI clear',
+});
+await syncWorkflow({
+  codexHome: home,
+  cwd: clearCliCwd,
+  progressPath: clearCliWorkflow.progressPath,
+});
+const clearSessionStartCli = execFileSync(process.execPath, [join(process.cwd(), 'hooks', 'chedex-governor.mjs'), 'session-start', '--codex-home', home], {
+  cwd: process.cwd(),
+  env: {
+    ...process.env,
+    CHEDEX_DISABLE_RELEASE_AUDIT: '1',
+  },
+  input: `${JSON.stringify({ cwd: clearCliCwd, source: 'clear' })}\n`,
+  encoding: 'utf8',
+});
+assert(clearSessionStartCli.includes('kept governed workflow protection after chat clear'), 'session-start CLI should pass clear source through to the governor');
+assert(!clearSessionStartCli.includes('artifacts:'), 'session-start CLI clear path should not render the full restore artifact block');
 
 const malformedStopCli = execFileSync(process.execPath, [join(process.cwd(), 'hooks', 'chedex-governor.mjs'), 'stop', '--codex-home', home], {
   cwd: process.cwd(),

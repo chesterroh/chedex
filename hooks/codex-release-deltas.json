@@ -52,7 +52,7 @@
       "checks": [
         "Re-run `npm run verify` after upgrading Codex CLI.",
         "Re-run `npm run install:user:dry` to confirm the managed hook surface still resolves as expected on 0.120.x.",
-        "Before broadening any managed SessionStart matcher, smoke-test startup, resume, and `/clear` hook payloads on the target Codex build."
+        "Smoke-test startup, resume, and `/clear` hook payloads on the target Codex build, including CHEDEX's soft-clear notice path."
       ]
     }
   ]

@@ -44,6 +44,8 @@ Within one workspace, `autopilot` may remain the governed owner while nested `ra
 - `Stop` blocks ambiguous or unreadable governed state until the current workflow is terminal or explicitly repaired/cleared.
 
 `SessionStart` does not auto-upgrade Codex CLI. It stays advisory, short-timeout, and fail-open. `UserPromptSubmit` stays intentionally narrow and does not rewrite prompts; on allow it emits no JSON output, and on block it emits the hook JSON verdict.
+The managed `SessionStart` matcher now covers `startup|resume|clear`. For `clear`, the governor keeps governed state indexed for the workspace and emits a soft-clear notice instead of the full restore-context block.
+The governor still keys off `cwd` and governed state, not the source value by itself. `clear` does not auto-run `workflow-clear` and does not silently discard active workflow protection.
 
 ## Active Workflow Index
 

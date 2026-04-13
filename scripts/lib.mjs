@@ -486,7 +486,7 @@ export function buildManagedHooksConfig(targets, options = {}) {
   if (supportedHookEvents.has('SessionStart')) {
     hooks.SessionStart = [
       {
-        matcher: '^(startup|resume)$',
+        matcher: '^(startup|resume|clear)$',
         hooks: [
           {
             type: 'command',

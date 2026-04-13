@@ -941,6 +941,26 @@ export function renderSessionStartContext(entry, progress) {
   return `${lines.join('\n')}\n`;
 }
 
+export function renderSessionStartClearNotice(entry, progress) {
+  const lines = [
+    'Chedex governor kept governed workflow protection after chat clear.',
+    'chat history was cleared, but this workspace still has governed workflow state.',
+    `mode: ${entry.mode}`,
+    `status: ${progress.status}`,
+  ];
+
+  if (progress.phase) {
+    lines.push(`phase: ${progress.phase}`);
+  }
+  lines.push(`task: ${progress.task}`);
+  if (progress.next_step) {
+    lines.push(`next_step: ${progress.next_step}`);
+  }
+
+  lines.push('closeout rule: governed workflow state is still tracked for this workspace until it is terminal or explicitly cleared, and when completed, verification is satisfied with a verifier pass carrying the governor-stamped completion token.');
+  return `${lines.join('\n')}\n`;
+}
+
 export function renderSessionStartWarning(reason) {
   return [
     'Chedex governor found governed workflow state for this workspace, but it could not restore it safely.',
@@ -953,9 +973,11 @@ export function renderSessionStartWarning(reason) {
 export async function sessionStartHook({
   codexHome = defaultCodexHome(),
   cwd = process.cwd(),
+  source = 'startup',
   releaseAudit = {},
 }) {
   const normalizedCwd = resolve(cwd);
+  const isClearSource = typeof source === 'string' && source.trim().toLowerCase() === 'clear';
   let workflowContext = '';
 
   try {
@@ -992,7 +1014,9 @@ export async function sessionStartHook({
         if (changed || JSON.stringify(entry) !== JSON.stringify(normalizedEntry)) {
           await saveActiveIndex(index, codexHome);
         }
-        return renderSessionStartContext(normalizedEntry, inspection.progress);
+        return isClearSource
+          ? renderSessionStartClearNotice(normalizedEntry, inspection.progress)
+          : renderSessionStartContext(normalizedEntry, inspection.progress);
       });
     });
   } catch (error) {
@@ -1260,6 +1284,7 @@ async function runCli() {
       const output = await sessionStartHook({
         codexHome,
         cwd: input.cwd || process.cwd(),
+        source: input.source,
       });
       process.stdout.write(output);
       return;

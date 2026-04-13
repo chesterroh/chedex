@@ -1,4 +1,4 @@
-# Chedex v0.120.0
+# Chedex v0.120
 
 An homage to preceding projects such as Oh My OpenAgent, Oh My Codex, and Ouroboros.
 
@@ -18,9 +18,9 @@ It intentionally excludes external orchestration machinery such as:
 - legacy external state systems
 - HUD, mailboxing, linked mode state, and runtime overlays
 
-## v0.120.0 Shape
+## v0.120 Shape
 
-`0.120.0` keeps the current Chedex shape verified against Codex `0.120.0` and records the official `0.116.0` / `0.117.0` / `0.118.0` / `0.119.0` / `0.120.0` release-surface upgrades in the startup release audit.
+`0.120` keeps the current Chedex shape verified against Codex `0.120.0` and records the official `0.116.0` / `0.117.0` / `0.118.0` / `0.119.0` / `0.120.0` release-surface upgrades in the startup release audit.
 
 - ordinary turns stay lightweight and native
 - selected governed lanes and artifact-backed planning/requirements lanes keep durable state under `~/.codex/workflows/`
@@ -162,10 +162,31 @@ Chedex keeps a small native-first execution chain:
 
 The governor still stores runtime state globally under `$CODEX_HOME/workflows/` and admits one active governed workflow entry per workspace `cwd`, but workflow synchronization now uses per-workflow locks so separate workspaces do not contend on one global runtime lock. A governed `workflow_root` cannot be attached to multiple workspaces at once.
 
+## Codex 0.120 Alignment
+
+Codex `0.120.0` now owns more of the native substrate directly:
+
+- native hook execution for `SessionStart`, `UserPromptSubmit`, and `Stop`
+- native skill discovery across repo, user, system, and admin roots
+- bundled system skills cached under `~/.codex/skills/.system/`
+
+Chedex `0.120` still fits on top of that surface rather than colliding with it:
+
+- CHEDEX-managed skills install into `~/.codex/skills/<name>/`, while Codex bundled skills live under `~/.codex/skills/.system/<name>/`
+- current bundled Codex system skill names (`imagegen`, `openai-docs`, `plugin-creator`, `skill-creator`, `skill-installer`) do not collide with current CHEDEX skill names
+- install merges managed hook handlers into `~/.codex/hooks.json` instead of replacing unrelated hook groups
+- governed workflow ownership remains CHEDEX territory under `~/.codex/workflows/`; Codex `0.120.0` does not ship a native `progress.json` / `handoff.json` / `verify.md` workflow runtime that would conflict with `autopilot`, `ralph`, or `autoresearch-loop`
+
+The current `SessionStart` difference is intentional rather than accidental:
+
+- Codex `0.120.0` can distinguish `SessionStart source = clear`
+- CHEDEX now matches `startup|resume|clear`, but it treats `clear` as a soft-clear path: governed workflow state stays protected and the governor emits a compact notice instead of a full resume-context restore
+
 ## Current Gaps
 
 - Repo verification still relies partly on required-text checks in `scripts/verify-repo.mjs`. This is good at catching drift, but it is not full semantic validation.
 - The latest verified Codex CLI version is still maintained as repo metadata plus docs wording, not generated into docs from one canonical source.
+- If a future native Codex bundled skill reuses a generic CHEDEX skill name such as `plan`, `execute`, or `review`, plain-name skill invocation would become ambiguous even though the on-disk install layout would still coexist cleanly.
 - Hook asset cleanup is still path-based rather than whole-tree cleanup, so nested stale hook assets remain a reasonable follow-up sweep.
 
 ## Notes

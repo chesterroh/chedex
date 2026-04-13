@@ -317,7 +317,7 @@ execFileSync(process.execPath, [repoPath('scripts', 'install-user.mjs')], {
 const installedHooksConfig = JSON.parse(await readFile(join(installHome, 'hooks.json'), 'utf8'));
 const sessionStartCommand = installedHooksConfig.hooks.SessionStart[0].hooks[0].command;
 assert(sessionStartCommand.includes(`'${join(installHome, 'hooks', 'chedex', 'chedex-governor.mjs')}'`), 'install-user should quote managed hook runtime paths');
-assert(installedHooksConfig.hooks.SessionStart[0].matcher === '^(startup|resume)$', 'install-user should preserve the SessionStart startup/resume matcher');
+assert(installedHooksConfig.hooks.SessionStart[0].matcher === '^(startup|resume|clear)$', 'install-user should preserve the SessionStart startup/resume/clear matcher');
 if (hookProbe.supportedHookEvents.includes('UserPromptSubmit')) {
   assert(installedHooksConfig.hooks.UserPromptSubmit[0].hooks[0].command.includes('user-prompt-submit'), 'install-user should wire the prompt-submit governor command when supported');
 }
