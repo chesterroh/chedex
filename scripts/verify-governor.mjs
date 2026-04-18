@@ -206,7 +206,7 @@ function dynamicReleaseDeltasPayload(source = 'test-deltas') {
     stale: false,
     deltas: [
       {
-        since: '0.120.0',
+        since: '0.121.0',
         summary: 'Test delta for current release audit coverage.',
         checks: ['Re-run `npm run verify` after upgrading Codex CLI.'],
       },

@@ -54,6 +54,15 @@
         "Re-run `npm run install:user:dry` to confirm the managed hook surface still resolves as expected on 0.120.x.",
         "Smoke-test startup, resume, and `/clear` hook payloads on the target Codex build, including CHEDEX's soft-clear notice path."
       ]
+    },
+    {
+      "since": "0.121.0",
+      "summary": "Codex 0.121.x adds native marketplace management and continues expanding plugin and MCP workflows while keeping the current CHEDEX hook surface intact.",
+      "checks": [
+        "Re-run `npm run verify` after upgrading Codex CLI.",
+        "Re-run `npm run install:user:dry` to confirm the managed hook surface still resolves as expected on 0.121.x.",
+        "Smoke-test `codex marketplace` plus any plugin-backed or MCP-dependent workflow you rely on after upgrading."
+      ]
     }
   ]
 }
