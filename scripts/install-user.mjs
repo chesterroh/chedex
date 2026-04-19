@@ -37,6 +37,7 @@ const configPresentBefore = await fileExists(targets.configPath);
 const existingConfig = await readTextIfExists(targets.configPath);
 const hooksConfigPresentBefore = await fileExists(targets.hooksConfigPath);
 const agentsMdPresentBefore = await fileExists(targets.agentsMdPath);
+const hookAssetsDirPresentBefore = await fileExists(targets.hookAssetsDir);
 const hookRuntimePresentBefore = await fileExists(targets.hookRuntimePath);
 const managedPromptPaths = roleNames().map((name) => join(targets.promptsDir, `${name}.md`));
 const managedAgentPaths = roleNames().map((name) => join(targets.agentsDir, `${name}.toml`));
@@ -52,12 +53,14 @@ const uninstallState = {
     config: configPresentBefore,
     hooksConfig: hooksConfigPresentBefore,
     agentsMd: agentsMdPresentBefore,
+    hookAssetsDir: hookAssetsDirPresentBefore,
     hookRuntime: hookRuntimePresentBefore,
   },
   backups: {
     config: null,
     hooksConfig: null,
     agentsMd: null,
+    hookAssetsDir: null,
     hookRuntime: null,
   },
   managed_paths: {
@@ -155,6 +158,27 @@ if (!dryRun) {
     uninstallState.backups.agentsMd = backupPath;
   }
 
+  if (hookAssetsDirPresentBefore) {
+    const backupPath = backupDestinationFor(targets.hookAssetsDir);
+    const type = await copyPath(targets.hookAssetsDir, backupPath);
+    uninstallBackups.push(backupPath);
+    uninstallState.backups.hookAssetsDir = backupPath;
+    uninstallState.managed_paths.hooks.push({
+      target_path: targets.hookAssetsDir,
+      backup_path: backupPath,
+      type,
+    });
+    if (hookRuntimePresentBefore && type === 'directory') {
+      uninstallState.backups.hookRuntime = join(backupPath, 'chedex-governor.mjs');
+    }
+  } else {
+    uninstallState.managed_paths.hooks.push({
+      target_path: targets.hookAssetsDir,
+      backup_path: null,
+      type: 'directory',
+    });
+  }
+
   for (const path of unionManagedPaths(managedPromptPaths, previousUninstallState?.managed_paths?.prompts)) {
     await backupManagedPath(path, 'prompts');
   }
@@ -165,10 +189,6 @@ if (!dryRun) {
 
   for (const path of unionManagedPaths(managedSkillPaths, previousUninstallState?.managed_paths?.skills)) {
     await backupManagedPath(path, 'skills');
-  }
-
-  for (const path of unionManagedPaths(managedHookPaths, previousUninstallState?.managed_paths?.hooks)) {
-    await backupManagedPath(path, 'hooks');
   }
 
   // Persist rollback metadata before managed files are copied so a later
@@ -187,9 +207,7 @@ if (!dryRun) {
     await removeTree(path);
   }
 
-  for (const path of unionManagedPaths(managedHookPaths, previousUninstallState?.managed_paths?.hooks)) {
-    await removeTree(path);
-  }
+  await removeTree(targets.hookAssetsDir);
 }
 
 const templateContent = await readTextIfExists(manifest.templateAgents);
@@ -216,7 +234,6 @@ if (!dryRun) {
   await writeJsonIfChanged(targets.hooksConfigPath, nextHooksConfig);
   const uninstall = renderUninstallNote(targets, {
     backups: uninstallBackups,
-    hookAssets: managedHookPaths,
   });
   await writeFileIfChanged(targets.uninstallPath, uninstall);
 }

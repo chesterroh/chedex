@@ -33,7 +33,6 @@ const uninstallState = await readJsonIfExists(targets.uninstallStatePath, null);
 const managedPromptPaths = roleNames().map((name) => join(targets.promptsDir, `${name}.md`));
 const managedAgentPaths = roleNames().map((name) => join(targets.agentsDir, `${name}.toml`));
 const managedSkillPaths = listSkills().map((name) => join(targets.skillsDir, name));
-const managedHookPaths = (await listRelativeFiles(manifest.hooksDir)).map((relativePath) => join(targets.hookAssetsDir, relativePath));
 
 async function restoreBackupIfPresent(backupPath, targetPath) {
   if (!backupPath || !(await fileExists(backupPath))) {
@@ -70,8 +69,16 @@ function unionManagedPaths(currentPaths, recordedEntries) {
 const hookEntries = Array.isArray(uninstallState?.managed_paths?.hooks)
   ? [...uninstallState.managed_paths.hooks]
   : [];
+const hookAssetsEntry = hookEntries.find((entry) => entry?.target_path === targets.hookAssetsDir)
+  || (uninstallState?.backups?.hookAssetsDir
+    ? {
+      target_path: targets.hookAssetsDir,
+      backup_path: uninstallState.backups.hookAssetsDir,
+      type: 'directory',
+    }
+    : null);
 
-if (!hookEntries.some((entry) => entry?.target_path === targets.hookRuntimePath) && uninstallState?.backups?.hookRuntime) {
+if (!hookAssetsEntry && !hookEntries.some((entry) => entry?.target_path === targets.hookRuntimePath) && uninstallState?.backups?.hookRuntime) {
   hookEntries.push({
     target_path: targets.hookRuntimePath,
     backup_path: uninstallState.backups.hookRuntime,
@@ -122,9 +129,14 @@ if (!dryRun) {
     await rm(targets.agentsMdPath, { force: true });
   }
 
-  for (const targetPath of unionManagedPaths(managedHookPaths, hookEntries)) {
-    const entry = hookEntries.find((candidate) => candidate.target_path === targetPath);
-    await restoreManagedPath(targetPath, entry);
+  if (hookAssetsEntry) {
+    await restoreManagedPath(targets.hookAssetsDir, hookAssetsEntry);
+  } else {
+    const managedHookPaths = (await listRelativeFiles(manifest.hooksDir)).map((relativePath) => join(targets.hookAssetsDir, relativePath));
+    for (const targetPath of unionManagedPaths(managedHookPaths, hookEntries)) {
+      const entry = hookEntries.find((candidate) => candidate.target_path === targetPath);
+      await restoreManagedPath(targetPath, entry);
+    }
   }
 
   await removeDirIfEmpty(targets.hookAssetsDir);

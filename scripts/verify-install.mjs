@@ -62,6 +62,8 @@ await writeFile(join(installProbeHome, 'config.toml'), '[features]\nfoo = true\n
 await writeFile(join(installProbeHome, 'hooks.json'), `${JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: 'echo keep', statusMessage: 'keep me' }] }] } }, null, 2)}\n`);
 await writeFile(join(installProbeHome, 'hooks', 'chedex', 'chedex-governor.mjs'), '# custom runtime\n');
 await writeFile(join(installProbeHome, 'hooks', 'chedex', 'codex-release-audit.mjs'), '# custom release audit\n');
+await mkdir(join(installProbeHome, 'hooks', 'chedex', 'nested'), { recursive: true });
+await writeFile(join(installProbeHome, 'hooks', 'chedex', 'nested', 'custom-hook.txt'), '# custom nested hook asset\n');
 await writeFile(join(installProbeHome, 'prompts', 'architect.md'), '# custom prompt\n');
 await writeFile(join(installProbeHome, 'skills', 'ralph', 'SKILL.md'), '# custom skill\n');
 await writeFile(join(installProbeHome, 'agents', 'architect.toml'), '# custom agent\n');
@@ -75,6 +77,7 @@ assert((await readFile(join(installProbeHome, 'config.toml'), 'utf8')) === '[fea
 assert((await readFile(join(installProbeHome, 'hooks.json'), 'utf8')).includes('echo keep'), 'uninstall should restore pre-existing hooks.json');
 assert((await readFile(join(installProbeHome, 'hooks', 'chedex', 'chedex-governor.mjs'), 'utf8')) === '# custom runtime\n', 'uninstall should restore pre-existing hook runtime');
 assert((await readFile(join(installProbeHome, 'hooks', 'chedex', 'codex-release-audit.mjs'), 'utf8')) === '# custom release audit\n', 'uninstall should restore pre-existing managed hook assets');
+assert((await readFile(join(installProbeHome, 'hooks', 'chedex', 'nested', 'custom-hook.txt'), 'utf8')) === '# custom nested hook asset\n', 'uninstall should restore pre-existing nested hook assets');
 assert((await readFile(join(installProbeHome, 'prompts', 'architect.md'), 'utf8')) === '# custom prompt\n', 'uninstall should restore pre-existing managed prompts');
 assert((await readFile(join(installProbeHome, 'skills', 'ralph', 'SKILL.md'), 'utf8')) === '# custom skill\n', 'uninstall should restore pre-existing managed skills');
 assert((await readFile(join(installProbeHome, 'agents', 'architect.toml'), 'utf8')) === '# custom agent\n', 'uninstall should restore pre-existing managed agent TOMLs');
@@ -373,10 +376,16 @@ const reinstallDriftHome = await mkdtemp(join(tmpdir(), 'chedex-install-reinstal
 const reinstallDriftEnv = { ...process.env, CODEX_HOME: reinstallDriftHome };
 runNodeScript(repoRoot, 'scripts/install-user.mjs', reinstallDriftEnv);
 await writeFile(join(reinstallDriftHome, 'skills', 'ralph', 'STALE.md'), '# stale managed file\n');
+await mkdir(join(reinstallDriftHome, 'hooks', 'chedex', 'nested'), { recursive: true });
+await writeFile(join(reinstallDriftHome, 'hooks', 'chedex', 'nested', 'STALE.md'), '# stale managed hook file\n');
 runNodeScript(repoRoot, 'scripts/install-user.mjs', reinstallDriftEnv);
 assert(
   await pathMissing(join(reinstallDriftHome, 'skills', 'ralph', 'STALE.md')),
   'reinstall should remove stale files inside managed skill directories',
+);
+assert(
+  await pathMissing(join(reinstallDriftHome, 'hooks', 'chedex', 'nested', 'STALE.md')),
+  'reinstall should remove stale files inside the managed hook asset directory',
 );
 runNodeScript(repoRoot, 'scripts/uninstall-user.mjs', reinstallDriftEnv);
 

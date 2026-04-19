@@ -287,7 +287,6 @@ export function stripManagedFeaturesSection(config) {
 
 export function renderUninstallNote(targets, options = {}) {
   const backupPaths = Array.isArray(options.backups) ? options.backups : [];
-  const hookAssetPaths = Array.isArray(options.hookAssets) ? options.hookAssets : [];
   const promptFiles = roleNames().map((name) => `${targets.promptsDir}/${name}.md`);
   const agentFiles = roleNames().map((name) => `${targets.agentsDir}/${name}.toml`);
   const skillDirs = listSkills().map((name) => `${targets.skillsDir}/${name}`);
@@ -302,7 +301,7 @@ export function renderUninstallNote(targets, options = {}) {
     ...promptFiles.map((path) => `- ${path}`),
     ...skillDirs.map((path) => `- ${path}`),
     ...agentFiles.map((path) => `- ${path}`),
-    ...(hookAssetPaths.length > 0 ? hookAssetPaths.map((path) => `- ${path}`) : [`- ${targets.hookAssetsDir}/*`]),
+    `- ${targets.hookAssetsDir}/*`,
     `- ${targets.hooksConfigPath}`,
     `- ${targets.uninstallStatePath}`,
     '',

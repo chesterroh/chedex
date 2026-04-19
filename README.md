@@ -188,7 +188,6 @@ The current `SessionStart` difference is intentional rather than accidental:
 - Repo verification still relies partly on required-text checks in `scripts/verify-repo.mjs`. This is good at catching drift, but it is not full semantic validation.
 - The latest verified Codex CLI version is still maintained as repo metadata plus docs wording, not generated into docs from one canonical source.
 - If a future native Codex bundled skill reuses a generic CHEDEX skill name such as `plan`, `execute`, or `review`, plain-name skill invocation would become ambiguous even though the on-disk install layout would still coexist cleanly.
-- Hook asset cleanup is still path-based rather than whole-tree cleanup, so nested stale hook assets remain a reasonable follow-up sweep.
 
 ## Notes
 
