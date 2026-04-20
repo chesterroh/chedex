@@ -27,7 +27,7 @@ Do not commit repo-local install byproducts such as `.codex/config.toml`, `.code
 5. Keep the skill aligned with `docs/guidance-schema.md` and `docs/prompt-contract.md`
 6. If the skill creates persistent artifacts, document the `$CODEX_HOME` path it owns
 7. If the skill is a governed workflow, document its `progress.json` and `handoff.json` expectations and update the governor runtime plus `scripts/verify-governor.mjs`
-8. If the skill is a governed mode, update `registry/workflow-mode-schemas.mjs` and `registry/workflow-mode-schemas.ts` together with the runtime and docs
+8. If the skill is a governed mode, update `hooks/workflow-mode-schemas.mjs`, `registry/workflow-mode-schemas.mjs`, and `registry/workflow-mode-schemas.ts` together with the runtime and docs
 9. If the skill is mirrored under `.codex/`, refresh the mirror before verifying
 
 A skill may exist as a concept-first contract before the governor admits it as a native governed mode. In that case, document the gap explicitly and avoid describing it as stop-gated or governor-restored until the runtime and tests actually support it.
@@ -81,6 +81,7 @@ Update together:
 
 - `hooks/chedex-governor.mjs`
 - `hooks/codex-release-audit.mjs`
+- `hooks/workflow-mode-schemas.mjs`
 - `registry/workflow-mode-schemas.mjs`
 - `registry/workflow-mode-schemas.ts`
 - `scripts/install-user.mjs`

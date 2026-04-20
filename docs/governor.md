@@ -136,7 +136,7 @@ Direct top-level `ultrawork` may omit `handoff.json` when no governed plan admit
 
 ## Mode-Specific Artifact Rules
 
-Workflow mode requirements are declared in `registry/workflow-mode-schemas.mjs` rather than scattered mode-specific governor branches. Each schema declares allowed phases, handoff policy, required artifacts, required approvals, and the completion review role.
+Workflow mode requirements are declared in `hooks/workflow-mode-schemas.mjs` rather than scattered mode-specific governor branches, and re-exported through `registry/workflow-mode-schemas.mjs` for registry/type surfaces. Each schema declares allowed phases, handoff policy, required artifacts, required approvals, and the completion review role.
 
 `autoresearch-loop` must also provide and keep on disk:
 

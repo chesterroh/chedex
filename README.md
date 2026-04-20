@@ -192,7 +192,7 @@ The current `SessionStart` difference is intentional rather than accidental:
 ## Notes
 
 - The prompts are the primary role surfaces. The registry is the structured metadata layer.
-- Governed workflow mode requirements live in `registry/workflow-mode-schemas.mjs`, and governed handoffs now store approval provenance that the runtime validates before admission.
+- Governed workflow mode requirements are defined in `hooks/workflow-mode-schemas.mjs` and re-exported through `registry/workflow-mode-schemas.mjs`, and governed handoffs now store approval provenance that the runtime validates before admission.
 - `agents/*.toml` are generated artifacts. Re-run `npm run generate:agents` after changing `registry/agent-definitions.mjs` or any prompt.
 - `.codex/` is a checked-in mirror of deterministic installable surfaces only. Refresh it with `npm run refresh:mirror` after changing mirrored source files.
 - The governor runtime lives in [`hooks/chedex-governor.mjs`](hooks/chedex-governor.mjs), the startup release-audit helper lives in [`hooks/codex-release-audit.mjs`](hooks/codex-release-audit.mjs), and terminal workflow history is preserved in `~/.codex/workflows/_archive.json`. See [`docs/governor.md`](docs/governor.md) for the governed workflow contract.
