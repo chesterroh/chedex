@@ -1,4 +1,4 @@
-# Chedex v0.121
+# Chedex v0.122
 
 An homage to preceding projects such as Oh My OpenAgent, Oh My Codex, and Ouroboros.
 
@@ -18,14 +18,14 @@ It intentionally excludes external orchestration machinery such as:
 - legacy external state systems
 - HUD, mailboxing, linked mode state, and runtime overlays
 
-## v0.121 Shape
+## v0.122 Shape
 
-`0.121` keeps the current Chedex shape verified against Codex `0.121.0` and records the official `0.116.0` / `0.117.0` / `0.118.0` / `0.119.0` / `0.120.0` / `0.121.0` release-surface upgrades in the startup release audit.
+`0.122` keeps the current Chedex shape verified against Codex `0.122.0` and records the official `0.116.0` / `0.117.0` / `0.118.0` / `0.119.0` / `0.120.0` / `0.121.0` / `0.122.0` release-surface upgrades in the startup release audit.
 
 - ordinary turns stay lightweight and native
 - selected governed lanes and artifact-backed planning/requirements lanes keep durable state under `~/.codex/workflows/`
 - Codex `>= 0.116.0` gets the narrow `UserPromptSubmit` integrity gate in addition to `SessionStart` and `Stop`
-- Chedex currently requires Codex `>= 0.114.0` with `codex_hooks` available and is verified against Codex `0.121.0`
+- Chedex currently requires Codex `>= 0.114.0` with `codex_hooks` available and is verified against Codex `0.122.0`
 - the repo keeps a deterministic `.codex/` mirror for installable source surfaces and verifies parity explicitly
 
 ## At A Glance
@@ -162,25 +162,28 @@ Chedex keeps a small native-first execution chain:
 
 The governor still stores runtime state globally under `$CODEX_HOME/workflows/` and admits one active governed workflow entry per workspace `cwd`, but workflow synchronization now uses per-workflow locks so separate workspaces do not contend on one global runtime lock. A governed `workflow_root` cannot be attached to multiple workspaces at once.
 
-## Codex 0.121 Alignment
+## Codex 0.122 Alignment
 
-Codex `0.121.0` now owns more of the native substrate directly:
+Codex `0.122.0` expands the native substrate directly with:
 
-- native hook execution for `SessionStart`, `UserPromptSubmit`, and `Stop`
-- native skill discovery across repo, user, system, and admin roots
-- bundled system skills cached under `~/.codex/skills/.system/`
-- native marketplace management alongside broader plugin and MCP surfaces
+- side conversations and plan-mode fresh-context starts
+- broader marketplace and plugin-source handling
+- deny-read filesystem policies plus stricter trusted-workspace handling for project hooks and exec policies
+- default-on tool discovery and image generation, while bundled system skills still live under `~/.codex/skills/.system/`
 
-Chedex `0.121` still fits on top of that surface rather than colliding with it:
+Chedex `0.122` still fits on top of that surface rather than colliding with it:
 
+- install stays user-global under `~/.codex/hooks.json` and `~/.codex/workflows/`, so the new project-hook trust requirements do not force moving the governor into repo-local `.codex`
 - CHEDEX-managed skills install into `~/.codex/skills/<name>/`, while Codex bundled skills live under `~/.codex/skills/.system/<name>/`
-- current bundled Codex system skill names (`imagegen`, `openai-docs`, `plugin-creator`, `skill-creator`, `skill-installer`) do not collide with current CHEDEX skill names
+- current bundled Codex system skill names (`imagegen`, `openai-docs`, `plugin-creator`, `skill-creator`, `skill-installer`) still do not collide with current CHEDEX skill names
+- tool discovery and image generation being default-on does not require extra CHEDEX feature flags
 - install merges managed hook handlers into `~/.codex/hooks.json` instead of replacing unrelated hook groups
-- governed workflow ownership remains CHEDEX territory under `~/.codex/workflows/`; Codex `0.121.0` does not ship a native `progress.json` / `handoff.json` / `verify.md` workflow runtime that would conflict with `autopilot`, `ralph`, or `autoresearch-loop`
+- governed workflow ownership remains CHEDEX territory under `~/.codex/workflows/`; Codex `0.122.0` does not ship a native `progress.json` / `handoff.json` / `verify.md` workflow runtime that would conflict with `autopilot`, `ralph`, or `autoresearch-loop`
+- the main 0.122-specific recheck is restricted-filesystem behavior: if you rely on deny-read policies or isolated exec paths, smoke-test governed workflow reads for `~/.codex/workflows/` and referenced workspace artifacts
 
 The current `SessionStart` difference is intentional rather than accidental:
 
-- Codex `0.121.0` can distinguish `SessionStart source = clear`
+- Codex `0.122.0` can still distinguish `SessionStart source = clear`
 - CHEDEX now matches `startup|resume|clear`, but it treats `clear` as a soft-clear path: governed workflow state stays protected and the governor emits a compact notice instead of a full resume-context restore
 
 ## Current Gaps

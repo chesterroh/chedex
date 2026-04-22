@@ -5,7 +5,7 @@ The Chedex governor is the native lifecycle layer for governed workflows.
 ## Requirements
 
 - Codex CLI `>= 0.114.0`
-- Latest verified Codex CLI: `0.121.0`
+- Latest verified Codex CLI: `0.122.0`
 - `codex_hooks` feature available in `codex features list`
 
 Install enables `multi_agent = true` and `codex_hooks = true`, and writes a managed `hooks.json` beside `config.toml`.
@@ -46,6 +46,7 @@ Within one workspace, `autopilot` may remain the governed owner while nested `ra
 `SessionStart` does not auto-upgrade Codex CLI. It stays advisory, short-timeout, and fail-open. `UserPromptSubmit` stays intentionally narrow and does not rewrite prompts; on allow it emits no JSON output, and on block it emits the hook JSON verdict.
 The managed `SessionStart` matcher now covers `startup|resume|clear`. For `clear`, the governor keeps governed state indexed for the workspace and emits a soft-clear notice instead of the full restore-context block.
 The governor still keys off `cwd` and governed state, not the source value by itself. `clear` does not auto-run `workflow-clear` and does not silently discard active workflow protection.
+Codex `0.122.0` also tightens trusted-workspace handling for project hooks and exec policies. CHEDEX keeps the governor on the user-global hook surface under `~/.codex/hooks.json`; if you later move that surface into repo-local `.codex`, trust the workspace first and recheck deny-read or isolated-exec behavior.
 
 ## Active Workflow Index
 

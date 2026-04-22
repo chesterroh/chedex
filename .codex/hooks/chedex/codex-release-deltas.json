@@ -63,6 +63,15 @@
         "Re-run `npm run install:user:dry` to confirm the managed hook surface still resolves as expected on 0.121.x.",
         "Smoke-test `codex marketplace` plus any plugin-backed or MCP-dependent workflow you rely on after upgrading."
       ]
+    },
+    {
+      "since": "0.122.0",
+      "summary": "Codex 0.122.x adds side conversations, plan-mode fresh-context starts, deny-read filesystem policies, stricter trusted-workspace handling for project hooks and exec policies, and default-on tool discovery plus image generation.",
+      "checks": [
+        "Re-run `npm run verify` after upgrading Codex CLI.",
+        "Re-run `npm run install:user:dry` to confirm the managed user-global hook surface still resolves as expected on 0.122.x.",
+        "Keep CHEDEX on user-global `~/.codex/hooks.json` unless you intentionally want project-local hooks; if you do move hooks into repo-local `.codex`, trust the workspace first and smoke-test deny-read or isolated-exec workflows."
+      ]
     }
   ]
 }
