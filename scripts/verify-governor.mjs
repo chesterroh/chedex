@@ -5,6 +5,8 @@ import { dirname, join } from 'node:path';
 import {
   acquireActiveIndexLock,
   acquireWorkflowLock,
+  readDirectoryLockMetadata,
+  repairStaleWorkflowLocks,
   GOVERNOR_SCHEMA_VERSION,
   activeIndexPath,
   archivePath,
@@ -12,7 +14,7 @@ import {
   normalizeTrackedPath,
   sessionStartHook,
   stopHook,
-  syncWorkflow,
+  syncWorkflow as syncWorkflowBase,
   userPromptSubmitHook,
   verificationComplete,
 } from '../hooks/chedex-governor.mjs';
@@ -32,6 +34,13 @@ function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
   }
+}
+
+async function syncWorkflow(options) {
+  return syncWorkflowBase({
+    ...options,
+    replace: options.replace ?? true,
+  });
 }
 
 async function writeJson(path, value) {
@@ -77,15 +86,15 @@ async function makeWorkflow({
   const workflowRoot = join(home, 'workflows', mode, slug);
   await mkdir(workflowRoot, { recursive: true });
   const progressPath = join(workflowRoot, 'progress.json');
+  const contextPath = join(workflowRoot, 'context.md');
   const verifyPath = join(workflowRoot, 'verify.md');
   const handoffPath = includeHandoff ? join(workflowRoot, 'handoff.json') : null;
-  const specPath = mode === 'autoresearch-loop' ? join(workflowRoot, 'spec.md') : null;
+  const specPath = join(workflowRoot, 'spec.md');
   const resultsPath = mode === 'autoresearch-loop' ? join(workflowRoot, 'results.tsv') : null;
 
+  await writeFile(contextPath, '# context\n');
   await writeFile(verifyPath, '# verify\n');
-  if (specPath) {
-    await writeFile(specPath, '# spec\n');
-  }
+  await writeFile(specPath, '# spec\n');
   if (resultsPath) {
     await writeFile(resultsPath, 'run_id\tmetric\tstatus\tcost\tnotes\nbaseline\t0\tkept\t0\tseed\n');
   }
@@ -113,6 +122,8 @@ async function makeWorkflow({
     workflow_root: workflowRoot,
     next_step: nextStep,
     artifacts: {
+      context: contextPath,
+      spec: specPath,
       plan: join(workflowRoot, 'plan.md'),
       verify: verifyPath,
     },
@@ -127,9 +138,6 @@ async function makeWorkflow({
 
   if (handoffPath) {
     progress.artifacts.handoff = handoffPath;
-  }
-  if (specPath) {
-    progress.artifacts.spec = specPath;
   }
   if (resultsPath) {
     progress.artifacts.results = resultsPath;
@@ -152,7 +160,7 @@ async function markWorkflowCompleted({
   mode,
   task,
   includeHandoff,
-  evidenceRef = 'npm run verify',
+  evidenceRef = 'cmd:npm run verify',
 }) {
   await writeJson(progressPath, {
     schema_version: GOVERNOR_SCHEMA_VERSION,
@@ -166,6 +174,8 @@ async function markWorkflowCompleted({
     next_step: 'Report results',
     artifacts: {
       plan: join(workflowRoot, 'plan.md'),
+      context: join(workflowRoot, 'context.md'),
+      spec: join(workflowRoot, 'spec.md'),
       verify: join(workflowRoot, 'verify.md'),
       ...(includeHandoff ? { handoff: join(workflowRoot, 'handoff.json') } : {}),
       ...(mode === 'autoresearch-loop'
@@ -379,11 +389,11 @@ await writeJson(forgedCompletionWorkflow.progressPath, {
   },
   verification: {
     state: 'satisfied',
-    evidence: ['manually typed proof'],
+    evidence: ['manual: typed proof'],
     review: {
       role: 'verifier',
       verdict: 'pass',
-      evidence_ref: 'manually typed proof',
+      evidence_ref: 'manual: typed proof',
       completion_token: 'forged-token',
       approved_at: '2026-03-16T00:00:00Z',
     },
@@ -435,6 +445,52 @@ const verificationReviewAllowed = await stopHook({
   cwd,
 });
 assert(verificationReviewAllowed.action === 'allow', 'verification-complete should produce a stop-allowing verifier review');
+
+const invalidEvidenceWorkflow = await makeWorkflow({
+  home,
+  slug: 'verification-invalid-evidence-ref',
+  mode: 'ultrawork',
+  includeHandoff: false,
+});
+await syncWorkflow({
+  codexHome: home,
+  cwd,
+  progressPath: invalidEvidenceWorkflow.progressPath,
+});
+await writeJson(invalidEvidenceWorkflow.progressPath, {
+  schema_version: GOVERNOR_SCHEMA_VERSION,
+  mode: 'ultrawork',
+  task: 'verification-invalid-evidence-ref task',
+  active: false,
+  status: 'completed',
+  phase: 'validate',
+  updated_at: '2026-03-16T00:00:00Z',
+  workflow_root: invalidEvidenceWorkflow.workflowRoot,
+  next_step: 'Report results',
+  artifacts: {
+    plan: join(invalidEvidenceWorkflow.workflowRoot, 'plan.md'),
+    verify: join(invalidEvidenceWorkflow.workflowRoot, 'verify.md'),
+  },
+  verification: {
+    state: 'pending',
+    evidence: [],
+  },
+  blocker: null,
+  risks: [],
+});
+let invalidEvidenceFailed = false;
+try {
+  await verificationComplete({
+    codexHome: home,
+    cwd,
+    progressPath: invalidEvidenceWorkflow.progressPath,
+    evidenceRef: 'npm run verify',
+    approvedAt: '2026-03-16T00:00:00Z',
+  });
+} catch (error) {
+  invalidEvidenceFailed = error.message.includes('stable anchor prefix');
+}
+assert(invalidEvidenceFailed, 'verification-complete should reject unanchored evidence references');
 
 const completedValid = await makeWorkflow({
   home,
@@ -742,6 +798,27 @@ try {
 }
 assert(unsupportedPhaseFailed, 'mode schemas should reject unsupported phases');
 
+const autopilotMissingPhaseSpec = await makeWorkflow({
+  home,
+  slug: 'autopilot-missing-phase-spec',
+  mode: 'autopilot',
+  phase: 'execute',
+});
+const autopilotMissingPhaseSpecProgress = JSON.parse(await readFile(autopilotMissingPhaseSpec.progressPath, 'utf8'));
+delete autopilotMissingPhaseSpecProgress.artifacts.spec;
+await writeJson(autopilotMissingPhaseSpec.progressPath, autopilotMissingPhaseSpecProgress);
+let autopilotMissingPhaseSpecFailed = false;
+try {
+  await syncWorkflow({
+    codexHome: home,
+    cwd,
+    progressPath: autopilotMissingPhaseSpec.progressPath,
+  });
+} catch (error) {
+  autopilotMissingPhaseSpecFailed = error.message.includes('autopilot workflows require artifacts.spec');
+}
+assert(autopilotMissingPhaseSpecFailed, 'autopilot execute phase should require the spec artifact declared by the skill contract');
+
 const invalidMissingRisks = await makeWorkflow({
   home,
   slug: 'invalid-missing-risks',
@@ -896,6 +973,8 @@ await heldWorkflowLock.release();
 await blockedByWorkflowLock;
 
 const heldLock = await acquireActiveIndexLock(lockedHome);
+const heldLockMetadata = await readDirectoryLockMetadata(heldLock.lockPath);
+assert(heldLockMetadata?.operation === 'active-index', 'active index locks should record owner metadata');
 const blockedSyncA = syncWorkflow({
   codexHome: lockedHome,
   cwd: lockedCwdA,
@@ -915,6 +994,31 @@ await heldLock.release();
 await Promise.all([blockedSyncA, blockedSyncB]);
 const lockedIndex = JSON.parse(await readFile(activeIndexPath(lockedHome), 'utf8'));
 assert(Object.keys(lockedIndex.entries).length === 2, 'serialized syncs should preserve both active index entries');
+
+const staleLockPath = join(lockedHome, 'workflows', '_lock_stale-test');
+await mkdir(staleLockPath, { recursive: true });
+await writeJson(join(staleLockPath, 'owner.json'), {
+  schema_version: GOVERNOR_SCHEMA_VERSION,
+  pid: 12345,
+  host: 'test-host',
+  cwd: lockedCwdA,
+  operation: 'stale-test',
+  lock_path: staleLockPath,
+  created_at: '2026-03-16T00:00:00Z',
+});
+const lockRepairDryRun = await repairStaleWorkflowLocks({
+  codexHome: lockedHome,
+  olderThanMs: 1,
+  now: new Date('2026-03-16T00:01:00Z'),
+  dryRun: true,
+});
+assert(lockRepairDryRun.removed.some((entry) => entry.lock_path === staleLockPath), 'lock repair dry-run should report stale locks');
+const lockRepair = await repairStaleWorkflowLocks({
+  codexHome: lockedHome,
+  olderThanMs: 1,
+  now: new Date('2026-03-16T00:01:00Z'),
+});
+assert(lockRepair.removed.some((entry) => entry.lock_path === staleLockPath), 'lock repair should remove stale workflow locks');
 
 const ownershipHome = await mkdtemp(join(tmpdir(), 'chedex-governor-owner-'));
 const ownerCwdA = join(ownershipHome, 'workspace-a');
@@ -945,6 +1049,76 @@ assert(ownershipConflictFailed, 'the same governed workflow should not be indexa
 const ownershipIndex = JSON.parse(await readFile(activeIndexPath(ownershipHome), 'utf8'));
 assert(Object.keys(ownershipIndex.entries).length === 1, 'ownership conflicts should preserve only the original workspace entry');
 assert(ownershipIndex.entries[ownerCwdA].cwd === ownerCwdA, 'the original workflow owner should remain indexed after an ownership conflict');
+
+const replacementHome = await mkdtemp(join(tmpdir(), 'chedex-governor-replace-'));
+const replacementCwd = join(replacementHome, 'workspace');
+await mkdir(replacementCwd, { recursive: true });
+const replacementWorkflowA = await makeWorkflow({
+  home: replacementHome,
+  slug: 'replacement-a',
+  mode: 'ralph',
+});
+const replacementWorkflowB = await makeWorkflow({
+  home: replacementHome,
+  slug: 'replacement-b',
+  mode: 'ralph',
+});
+await syncWorkflow({
+  codexHome: replacementHome,
+  cwd: replacementCwd,
+  progressPath: replacementWorkflowA.progressPath,
+});
+let activeReplacementFailed = false;
+try {
+  await syncWorkflow({
+    codexHome: replacementHome,
+    cwd: replacementCwd,
+    progressPath: replacementWorkflowB.progressPath,
+    replace: false,
+  });
+} catch (error) {
+  activeReplacementFailed = error.message.includes('active workflow owner replacement requires --replace');
+}
+assert(activeReplacementFailed, 'syncing a different active owner for the same cwd should require explicit replacement');
+const replacementIndexAfterFailed = JSON.parse(await readFile(activeIndexPath(replacementHome), 'utf8'));
+assert(replacementIndexAfterFailed.entries[replacementCwd].workflow_root === normalizeTrackedPath(replacementWorkflowA.workflowRoot), 'failed replacement should preserve the existing active owner');
+await syncWorkflow({
+  codexHome: replacementHome,
+  cwd: replacementCwd,
+  progressPath: replacementWorkflowB.progressPath,
+  replace: true,
+});
+const replacementIndexAfterReplace = JSON.parse(await readFile(activeIndexPath(replacementHome), 'utf8'));
+assert(replacementIndexAfterReplace.entries[replacementCwd].workflow_root === normalizeTrackedPath(replacementWorkflowB.workflowRoot), 'explicit replacement should install the next workflow owner');
+
+const terminalReplacementWorkflowA = await makeWorkflow({
+  home: replacementHome,
+  slug: 'terminal-replacement-a',
+  mode: 'ralph',
+  status: 'paused',
+  phase: 'execute',
+  nextStep: 'Resume later',
+  risks: ['Paused for replacement test'],
+});
+const terminalReplacementWorkflowB = await makeWorkflow({
+  home: replacementHome,
+  slug: 'terminal-replacement-b',
+  mode: 'ralph',
+});
+await syncWorkflow({
+  codexHome: replacementHome,
+  cwd: replacementCwd,
+  progressPath: terminalReplacementWorkflowA.progressPath,
+  replace: true,
+});
+await syncWorkflow({
+  codexHome: replacementHome,
+  cwd: replacementCwd,
+  progressPath: terminalReplacementWorkflowB.progressPath,
+  replace: false,
+});
+const terminalReplacementIndex = JSON.parse(await readFile(activeIndexPath(replacementHome), 'utf8'));
+assert(terminalReplacementIndex.entries[replacementCwd].workflow_root === normalizeTrackedPath(terminalReplacementWorkflowB.workflowRoot), 'non-active terminal owners should be replaceable without --replace');
 
 const currentReleaseAudit = await buildReleaseAudit({
   codexHome: home,
@@ -1132,6 +1306,19 @@ const fetchedDeltas = await getReleaseDeltas({
   }),
 });
 assert(fetchedDeltas.source === 'remote-deltas', 'dynamic release deltas should prefer the fetched source when it succeeds');
+
+const incompatibleDeltasHome = await mkdtemp(join(tmpdir(), 'chedex-incompatible-deltas-'));
+const incompatibleDeltasFallback = await getReleaseDeltas({
+  codexHome: incompatibleDeltasHome,
+  now: new Date('2026-03-17T00:00:00Z'),
+  cacheTtlMs: 0,
+  fetchDynamicDeltas: async ({ now }) => ({
+    ...dynamicReleaseDeltasPayload('incompatible-remote-deltas'),
+    checked_at: now.toISOString(),
+    min_chedex_version: '99.0.0',
+  }),
+});
+assert(incompatibleDeltasFallback.source === 'bundled', 'incompatible remote release deltas should fall back to bundled guidance');
 
 const cachedDeltasFallback = await getReleaseDeltas({
   codexHome: home,

@@ -99,10 +99,14 @@ assert(
 
 const installedHooksConfig = JSON.parse(await readFile(join(freshHome, 'hooks.json'), 'utf8'));
 const installedSessionStartCommand = installedHooksConfig.hooks.SessionStart[0].hooks[0].command;
+const installedSessionStartStatus = installedHooksConfig.hooks.SessionStart[0].hooks[0].statusMessage;
 assert(installedSessionStartCommand.includes('session-start'), 'install should wire SessionStart to the governor session-start command');
+assert(installedSessionStartStatus.includes('managed:v1:SessionStart'), 'install should stamp managed SessionStart hooks with a stable marker');
 if (hookProbe.supportedHookEvents.includes('UserPromptSubmit')) {
   const installedUserPromptSubmitCommand = installedHooksConfig.hooks.UserPromptSubmit[0].hooks[0].command;
+  const installedUserPromptSubmitStatus = installedHooksConfig.hooks.UserPromptSubmit[0].hooks[0].statusMessage;
   assert(installedUserPromptSubmitCommand.includes('user-prompt-submit'), 'install should wire UserPromptSubmit to the governor prompt-submit command');
+  assert(installedUserPromptSubmitStatus.includes('managed:v1:UserPromptSubmit'), 'install should stamp managed UserPromptSubmit hooks with a stable marker');
   const promptSubmitOutput = runShellCommand(
     installedUserPromptSubmitCommand,
     freshEnv,
@@ -123,6 +127,29 @@ const emptyClearSessionStartOutput = runShellCommand(
   `${JSON.stringify({ cwd: join(freshHome, 'workspace-empty'), source: 'clear' })}\n`,
 );
 assert(emptyClearSessionStartOutput === '', 'session-start clear should stay quiet when no governed workflow is active');
+
+const duplicateInlineHome = await mkdtemp(join(tmpdir(), 'chedex-install-inline-duplicate-'));
+await writeFile(join(duplicateInlineHome, 'config.toml'), [
+  '[features]',
+  'multi_agent = true',
+  '',
+  '[[hooks.SessionStart]]',
+  'matcher = "^(startup|resume|clear)$"',
+  '[[hooks.SessionStart.hooks]]',
+  'type = "command"',
+  'command = "node /tmp/chedex-governor.mjs session-start"',
+  'statusMessage = "Chedex governor: managed:v1:SessionStart restore governed workflow context"',
+  '',
+].join('\n'));
+let duplicateInlineFailed = false;
+try {
+  runNodeScript(repoRoot, 'scripts/install-user.mjs', { ...process.env, CODEX_HOME: duplicateInlineHome });
+} catch (error) {
+  duplicateInlineFailed = error.stderr.includes('managed hook duplicate')
+    || error.stdout.includes('managed hook duplicate')
+    || error.message.includes('managed hook duplicate');
+}
+assert(duplicateInlineFailed, 'install should fail when inline config.toml already defines the same managed lifecycle hook');
 
 const installedGovernorPath = join(freshHome, 'hooks', 'chedex', 'chedex-governor.mjs');
 const governedCwd = join(freshHome, 'workspace-governed');

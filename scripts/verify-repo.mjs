@@ -155,8 +155,8 @@ const explicitCallerFallbackPromptSnippet = 'Treat built-in agent defaults as fa
 
 const governorSurfaceChecks = [
   [repoPath('README.md'), ['codex_hooks', 'multi_agent', 'hooks.json', '_active.json', 'handoff.json', 'UserPromptSubmit', chedexLatestVerifiedCodexVersion, 'durable evidence log', 'override repo defaults unless unavailable or incompatible', 'hooks/workflow-mode-schemas.mjs', 'registry/workflow-mode-schemas.mjs', '_archive.json']],
-  [repoPath('docs', 'install.md'), ['codex_hooks', 'multi_agent', 'hooks.json', 'UserPromptSubmit', chedexMinimumCodexVersion, chedexLatestVerifiedCodexVersion, '_codex_release_audit.json', '_codex_release_deltas.json', '_archive.json', 'recommended workflow artifacts rather than hard admission requirements']],
-  [repoPath('docs', 'governor.md'), ['workflow-sync', 'SessionStart', 'UserPromptSubmit', 'Stop', 'handoff.json', 'risks', 'release audit', 'multi_agent', 'durable evidence log', 'autoresearch-plan is not a governed mode', chedexMinimumCodexVersion, chedexLatestVerifiedCodexVersion, 'hooks/workflow-mode-schemas.mjs', 'registry/workflow-mode-schemas.mjs', 'verification-complete', '_archive.json', 'completion_token']],
+  [repoPath('docs', 'install.md'), ['codex_hooks', 'multi_agent', 'hooks.json', 'UserPromptSubmit', chedexMinimumCodexVersion, chedexLatestVerifiedCodexVersion, '_codex_release_audit.json', '_codex_release_deltas.json', '_archive.json', 'phase-aware artifacts', 'managed:v1']],
+  [repoPath('docs', 'governor.md'), ['workflow-sync', 'SessionStart', 'UserPromptSubmit', 'Stop', 'handoff.json', 'risks', 'release audit', 'multi_agent', 'durable evidence log', 'autoresearch-plan is not a governed mode', chedexMinimumCodexVersion, chedexLatestVerifiedCodexVersion, 'hooks/workflow-mode-schemas.mjs', 'registry/workflow-mode-schemas.mjs', 'verification-complete', '_archive.json', 'completion_token', 'workflow-lock-repair', 'phase-aware artifact requirements']],
   [repoPath('README.md'), ['~/.codex/workflows/deep-interview/', 'interview.md', 'not governed by `progress.json` or `handoff.json` by default']],
   [repoPath('docs', 'install.md'), ['~/.codex/workflows/deep-interview/', 'interview.md', 'does not require `progress.json` or `handoff.json` by default']],
   [repoPath('README.md'), ['~/.codex/workflows/autoresearch-plan/', '~/.codex/workflows/autoresearch-loop/', 'results.tsv']],
@@ -226,14 +226,14 @@ for (const snippet of ['copyTree', '.codex', 'mirrorHookAssetsDir']) {
 }
 
 const governorRuntime = await readFile(repoPath('hooks', 'chedex-governor.mjs'), 'utf8');
-for (const snippet of ['session-start', 'workflow-sync', 'workflow-clear', 'verification-complete', 'risks must be an array', 'buildReleaseAudit', 'MODE_SCHEMAS', '_archive.json']) {
+for (const snippet of ['session-start', 'workflow-sync', 'workflow-clear', 'workflow-lock-repair', 'verification-complete', 'risks must be an array', 'buildReleaseAudit', 'MODE_SCHEMAS', '_archive.json', 'repairStaleWorkflowLocks', 'collectRequiredArtifactsForProgress', 'active workflow owner replacement requires --replace']) {
   if (!governorRuntime.includes(snippet)) {
     throw new Error(`governor runtime missing "${snippet}"`);
   }
 }
 
 const releaseAuditRuntime = await readFile(repoPath('hooks', 'codex-release-audit.mjs'), 'utf8');
-for (const snippet of ['registry.npmjs.org', 'renderReleaseAuditAdvisory', 'CODEX_RELEASE_DELTAS_URL', 'codex-release-deltas.json']) {
+for (const snippet of ['registry.npmjs.org', 'renderReleaseAuditAdvisory', 'CODEX_RELEASE_DELTAS_URL', 'codex-release-deltas.json', 'CHEDEX_RELEASE_DELTA_COMPAT_VERSION']) {
   if (!releaseAuditRuntime.includes(snippet)) {
     throw new Error(`release audit runtime missing "${snippet}"`);
   }
@@ -243,7 +243,7 @@ const libContent = await readFile(repoPath('scripts', 'lib.mjs'), 'utf8');
 if (!libContent.includes("return process.env.CODEX_HOME || join(homedir(), '.codex');")) {
   throw new Error('codexHome() no longer resolves to ~/.codex');
 }
-for (const snippet of ['chedexMinimumCodexVersion', 'mergeManagedHooksConfig', 'probeCodexHooksSupport']) {
+for (const snippet of ['chedexMinimumCodexVersion', 'mergeManagedHooksConfig', 'probeCodexHooksSupport', 'detectInlineManagedHookDuplicates', 'managed:v1']) {
   if (!libContent.includes(snippet)) {
     throw new Error(`lib.mjs missing ${snippet}`);
   }

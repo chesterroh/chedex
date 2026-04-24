@@ -40,10 +40,11 @@ Recommended files:
 - Do not depend on tmux, HUD state, notify hooks, or custom state servers.
 - Ralph owns persistence and verification; `ultrawork` owns parallel fan-out inside the execution slice.
 - Ralph is a governed workflow owner; assume native `SessionStart` and `Stop` hooks will restore and gate it.
+- Governor validation requires `plan.md` and `handoff.json` by `execute`, and `verify.md` by `verify` or terminal states.
 - Prefer the smallest execution slice that produces fresh evidence.
 - Keep artifacts short and update them in place rather than creating throwaway copies.
 - On pause or cancellation, mark the current state in `progress.json` instead of deleting artifacts.
-- `completed` is not enough by itself. The stop gate allows completion only when verification is satisfied and `progress.json.verification.review` records a verifier `pass`.
+- `completed` is not enough by itself. The stop gate allows completion only when verification is satisfied and `progress.json.verification.review` records a verifier `pass` with governor-stamped completion provenance and a stable evidence reference.
 
 ## Progress Shape
 

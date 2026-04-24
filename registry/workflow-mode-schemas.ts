@@ -8,6 +8,10 @@ export interface WorkflowModeSchema {
   handoff_policy: HandoffPolicy;
   required_artifacts: string[];
   required_disk_artifacts: string[];
+  phase_artifact_requirements: Array<{ phase: string; artifacts: string[] }>;
+  phase_disk_artifact_requirements: Array<{ phase: string; artifacts: string[] }>;
+  terminal_artifacts: string[];
+  terminal_disk_artifacts: string[];
   required_handoff_approvals: string[];
   completion_review_role: string;
 }

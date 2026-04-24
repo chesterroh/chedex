@@ -72,6 +72,25 @@
         "Re-run `npm run install:user:dry` to confirm the managed user-global hook surface still resolves as expected on 0.122.x.",
         "Keep CHEDEX on user-global `~/.codex/hooks.json` unless you intentionally want project-local hooks; if you do move hooks into repo-local `.codex`, trust the workspace first and smoke-test deny-read or isolated-exec workflows."
       ]
+    },
+    {
+      "since": "0.123.0",
+      "summary": "Codex 0.123.x adds a built-in Amazon Bedrock provider, `/mcp verbose`, broader plugin MCP file-shape support, realtime handoff improvements, host-specific `remote_sandbox_config`, and refreshed model metadata.",
+      "checks": [
+        "Re-run `npm run verify` after upgrading Codex CLI.",
+        "Re-run `npm run install:user:dry` to confirm managed hooks and generated agents still resolve on 0.123.x.",
+        "If you rely on MCP, plugin-backed workflows, remote environments, or model default assumptions, smoke-test those paths after upgrading."
+      ]
+    },
+    {
+      "since": "0.124.0",
+      "summary": "Codex 0.124.x promotes `codex_hooks` to stable/default-on, adds inline `config.toml` and managed `requirements.toml` hook configuration, expands tool-use hooks beyond Bash, adds remote plugin list/read, app-server environment selection, quick reasoning controls, and default Fast service tier behavior.",
+      "checks": [
+        "Re-run `npm run verify` after upgrading Codex CLI.",
+        "Re-run `npm run install:user:dry` to confirm `codex_hooks` is stable/enabled and CHEDEX still wires `SessionStart`, `UserPromptSubmit`, and `Stop`.",
+        "Keep CHEDEX-managed lifecycle hooks in one representation per config layer; do not duplicate the same user-layer hooks in both `hooks.json` and inline `config.toml` hooks.",
+        "If you add CHEDEX `PreToolUse`, `PostToolUse`, or `PermissionRequest` hooks, treat `tool_name` as arbitrary and `tool_input` as schema-free rather than Bash-only."
+      ]
     }
   ]
 }

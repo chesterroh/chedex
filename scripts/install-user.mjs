@@ -6,6 +6,7 @@ import {
   chedexMarkerStart,
   copyPath,
   copyTree,
+  detectInlineManagedHookDuplicates,
   ensureExecutable,
   ensureDir,
   fileExists,
@@ -46,6 +47,9 @@ const managedHookPaths = (await listRelativeFiles(manifest.hooksDir)).map((relat
 const currentHooksConfig = await readJsonIfExists(targets.hooksConfigPath, { hooks: {} });
 const previousUninstallState = await readJsonIfExists(targets.uninstallStatePath, null);
 const hookProbe = probeCodexHooksSupport();
+const inlineHookDuplicates = detectInlineManagedHookDuplicates(existingConfig, {
+  supportedHookEvents: hookProbe.supportedHookEvents,
+});
 const uninstallBackups = [];
 const uninstallState = {
   schema_version: 1,
@@ -111,6 +115,19 @@ async function backupManagedPath(targetPath, bucket) {
 
 if (!hookProbe.ok) {
   throw new Error(`Chedex requires Codex native hooks support: ${hookProbe.reason}`);
+}
+
+const inlineHookErrors = inlineHookDuplicates.filter((item) => item.severity === 'error');
+if (inlineHookErrors.length > 0) {
+  throw new Error([
+    'Chedex managed hook duplicate detected in config.toml.',
+    ...inlineHookErrors.map((item) => `- ${item.reason}`),
+    'Remove the duplicate inline hook table or keep Chedex-managed lifecycle hooks in hooks.json only.',
+  ].join('\n'));
+}
+
+for (const warning of inlineHookDuplicates.filter((item) => item.severity === 'warning')) {
+  process.stderr.write(`warning: ${warning.reason}\n`);
 }
 
 const staleAgents = await staleGeneratedAgents();
@@ -247,6 +264,7 @@ const summary = [
   `codex_hooks_feature_stage=${hookProbe.feature.stage}`,
   `codex_hooks_feature_enabled_before_install=${hookProbe.feature.enabled ? 'true' : 'false'}`,
   `managed_hook_events=${hookProbe.supportedHookEvents.join(',')}`,
+  `inline_hook_duplicate_check=${inlineHookDuplicates.length === 0 ? 'ok' : 'warning'}`,
   `hooks_config=${targets.hooksConfigPath}`,
   `hook_runtime=${targets.hookRuntimePath}`,
   `uninstall_state=${targets.uninstallStatePath}`,

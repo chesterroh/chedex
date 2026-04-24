@@ -18,11 +18,15 @@ export const backupsDirName = '.chedex-backups';
 export const chedexHooksFeature = 'codex_hooks';
 export const chedexMinimumCodexVersion = '0.114.0';
 export const chedexUserPromptSubmitMinimumCodexVersion = '0.116.0';
-export const chedexLatestVerifiedCodexVersion = '0.122.0';
+export const chedexLatestVerifiedCodexVersion = '0.124.0';
 export const chedexHookStatusPrefix = 'Chedex governor:';
-export const chedexSessionStartStatusMessage = `${chedexHookStatusPrefix} restore governed workflow context`;
-export const chedexUserPromptSubmitStatusMessage = `${chedexHookStatusPrefix} guard governed prompt submission`;
-export const chedexStopStatusMessage = `${chedexHookStatusPrefix} enforce terminal workflow state`;
+export const chedexManagedHookMarkerPrefix = `${chedexHookStatusPrefix} managed:v1:`;
+export const chedexLegacySessionStartStatusMessage = `${chedexHookStatusPrefix} restore governed workflow context`;
+export const chedexLegacyUserPromptSubmitStatusMessage = `${chedexHookStatusPrefix} guard governed prompt submission`;
+export const chedexLegacyStopStatusMessage = `${chedexHookStatusPrefix} enforce terminal workflow state`;
+export const chedexSessionStartStatusMessage = `${chedexManagedHookMarkerPrefix}SessionStart restore governed workflow context`;
+export const chedexUserPromptSubmitStatusMessage = `${chedexManagedHookMarkerPrefix}UserPromptSubmit guard governed prompt submission`;
+export const chedexStopStatusMessage = `${chedexManagedHookMarkerPrefix}Stop enforce terminal workflow state`;
 
 export function codexHome() {
   return process.env.CODEX_HOME || join(homedir(), '.codex');
@@ -309,7 +313,7 @@ export function renderUninstallNote(targets, options = {}) {
     '',
     `- ${targets.configPath}`,
     `- managed block markers: ${chedexMarkerStart} / ${chedexMarkerEnd}`,
-    '- features enforced: `multi_agent = true`, `codex_hooks = true`',
+    '- features enforced: `multi_agent = true`, compatibility `codex_hooks = true`',
     '',
     '## Backup Root',
     '',
@@ -402,19 +406,79 @@ export function isManagedHookHandler(handler) {
     return false;
   }
 
-  if (statusMessage === chedexSessionStartStatusMessage) {
+  if (
+    statusMessage === chedexSessionStartStatusMessage
+    || statusMessage === chedexLegacySessionStartStatusMessage
+  ) {
     return handler.type === 'command' && command.includes(' session-start');
   }
 
-  if (statusMessage === chedexUserPromptSubmitStatusMessage) {
+  if (
+    statusMessage === chedexUserPromptSubmitStatusMessage
+    || statusMessage === chedexLegacyUserPromptSubmitStatusMessage
+  ) {
     return handler.type === 'command' && command.includes(' user-prompt-submit');
   }
 
-  if (statusMessage === chedexStopStatusMessage) {
+  if (
+    statusMessage === chedexStopStatusMessage
+    || statusMessage === chedexLegacyStopStatusMessage
+  ) {
     return handler.type === 'command' && command.includes(' stop');
   }
 
   return false;
+}
+
+export function detectInlineManagedHookDuplicates(configText, options = {}) {
+  const supportedHookEvents = Array.isArray(options.supportedHookEvents) && options.supportedHookEvents.length > 0
+    ? options.supportedHookEvents
+    : ['SessionStart', 'UserPromptSubmit', 'Stop'];
+  const text = String(configText || '');
+  if (!text.trim()) {
+    return [];
+  }
+
+  const results = [];
+  for (const eventName of supportedHookEvents) {
+    const commandName = eventName === 'SessionStart'
+      ? 'session-start'
+      : eventName === 'UserPromptSubmit'
+        ? 'user-prompt-submit'
+        : 'stop';
+    const eventPattern = new RegExp(`\\[\\[?\\s*hooks\\.${eventName}(?:\\.|\\]|\\s)`, 'i');
+    const hasEventTable = eventPattern.test(text);
+    const hasGovernorCommand = text.includes('chedex-governor.mjs') && text.includes(` ${commandName}`);
+    const hasManagedMarker = text.includes(`${chedexManagedHookMarkerPrefix}${eventName}`)
+      || (
+        eventName === 'SessionStart'
+        && text.includes(chedexLegacySessionStartStatusMessage)
+      )
+      || (
+        eventName === 'UserPromptSubmit'
+        && text.includes(chedexLegacyUserPromptSubmitStatusMessage)
+      )
+      || (
+        eventName === 'Stop'
+        && text.includes(chedexLegacyStopStatusMessage)
+      );
+
+    if (hasEventTable && hasGovernorCommand && hasManagedMarker) {
+      results.push({
+        event: eventName,
+        severity: 'error',
+        reason: `inline config.toml already defines the managed Chedex ${eventName} lifecycle hook`,
+      });
+    } else if (hasEventTable && (hasGovernorCommand || hasManagedMarker)) {
+      results.push({
+        event: eventName,
+        severity: 'warning',
+        reason: `inline config.toml appears to reference a Chedex ${eventName} hook; check for duplicate lifecycle execution`,
+      });
+    }
+  }
+
+  return results;
 }
 
 export function stripManagedHooksConfig(raw) {

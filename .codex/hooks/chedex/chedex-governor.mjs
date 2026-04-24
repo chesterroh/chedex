@@ -2,8 +2,8 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import { realpathSync } from 'node:fs';
-import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
+import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { homedir, hostname } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -21,6 +21,8 @@ export const GOVERNED_MODES = new Set(Object.keys(MODE_SCHEMAS));
 export const VERIFICATION_SATISFIED = 'satisfied';
 export const ACTIVE_INDEX_LOCK_TIMEOUT_MS = 5000;
 export const ACTIVE_INDEX_LOCK_RETRY_MS = 25;
+export const DIRECTORY_LOCK_METADATA_FILE = 'owner.json';
+export const DEFAULT_LOCK_REPAIR_OLDER_THAN_MS = 15 * 60 * 1000;
 
 export function defaultCodexHome() {
   return process.env.CODEX_HOME || join(homedir(), '.codex');
@@ -52,6 +54,22 @@ export function workflowLockId(input) {
 
 export function workflowLockPath(codexHome = defaultCodexHome(), workflowId) {
   return join(workflowsRoot(codexHome), `_lock_${workflowLockId(workflowId)}`);
+}
+
+export function directoryLockMetadataPath(lockPath) {
+  return join(lockPath, DIRECTORY_LOCK_METADATA_FILE);
+}
+
+export function buildDirectoryLockMetadata(lockPath, operation = 'governor-lock') {
+  return {
+    schema_version: GOVERNOR_SCHEMA_VERSION,
+    pid: process.pid,
+    host: hostname(),
+    cwd: process.cwd(),
+    operation,
+    lock_path: lockPath,
+    created_at: new Date().toISOString(),
+  };
 }
 
 export async function pathExists(path) {
@@ -100,12 +118,13 @@ function sleep(ms) {
   });
 }
 
-async function acquireDirectoryLock(lockPath, { timeoutMs, retryMs }) {
+async function acquireDirectoryLock(lockPath, { timeoutMs, retryMs, operation = 'governor-lock' }) {
   const deadline = Date.now() + timeoutMs;
 
   for (;;) {
     try {
       await mkdir(lockPath);
+      await writeJson(directoryLockMetadataPath(lockPath), buildDirectoryLockMetadata(lockPath, operation));
       let released = false;
       return {
         lockPath,
@@ -120,11 +139,80 @@ async function acquireDirectoryLock(lockPath, { timeoutMs, retryMs }) {
         throw error;
       }
       if (Date.now() >= deadline) {
-        throw new Error(`timed out waiting for active index lock at ${lockPath}`);
+        const metadata = await readDirectoryLockMetadata(lockPath);
+        throw new Error(`timed out waiting for governor lock at ${lockPath}${metadata ? `\nlock_owner=${formatDirectoryLockMetadata(metadata)}` : ''}`);
       }
       await sleep(retryMs);
     }
   }
+}
+
+export async function readDirectoryLockMetadata(lockPath) {
+  try {
+    return await readJsonIfExists(directoryLockMetadataPath(lockPath), null);
+  } catch {
+    return null;
+  }
+}
+
+export function formatDirectoryLockMetadata(metadata) {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    return 'unavailable';
+  }
+  return [
+    `pid:${metadata.pid ?? 'unknown'}`,
+    `host:${metadata.host || 'unknown'}`,
+    `operation:${metadata.operation || 'unknown'}`,
+    `created_at:${metadata.created_at || 'unknown'}`,
+  ].join(',');
+}
+
+export async function listWorkflowLockDirs(codexHome = defaultCodexHome()) {
+  let entries;
+  try {
+    entries = await readdir(workflowsRoot(codexHome), { withFileTypes: true });
+  } catch (error) {
+    if (error?.code === 'ENOENT') return [];
+    throw error;
+  }
+
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => join(workflowsRoot(codexHome), entry.name))
+    .filter((path) => {
+      const name = basename(path);
+      return name === '_active.lock' || name === '_archive.lock' || name.startsWith('_lock_');
+    });
+}
+
+export async function repairStaleWorkflowLocks({
+  codexHome = defaultCodexHome(),
+  olderThanMs = DEFAULT_LOCK_REPAIR_OLDER_THAN_MS,
+  now = new Date(),
+  dryRun = false,
+} = {}) {
+  const removed = [];
+  const kept = [];
+  for (const lockPath of await listWorkflowLockDirs(codexHome)) {
+    const metadata = await readDirectoryLockMetadata(lockPath);
+    const lockStat = await stat(lockPath);
+    const createdAt = parseIsoDate(metadata?.created_at) || lockStat.mtime;
+    const ageMs = now.getTime() - createdAt.getTime();
+    const item = {
+      lock_path: lockPath,
+      age_ms: ageMs,
+      metadata,
+    };
+    if (ageMs >= olderThanMs) {
+      if (!dryRun) {
+        await rm(lockPath, { recursive: true, force: true });
+      }
+      removed.push(item);
+    } else {
+      kept.push(item);
+    }
+  }
+  return { removed, kept, dry_run: dryRun };
 }
 
 export async function acquireActiveIndexLock(
@@ -132,10 +220,11 @@ export async function acquireActiveIndexLock(
   {
     timeoutMs = ACTIVE_INDEX_LOCK_TIMEOUT_MS,
     retryMs = ACTIVE_INDEX_LOCK_RETRY_MS,
+    operation = 'active-index',
   } = {},
 ) {
   await mkdir(workflowsRoot(codexHome), { recursive: true });
-  return acquireDirectoryLock(activeIndexLockPath(codexHome), { timeoutMs, retryMs });
+  return acquireDirectoryLock(activeIndexLockPath(codexHome), { timeoutMs, retryMs, operation });
 }
 
 export async function acquireArchiveLock(
@@ -143,10 +232,11 @@ export async function acquireArchiveLock(
   {
     timeoutMs = ACTIVE_INDEX_LOCK_TIMEOUT_MS,
     retryMs = ACTIVE_INDEX_LOCK_RETRY_MS,
+    operation = 'archive',
   } = {},
 ) {
   await mkdir(workflowsRoot(codexHome), { recursive: true });
-  return acquireDirectoryLock(archiveLockPath(codexHome), { timeoutMs, retryMs });
+  return acquireDirectoryLock(archiveLockPath(codexHome), { timeoutMs, retryMs, operation });
 }
 
 export async function acquireWorkflowLock(
@@ -155,10 +245,11 @@ export async function acquireWorkflowLock(
   {
     timeoutMs = ACTIVE_INDEX_LOCK_TIMEOUT_MS,
     retryMs = ACTIVE_INDEX_LOCK_RETRY_MS,
+    operation = `workflow:${workflowId}`,
   } = {},
 ) {
   await mkdir(workflowsRoot(codexHome), { recursive: true });
-  return acquireDirectoryLock(workflowLockPath(codexHome, workflowId), { timeoutMs, retryMs });
+  return acquireDirectoryLock(workflowLockPath(codexHome, workflowId), { timeoutMs, retryMs, operation });
 }
 
 export async function withActiveIndexLock(codexHome, fn, options) {
@@ -279,6 +370,57 @@ export function modeSchemaFor(mode) {
   return mode ? MODE_SCHEMAS[mode] || null : null;
 }
 
+export function phaseIndex(schema, phase) {
+  return schema?.phases?.indexOf(phase) ?? -1;
+}
+
+export function phaseRequirementApplies(schema, currentPhase, requiredPhase) {
+  const currentIndex = phaseIndex(schema, currentPhase);
+  const requiredIndex = phaseIndex(schema, requiredPhase);
+  return currentIndex >= 0 && requiredIndex >= 0 && currentIndex >= requiredIndex;
+}
+
+export function collectPhaseRequiredArtifacts(schema, phase, requirementField) {
+  const rules = Array.isArray(schema?.[requirementField]) ? schema[requirementField] : [];
+  const artifacts = new Set();
+  for (const rule of rules) {
+    if (!rule || typeof rule !== 'object' || Array.isArray(rule)) continue;
+    if (!phaseRequirementApplies(schema, phase, rule.phase)) continue;
+    for (const artifact of Array.isArray(rule.artifacts) ? rule.artifacts : []) {
+      if (typeof artifact === 'string' && artifact.trim()) {
+        artifacts.add(artifact);
+      }
+    }
+  }
+  return [...artifacts];
+}
+
+export function collectRequiredArtifactsForProgress(progress, schema) {
+  const artifacts = new Set(schema?.required_artifacts || []);
+  for (const artifact of collectPhaseRequiredArtifacts(schema, progress?.phase, 'phase_artifact_requirements')) {
+    artifacts.add(artifact);
+  }
+  if (TERMINAL_STATUSES.has(progress?.status)) {
+    for (const artifact of schema?.terminal_artifacts || []) {
+      artifacts.add(artifact);
+    }
+  }
+  return [...artifacts];
+}
+
+export function collectRequiredDiskArtifactsForProgress(progress, schema) {
+  const artifacts = new Set(schema?.required_disk_artifacts || []);
+  for (const artifact of collectPhaseRequiredArtifacts(schema, progress?.phase, 'phase_disk_artifact_requirements')) {
+    artifacts.add(artifact);
+  }
+  if (TERMINAL_STATUSES.has(progress?.status)) {
+    for (const artifact of schema?.terminal_disk_artifacts || []) {
+      artifacts.add(artifact);
+    }
+  }
+  return [...artifacts];
+}
+
 export function validateVerificationReview(review, { requiredRole = 'verifier' } = {}) {
   const errors = [];
   if (!review || typeof review !== 'object' || Array.isArray(review)) {
@@ -314,6 +456,50 @@ export function validateVerificationReview(review, { requiredRole = 'verifier' }
     ok: errors.length === 0,
     errors,
   };
+}
+
+export function evidenceReferenceHasStableAnchor(value) {
+  return /^(artifact|cmd|evidence|manual|test|verifier):\s*\S+/i.test(String(value).trim());
+}
+
+export function evidenceArtifactReference(value) {
+  const match = String(value).trim().match(/^([^:\s]+)(?::|\s|$)/);
+  return match ? match[1] : '';
+}
+
+export async function validateEvidenceReference(progress, progressPath, evidenceRef) {
+  const errors = [];
+  if (typeof evidenceRef !== 'string' || !evidenceRef.trim()) {
+    return ['verification evidence references must be non-empty strings'];
+  }
+
+  if (evidenceReferenceHasStableAnchor(evidenceRef)) {
+    return errors;
+  }
+
+  const reference = evidenceArtifactReference(evidenceRef);
+  if (!reference) {
+    return ['verification evidence references must use a stable anchor prefix such as cmd:, test:, verifier:, or reference an existing artifact path'];
+  }
+
+  const progressDir = dirname(progressPath);
+  for (const [field, artifactValue] of Object.entries(progress.artifacts || {})) {
+    if (typeof artifactValue !== 'string' || !artifactValue.trim()) continue;
+    const artifactPath = resolvePathFrom(progressDir, artifactValue);
+    const candidates = new Set([
+      field,
+      artifactValue,
+      artifactPath,
+      basename(artifactPath),
+    ]);
+    if (!candidates.has(reference)) continue;
+    if (await pathExists(artifactPath)) {
+      return errors;
+    }
+    return [`verification evidence reference ${evidenceRef} points at missing artifact ${artifactPath}`];
+  }
+
+  return [`verification evidence reference ${evidenceRef} must use a stable anchor prefix such as cmd:, test:, verifier:, or reference an existing artifact path`];
 }
 
 export function validateGovernedProgress(progress) {
@@ -392,7 +578,7 @@ export function validateGovernedProgress(progress) {
     errors.push('artifacts must be an object');
   }
 
-  const modeRequiredArtifacts = schema?.required_artifacts || [];
+  const modeRequiredArtifacts = collectRequiredArtifactsForProgress(progress, schema);
   for (const field of modeRequiredArtifacts) {
     const artifactPath = progress.artifacts?.[field];
     if (typeof artifactPath !== 'string' || !artifactPath.trim()) {
@@ -552,9 +738,6 @@ export async function validateGovernedWorkflow(progress, progressPath) {
   const normalizedProgressDir = normalizeTrackedPath(progressDir);
   const workflowRoot = resolvePathFrom(progressDir, progress.workflow_root || null);
   const handoffPath = resolvePathFrom(progressDir, progress.artifacts?.handoff || null);
-  const specPath = resolvePathFrom(progressDir, progress.artifacts?.spec || null);
-  const resultsPath = resolvePathFrom(progressDir, progress.artifacts?.results || null);
-  const verifyPath = resolvePathFrom(progressDir, progress.artifacts?.verify || null);
 
   if (!workflowRoot) {
     errors.push('workflow_root must resolve to a directory');
@@ -562,19 +745,31 @@ export async function validateGovernedWorkflow(progress, progressPath) {
     errors.push('workflow_root must resolve to the directory that contains progress.json');
   }
 
-  const requiredArtifactPaths = {
-    spec: specPath,
-    results: resultsPath,
-    verify: verifyPath,
-  };
+  const artifactPaths = {};
+  for (const [field, artifactValue] of Object.entries(progress.artifacts || {})) {
+    if (typeof artifactValue === 'string' && artifactValue.trim()) {
+      artifactPaths[field] = resolvePathFrom(progressDir, artifactValue);
+    }
+  }
 
-  for (const field of schema?.required_disk_artifacts || []) {
-    const artifactPath = requiredArtifactPaths[field];
+  for (const field of collectRequiredDiskArtifactsForProgress(progress, schema)) {
+    const artifactPath = artifactPaths[field];
     if (!artifactPath) {
+      errors.push(`${progress.mode} workflows require artifacts.${field}`);
       continue;
     }
     if (!(await pathExists(artifactPath))) {
       errors.push(`missing ${field} artifact at ${artifactPath}`);
+    }
+  }
+
+  if (progress.status === 'completed') {
+    const evidenceRefs = [
+      ...(Array.isArray(progress.verification?.evidence) ? progress.verification.evidence : []),
+      progress.verification?.review?.evidence_ref,
+    ].filter(Boolean);
+    for (const evidenceRef of evidenceRefs) {
+      errors.push(...await validateEvidenceReference(progress, progressPath, evidenceRef));
     }
   }
 
@@ -811,7 +1006,34 @@ export async function inspectIndexedWorkflowEntry(entry) {
   };
 }
 
-export async function syncWorkflow({ codexHome = defaultCodexHome(), cwd = process.cwd(), progressPath }) {
+export function activeEntryMatchesWorkflow(entry, { progressPath, workflowRoot }) {
+  if (!entry) return false;
+  const indexedProgressPath = typeof entry.progress_path === 'string'
+    ? normalizeTrackedPath(entry.progress_path)
+    : null;
+  const indexedWorkflowRoot = typeof entry.workflow_root === 'string'
+    ? normalizeTrackedPath(entry.workflow_root)
+    : null;
+  return indexedProgressPath === normalizeTrackedPath(progressPath)
+    && indexedWorkflowRoot === normalizeTrackedPath(workflowRoot);
+}
+
+export function describeActiveEntry(entry) {
+  if (!entry) return 'none';
+  return [
+    `mode=${entry.mode || 'unknown'}`,
+    `status=${entry.status || 'unknown'}`,
+    `workflow_root=${entry.workflow_root || 'unknown'}`,
+    `progress_path=${entry.progress_path || 'unknown'}`,
+  ].join(' ');
+}
+
+export async function syncWorkflow({
+  codexHome = defaultCodexHome(),
+  cwd = process.cwd(),
+  progressPath,
+  replace = false,
+}) {
   const normalizedCwd = resolve(cwd);
   const normalizedProgressPath = resolve(progressPath);
   return withWorkflowLock(codexHome, normalizedCwd, async () => {
@@ -824,12 +1046,20 @@ export async function syncWorkflow({ codexHome = defaultCodexHome(), cwd = proce
     return withActiveIndexLock(codexHome, async () => {
       const index = await loadActiveIndex(codexHome);
       const existingEntry = index.entries[normalizedCwd] || null;
-      const nextEntry = deriveActiveEntry({
+      const provisionalEntry = deriveActiveEntry({
         cwd: normalizedCwd,
         progressPath: normalizedProgressPath,
         progress,
-        completionToken: existingEntry?.completion_token || randomUUID(),
+        completionToken: randomUUID(),
       });
+      const sameOwner = activeEntryMatchesWorkflow(existingEntry, {
+        progressPath: provisionalEntry.progress_path,
+        workflowRoot: provisionalEntry.workflow_root,
+      });
+      const nextEntry = {
+        ...provisionalEntry,
+        completion_token: sameOwner ? existingEntry.completion_token : provisionalEntry.completion_token,
+      };
       const conflictingEntry = findWorkflowOwnershipConflict(index, {
         cwd: normalizedCwd,
         progressPath: nextEntry.progress_path,
@@ -842,7 +1072,7 @@ export async function syncWorkflow({ codexHome = defaultCodexHome(), cwd = proce
       }
       if (
         progress.status === 'completed'
-        && (!existingEntry || normalizeTrackedPath(existingEntry.progress_path) !== nextEntry.progress_path)
+        && (!existingEntry || !sameOwner)
       ) {
         throw new Error('completed workflows must transition from an already indexed governed workflow and finalize through verification-complete');
       }
@@ -851,6 +1081,11 @@ export async function syncWorkflow({ codexHome = defaultCodexHome(), cwd = proce
         && progress.verification?.review?.completion_token !== existingEntry?.completion_token
       ) {
         throw new Error('completed workflow verification provenance does not match the governor-issued completion token. Re-run verification-complete before syncing closeout state.');
+      }
+      if (existingEntry && !sameOwner && existingEntry.status === ACTIVE_STATUS && !replace) {
+        throw new Error(
+          `active workflow owner replacement requires --replace. Existing owner: ${describeActiveEntry(existingEntry)}. Next owner: ${describeActiveEntry(nextEntry)}.`,
+        );
       }
       index.entries[normalizedCwd] = nextEntry;
 
@@ -1269,7 +1504,7 @@ async function runCli() {
   const codexHome = args.codex_home ? resolve(args.codex_home) : defaultCodexHome();
 
   if (!command) {
-    throw new Error('usage: chedex-governor.mjs <session-start|user-prompt-submit|stop|workflow-sync|workflow-clear|verification-complete>');
+    throw new Error('usage: chedex-governor.mjs <session-start|user-prompt-submit|stop|workflow-sync|workflow-clear|workflow-lock-repair|verification-complete>');
   }
 
   switch (command) {
@@ -1331,8 +1566,20 @@ async function runCli() {
         codexHome,
         cwd: args.cwd || process.cwd(),
         progressPath: args.progress,
+        replace: Boolean(args.replace),
       });
       process.stdout.write(`${JSON.stringify(entry, null, 2)}\n`);
+      return;
+    }
+    case 'workflow-lock-repair': {
+      const result = await repairStaleWorkflowLocks({
+        codexHome,
+        olderThanMs: args.older_than_ms === true || args.older_than_ms == null
+          ? DEFAULT_LOCK_REPAIR_OLDER_THAN_MS
+          : Number(args.older_than_ms),
+        dryRun: Boolean(args.dry_run),
+      });
+      process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
       return;
     }
     case 'workflow-clear': {

@@ -10,6 +10,7 @@ export const DEFAULT_RELEASE_AUDIT_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 export const CODEX_PACKAGE_REGISTRY_URL = 'https://registry.npmjs.org/@openai%2Fcodex';
 export const CODEX_CHANGELOG_URL = 'https://developers.openai.com/codex/changelog/';
 export const CODEX_RELEASE_DELTAS_URL = 'https://raw.githubusercontent.com/chesterroh/chedex/main/hooks/codex-release-deltas.json';
+export const CHEDEX_RELEASE_DELTA_COMPAT_VERSION = '0.124.0';
 
 export function defaultCodexHome() {
   return process.env.CODEX_HOME || join(homedir(), '.codex');
@@ -138,8 +139,27 @@ export function normalizeReleaseDeltaBundle(raw) {
     deltas,
     checked_at: typeof raw.checked_at === 'string' ? raw.checked_at : null,
     source: typeof raw.source === 'string' ? raw.source : null,
+    min_chedex_version: typeof raw.min_chedex_version === 'string' && parseSemver(raw.min_chedex_version)
+      ? raw.min_chedex_version
+      : null,
+    max_chedex_version: typeof raw.max_chedex_version === 'string' && parseSemver(raw.max_chedex_version)
+      ? raw.max_chedex_version
+      : null,
     stale: Boolean(raw.stale),
   };
+}
+
+export function isReleaseDeltaBundleCompatible(
+  bundle,
+  chedexVersion = CHEDEX_RELEASE_DELTA_COMPAT_VERSION,
+) {
+  const current = parseSemver(chedexVersion);
+  if (!bundle || !current) return false;
+  const min = bundle.min_chedex_version ? parseSemver(bundle.min_chedex_version) : null;
+  const max = bundle.max_chedex_version ? parseSemver(bundle.max_chedex_version) : null;
+  if (min && compareSemver(current, min) < 0) return false;
+  if (max && compareSemver(current, max) > 0) return false;
+  return true;
 }
 
 export async function readReleaseAuditCache(codexHome = defaultCodexHome()) {
@@ -236,12 +256,17 @@ export async function fetchReleaseDeltas({
   if (!payload) {
     throw new Error('release delta payload was invalid');
   }
+  if (!isReleaseDeltaBundleCompatible(payload)) {
+    throw new Error('release delta payload is incompatible with this Chedex version');
+  }
 
   return {
     schema_version: RELEASE_DELTA_SCHEMA_VERSION,
     deltas: payload.deltas,
     checked_at: now.toISOString(),
     source: deltasUrl,
+    min_chedex_version: payload.min_chedex_version,
+    max_chedex_version: payload.max_chedex_version,
   };
 }
 
@@ -305,7 +330,7 @@ export async function getReleaseDeltas({
   let cached = null;
   try {
     cached = await readReleaseDeltaCache(codexHome);
-    if (cached && isFreshReleaseAudit(cached, { now, ttlMs: cacheTtlMs })) {
+    if (cached && isReleaseDeltaBundleCompatible(cached) && isFreshReleaseAudit(cached, { now, ttlMs: cacheTtlMs })) {
       return cached;
     }
   } catch {
@@ -314,10 +339,13 @@ export async function getReleaseDeltas({
 
   try {
     const refreshed = await fetchDynamicDeltas({ now });
+    if (!isReleaseDeltaBundleCompatible(refreshed)) {
+      throw new Error('release delta payload is incompatible with this Chedex version');
+    }
     await writeReleaseDeltaCache(codexHome, refreshed);
     return refreshed;
   } catch (error) {
-    if (cached) {
+    if (cached && isReleaseDeltaBundleCompatible(cached)) {
       return {
         ...cached,
         stale: true,

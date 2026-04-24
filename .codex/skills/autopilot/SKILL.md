@@ -31,7 +31,8 @@ Recommended files:
 - It should not invent extra runtime semantics beyond the native governor contract and the narrower lanes already present in Chedex.
 - Within one workspace, `autopilot` remains the governed owner by default. Nested `ralph` or `ultrawork` execution slices should report through the current `autopilot` workflow instead of syncing competing governed state.
 - If the task resolves into a pure governed research loop, explicitly hand governed ownership to `autoresearch-loop` instead of keeping `autopilot` active in the same workspace.
-- Governor admission for `autopilot` currently enforces `progress.json` plus `artifacts.handoff`; the other recommended artifacts remain workflow guidance rather than hard runtime requirements.
+- Governor validation for `autopilot` is phase-aware: `context.md` is required by `specify`, `spec.md` by `plan`, `plan.md` plus `handoff.json` by `execute`, and `verify.md` by `verify` or terminal states.
+- Within the same workspace, syncing a different active governed owner requires an explicit ownership replacement. Nested lanes should report through the current `autopilot` workflow rather than calling `workflow-sync --replace`.
 
 ## Phases
 
@@ -54,8 +55,8 @@ Recommended files:
    - Hand stable governed optimization to `autoresearch-loop` when the work has clearly become a research loop rather than a broad delivery loop.
    - Let `ralph` use `ultrawork` only when lanes are truly independent.
 5. Verify
-   - Refresh `verify.md` with tests, diagnostics, rejections, and remaining risk.
-   - Record the verifier review record in `progress.json.verification.review` before marking the workflow completed.
+- Refresh `verify.md` with tests, diagnostics, rejections, and remaining risk.
+- Record the verifier review record in `progress.json.verification.review` before marking the workflow completed; completion evidence should use a stable anchor such as `cmd:`, `test:`, `verifier:`, or an artifact reference such as `verify.md: npm run verify`.
    - Loop back to clarify, specify, or plan when evidence shows the contract is still weak.
 
 ## Rules
