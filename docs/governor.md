@@ -5,11 +5,11 @@ The Chedex governor is the native lifecycle layer for governed workflows.
 ## Requirements
 
 - Codex CLI `>= 0.114.0`
-- Latest verified Codex CLI: `0.124.0`
+- Latest verified Codex CLI: `0.125.0`
 - `codex_hooks` feature available in `codex features list`
 
 Install enables `multi_agent = true` and compatibility `codex_hooks = true`, and writes a managed `hooks.json` beside `config.toml`.
-On Codex `0.124.0`, `codex_hooks` is stable/default-on; CHEDEX keeps the explicit flag for compatibility with older supported installs.
+On Codex `0.124.0` and later, `codex_hooks` is stable/default-on; CHEDEX keeps the explicit flag for compatibility with older supported installs.
 On Codex `>= 0.116.0`, the managed hook set also includes `UserPromptSubmit`.
 Managed hook handlers carry stable `Chedex governor: managed:v1:<event>` status markers. Install and uninstall still recognize the older unversioned Chedex status messages for cleanup compatibility.
 
@@ -50,8 +50,9 @@ Within one workspace, `autopilot` may remain the governed owner while nested `ra
 The managed `SessionStart` matcher now covers `startup|resume|clear`. For `clear`, the governor keeps governed state indexed for the workspace and emits a soft-clear notice instead of the full restore-context block.
 The governor still keys off `cwd` and governed state, not the source value by itself. `clear` does not auto-run `workflow-clear` and does not silently discard active workflow protection.
 Codex `0.122.0` tightened trusted-workspace handling for project hooks and exec policies. CHEDEX keeps the governor on the user-global hook surface under `~/.codex/hooks.json`; if you later move that surface into repo-local `.codex`, trust the workspace first and recheck deny-read or isolated-exec behavior.
-Codex `0.124.0` can also load inline hooks from `config.toml` and managed hooks from `requirements.toml`. CHEDEX stays on `hooks.json`; install now rejects exact duplicates of the managed Chedex lifecycle hooks in inline `config.toml` hook tables before it writes another copy.
-Codex `0.124.0` also broadens `PreToolUse`, `PostToolUse`, and `PermissionRequest` hook payloads beyond Bash. The governor does not consume those tool-use events today, but future CHEDEX tool-use hooks should treat `tool_name` as arbitrary and `tool_input` as schema-free.
+Codex `0.124.0` and later can also load inline hooks from `config.toml` and managed hooks from `requirements.toml`. CHEDEX stays on `hooks.json`; install now rejects exact duplicates of the managed Chedex lifecycle hooks in inline `config.toml` hook tables before it writes another copy.
+Codex `0.124.0` and later also broaden `PreToolUse`, `PostToolUse`, and `PermissionRequest` hook payloads beyond Bash. The governor does not consume those tool-use events today, but future CHEDEX tool-use hooks should treat `tool_name` as arbitrary and `tool_input` as schema-free.
+Codex `0.125.0` adds broader app-server, plugin, permission-profile, provider-discovery, exec JSON, and rollout-trace surfaces. The governor's lifecycle contract remains `SessionStart`, `UserPromptSubmit`, and `Stop`; smoke-test those 0.125 surfaces separately if a workflow depends on them.
 
 ## Active Workflow Index
 

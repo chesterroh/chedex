@@ -91,6 +91,15 @@
         "Keep CHEDEX-managed lifecycle hooks in one representation per config layer; do not duplicate the same user-layer hooks in both `hooks.json` and inline `config.toml` hooks.",
         "If you add CHEDEX `PreToolUse`, `PostToolUse`, or `PermissionRequest` hooks, treat `tool_name` as arbitrary and `tool_input` as schema-free rather than Bash-only."
       ]
+    },
+    {
+      "since": "0.125.0",
+      "summary": "Codex 0.125.x expands app-server transports and thread APIs, remote plugin installs and marketplace upgrades, permission-profile round-tripping, provider-owned model discovery, exec JSON reasoning-token usage, rollout tracing, and config/schema handling.",
+      "checks": [
+        "Re-run `npm run verify` after upgrading Codex CLI.",
+        "Re-run `npm run install:user:dry` to confirm managed hooks and generated agent config paths still resolve on 0.125.x.",
+        "If you rely on app-server, remote plugin, Bedrock/provider-discovery, permission-profile, `codex exec --json`, or rollout-trace workflows, smoke-test those paths after upgrading."
+      ]
     }
   ]
 }

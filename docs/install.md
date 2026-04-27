@@ -3,7 +3,7 @@
 ## Requirements
 
 - Codex CLI `>= 0.114.0`
-- Latest verified Codex CLI: `0.124.0`
+- Latest verified Codex CLI: `0.125.0`
 - `codex features list` must expose `codex_hooks`
 - Node `>= 20`
 
@@ -34,7 +34,7 @@ This installs:
 - `CHEDEX_UNINSTALL.md` and `CHEDEX_UNINSTALL.json` into `~/.codex/` for reversible uninstall metadata
 - `multi_agent = true` and compatibility `codex_hooks = true` inside the `~/.codex/config.toml` `[features]` section
 
-Codex `0.124.0` still installs bundled system skills under `~/.codex/skills/.system/` and enables tool discovery plus image generation by default. CHEDEX deliberately manages only top-level user skill directories under `~/.codex/skills/<name>`, so the current install shape coexists with native Codex instead of overwriting it. Current bundled Codex names (`imagegen`, `openai-docs`, `plugin-creator`, `skill-creator`, `skill-installer`) do not collide with current CHEDEX names.
+Codex `0.125.0` still installs bundled system skills under `~/.codex/skills/.system/` and enables tool discovery plus image generation by default. CHEDEX deliberately manages only top-level user skill directories under `~/.codex/skills/<name>`, so the current install shape coexists with native Codex instead of overwriting it. Current bundled Codex names (`imagegen`, `openai-docs`, `plugin-creator`, `skill-creator`, `skill-installer`) do not collide with current CHEDEX names.
 
 Managed hook events:
 
@@ -44,8 +44,9 @@ Managed hook events:
 
 Install merges CHEDEX-managed hook handlers into `~/.codex/hooks.json` after stripping only prior CHEDEX-managed entries, so unrelated native or user-defined hook groups are preserved.
 Managed CHEDEX hook handlers use stable `Chedex governor: managed:v1:<event>` status markers while uninstall still strips older unversioned CHEDEX handlers.
-Codex `0.124.0` also supports inline hooks in `config.toml` and managed hooks in `requirements.toml`. CHEDEX still writes the managed lifecycle set to user-global `~/.codex/hooks.json`; install fails if it detects the exact same managed lifecycle hook represented in inline `config.toml` hook tables.
-Codex `0.124.0` broadens `PreToolUse`, `PostToolUse`, and `PermissionRequest` hook payloads beyond Bash. CHEDEX does not install those tool-use hooks today, but future tool-use hook code should treat `tool_name` as arbitrary and `tool_input` as schema-free.
+Codex `0.124.0` and later also support inline hooks in `config.toml` and managed hooks in `requirements.toml`. CHEDEX still writes the managed lifecycle set to user-global `~/.codex/hooks.json`; install fails if it detects the exact same managed lifecycle hook represented in inline `config.toml` hook tables.
+Codex `0.124.0` and later broaden `PreToolUse`, `PostToolUse`, and `PermissionRequest` hook payloads beyond Bash. CHEDEX does not install those tool-use hooks today, but future tool-use hook code should treat `tool_name` as arbitrary and `tool_input` as schema-free.
+Codex `0.125.0` adds app-server transport/thread/plugin APIs, permission-profile round-tripping, provider-owned model discovery, `codex exec --json` reasoning-token usage, rollout tracing, and config/schema fixes. CHEDEX does not depend on those APIs for install, but app-server, remote plugin, Bedrock/provider-discovery, permission-profile, exec JSON, and rollout-trace paths should be smoke-tested if you rely on them.
 
 The managed `SessionStart` matcher now covers `startup|resume|clear`. CHEDEX treats `clear` as a soft-clear path: it preserves governed workflow state, keeps stop protection intact, and emits a compact notice instead of the full resume-context block.
 Codex `0.122.0` tightened trusted-workspace handling for project hooks and exec policies. CHEDEX continues to install user-global hooks into `~/.codex/hooks.json`, so the supported upgrade path is to keep the governor global and recheck restricted-filesystem workflows rather than relocating hooks into repo-local `.codex`.
@@ -63,7 +64,7 @@ Direct top-level `ultrawork` uses a minimal workflow root under `~/.codex/workfl
 Dynamic release-delta guidance is cached separately in `~/.codex/workflows/_codex_release_deltas.json`, and incompatible remote delta bundles fall back to bundled or cached guidance.
 Completed and cancelled governed workflows are archived into `~/.codex/workflows/_archive.json` when they leave the active index.
 `handoff.json` is required for governed plans and the richer `autopilot` / `ralph` / `autoresearch-loop` workflows, and those handoffs now require stored `architect` and `verifier` approval entries under `approvals`; direct top-level `ultrawork` may omit `handoff.json`.
-Codex `0.124.0` does not currently ship a native governed workflow runtime with CHEDEX-style `progress.json` / `handoff.json` / `verify.md` ownership, so the current workflow-state collision risk is low; the main future risk is duplicate skill names, not duplicate loop state. The practical 0.124 rechecks are duplicate hook configuration, deny-read or isolated-exec behavior, and remote/app-server environment selection if you depend on those paths.
+Codex `0.125.0` does not currently ship a native governed workflow runtime with CHEDEX-style `progress.json` / `handoff.json` / `verify.md` ownership, so the current workflow-state collision risk is low; the main future risk is duplicate skill names, not duplicate loop state. The practical 0.125 rechecks are duplicate hook configuration, deny-read or isolated-exec behavior, remote/app-server environment selection, remote plugin installs, provider discovery, and permission-profile behavior if you depend on those paths.
 `workflow-sync` preserves the current owner for the same workflow root, rejects a different active owner for the same workspace unless `--replace` is explicit, and records lock-owner metadata that can be cleared with `workflow-lock-repair` when a stale lock is confirmed.
 The release audit is advisory only: it does not auto-upgrade Codex CLI.
 
