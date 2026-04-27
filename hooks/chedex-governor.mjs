@@ -4,7 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { homedir, hostname } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   APPROVAL_VERDICTS,
@@ -918,6 +918,114 @@ export function shouldArchiveWorkflow(progress) {
   return progress?.status === 'completed' || progress?.status === 'cancelled';
 }
 
+export function workflowRootCleanupTarget(codexHome = defaultCodexHome(), workflowRoot) {
+  const workflowStoreRoot = normalizeTrackedPath(workflowsRoot(codexHome));
+  const target = normalizeTrackedPath(workflowRoot);
+  const prefix = `${workflowStoreRoot}${sep}`;
+
+  if (!target.startsWith(prefix)) {
+    return {
+      ok: false,
+      target,
+      reason: 'workflow_root is outside the Chedex workflow store',
+    };
+  }
+
+  const relativeParts = target.slice(prefix.length).split(sep).filter(Boolean);
+  if (relativeParts.length < 2 || relativeParts.some((part) => part.startsWith('_'))) {
+    return {
+      ok: false,
+      target,
+      reason: 'workflow_root is not a concrete managed workflow directory',
+    };
+  }
+
+  return {
+    ok: true,
+    target,
+    reason: null,
+  };
+}
+
+export async function cleanupWorkflowRootCache({
+  codexHome = defaultCodexHome(),
+  workflowRoot,
+}) {
+  const cleanupTarget = workflowRootCleanupTarget(codexHome, workflowRoot);
+  if (!cleanupTarget.ok) {
+    return {
+      removed: false,
+      skipped: true,
+      path: cleanupTarget.target,
+      reason: cleanupTarget.reason,
+    };
+  }
+
+  await rm(cleanupTarget.target, { recursive: true, force: true });
+  return {
+    removed: true,
+    skipped: false,
+    path: cleanupTarget.target,
+    reason: null,
+  };
+}
+
+export async function cleanupFinishedIndexedWorkflows({
+  codexHome = defaultCodexHome(),
+  index,
+}) {
+  const workflowRoots = [];
+  let changed = false;
+
+  for (const [entryCwd, entry] of Object.entries(index.entries || {})) {
+    const inspection = await inspectIndexedWorkflowEntry(entry);
+    if (!inspection.ok) {
+      continue;
+    }
+
+    const { progress, normalizedEntry } = inspection;
+    if (!shouldArchiveWorkflow(progress)) {
+      continue;
+    }
+
+    await archiveWorkflow({
+      codexHome,
+      cwd: entryCwd,
+      entry: normalizedEntry,
+      progress,
+    });
+    delete index.entries[entryCwd];
+    workflowRoots.push(normalizedEntry.workflow_root);
+    changed = true;
+  }
+
+  if (changed) {
+    await saveActiveIndex(index, codexHome);
+  }
+
+  const cache_cleanup = [];
+  for (const workflowRoot of workflowRoots) {
+    try {
+      cache_cleanup.push(await cleanupWorkflowRootCache({
+        codexHome,
+        workflowRoot,
+      }));
+    } catch (error) {
+      cache_cleanup.push({
+        removed: false,
+        skipped: false,
+        path: normalizeTrackedPath(workflowRoot),
+        reason: formatErrorReason(error),
+      });
+    }
+  }
+
+  return {
+    changed,
+    cache_cleanup,
+  };
+}
+
 export function findWorkflowOwnershipConflict(index, { cwd, progressPath, workflowRoot }) {
   for (const [entryCwd, entry] of Object.entries(index.entries || {})) {
     if (entryCwd === cwd || entry?.cwd === cwd) {
@@ -1292,6 +1400,10 @@ export async function stopHook({ codexHome = defaultCodexHome(), cwd = process.c
         const index = loadResult.index;
         const entry = index.entries[normalizedCwd];
         if (!entry) {
+          await cleanupFinishedIndexedWorkflows({
+            codexHome,
+            index,
+          });
           return { action: 'allow' };
         }
 
@@ -1314,16 +1426,10 @@ export async function stopHook({ codexHome = defaultCodexHome(), cwd = process.c
           };
         }
 
-        if (shouldArchiveWorkflow(progress)) {
-          await archiveWorkflow({
-            codexHome,
-            cwd: normalizedCwd,
-            entry: inspection.normalizedEntry,
-            progress,
-          });
-          delete index.entries[normalizedCwd];
-          await saveActiveIndex(index, codexHome);
-        }
+        await cleanupFinishedIndexedWorkflows({
+          codexHome,
+          index,
+        });
 
         return { action: 'allow' };
       });

@@ -83,7 +83,7 @@ If the active index cannot be read safely, `Stop` fails closed and `SessionStart
 Syncing the same `workflow_root` / `progress_path` from the same `cwd` updates the existing owner and preserves its completion token. Syncing a different active workflow from that `cwd` is rejected unless `workflow-sync --replace` is used. Non-active terminal owners may be replaced without `--replace`.
 A given `workflow_root` / `progress_path` may only be owned by one workspace at a time; reusing the same governed workflow from another workspace is rejected until the original owner clears or completes it.
 
-When a workflow reaches `completed` or `cancelled` and the runtime clears it from `_active.json`, the governor appends the final entry and progress snapshot to `~/.codex/workflows/_archive.json` instead of deleting the history outright.
+When a workflow reaches `completed` or `cancelled` and the runtime clears it from `_active.json`, the governor appends the final entry and progress snapshot to `~/.codex/workflows/_archive.json`, then removes the managed workflow root under `~/.codex/workflows/<mode>/<slug>/`.
 
 ## Governed `progress.json`
 

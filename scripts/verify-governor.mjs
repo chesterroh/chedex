@@ -12,6 +12,7 @@ import {
   archivePath,
   clearWorkflow,
   normalizeTrackedPath,
+  pathExists,
   sessionStartHook,
   stopHook,
   syncWorkflow as syncWorkflowBase,
@@ -498,6 +499,14 @@ const completedValid = await makeWorkflow({
   mode: 'ultrawork',
   includeHandoff: false,
 });
+const completedOtherCwd = join(home, 'other-workspace');
+await mkdir(completedOtherCwd, { recursive: true });
+const completedOther = await makeWorkflow({
+  home,
+  slug: 'completed-other-workspace',
+  mode: 'ultrawork',
+  includeHandoff: false,
+});
 
 await syncWorkflow({
   codexHome: home,
@@ -518,6 +527,25 @@ await syncWorkflow({
   cwd,
   progressPath: completedValid.progressPath,
 });
+await syncWorkflow({
+  codexHome: home,
+  cwd: completedOtherCwd,
+  progressPath: completedOther.progressPath,
+});
+await markWorkflowCompleted({
+  codexHome: home,
+  cwd: completedOtherCwd,
+  workflowRoot: completedOther.workflowRoot,
+  progressPath: completedOther.progressPath,
+  mode: 'ultrawork',
+  task: 'completed-other-workspace task',
+  includeHandoff: false,
+});
+await syncWorkflow({
+  codexHome: home,
+  cwd: completedOtherCwd,
+  progressPath: completedOther.progressPath,
+});
 
 const completedAllowed = await stopHook({
   codexHome: home,
@@ -527,8 +555,12 @@ assert(completedAllowed.action === 'allow', 'completed workflow with satisfied v
 
 const indexAfterCompleted = JSON.parse(await readFile(activeIndexPath(home), 'utf8'));
 assert(!(cwd in indexAfterCompleted.entries), 'completed workflow should be cleared from the active index');
+assert(!(completedOtherCwd in indexAfterCompleted.entries), 'stop should clear all finished workflows from the active index');
 const archiveAfterCompleted = JSON.parse(await readFile(archivePath(home), 'utf8'));
 assert(archiveAfterCompleted.entries.some((entry) => entry.progress.task === 'completed-verified task'), 'completed workflows should move into the workflow archive');
+assert(archiveAfterCompleted.entries.some((entry) => entry.progress.task === 'completed-other-workspace task'), 'stop should archive all finished workflows');
+assert(!(await pathExists(completedValid.workflowRoot)), 'completed workflow cache directory should be removed on stop');
+assert(!(await pathExists(completedOther.workflowRoot)), 'all finished workflow cache directories should be removed on stop');
 
 const completedResearchLoop = await makeWorkflow({
   home,
@@ -564,6 +596,43 @@ const completedResearchAllowed = await stopHook({
 assert(completedResearchAllowed.action === 'allow', 'completed autoresearch-loop with satisfied verification should allow stop');
 const archiveAfterResearchComplete = JSON.parse(await readFile(archivePath(home), 'utf8'));
 assert(archiveAfterResearchComplete.entries.some((entry) => entry.progress.task === 'completed-autoresearch-loop task'), 'completed autoresearch-loop workflows should archive on stop');
+assert(!(await pathExists(completedResearchLoop.workflowRoot)), 'completed autoresearch-loop cache directory should be removed on stop');
+
+const completedNoCurrentCwd = join(home, 'no-current-workspace');
+await mkdir(completedNoCurrentCwd, { recursive: true });
+const completedNoCurrent = await makeWorkflow({
+  home,
+  slug: 'completed-no-current-entry',
+  mode: 'ultrawork',
+  includeHandoff: false,
+});
+await syncWorkflow({
+  codexHome: home,
+  cwd: completedNoCurrentCwd,
+  progressPath: completedNoCurrent.progressPath,
+});
+await markWorkflowCompleted({
+  codexHome: home,
+  cwd: completedNoCurrentCwd,
+  workflowRoot: completedNoCurrent.workflowRoot,
+  progressPath: completedNoCurrent.progressPath,
+  mode: 'ultrawork',
+  task: 'completed-no-current-entry task',
+  includeHandoff: false,
+});
+await syncWorkflow({
+  codexHome: home,
+  cwd: completedNoCurrentCwd,
+  progressPath: completedNoCurrent.progressPath,
+});
+const noCurrentStopAllowed = await stopHook({
+  codexHome: home,
+  cwd: join(home, 'workspace-without-entry'),
+});
+assert(noCurrentStopAllowed.action === 'allow', 'stop without a current entry should allow after pruning finished workflows');
+const indexAfterNoCurrentStop = JSON.parse(await readFile(activeIndexPath(home), 'utf8'));
+assert(!(completedNoCurrentCwd in indexAfterNoCurrentStop.entries), 'stop without a current entry should clear finished workflow entries');
+assert(!(await pathExists(completedNoCurrent.workflowRoot)), 'stop without a current entry should remove finished workflow cache directories');
 
 const missingResearchSpecWorkflow = await makeWorkflow({
   home,
