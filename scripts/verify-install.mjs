@@ -92,6 +92,8 @@ const freshUninstallState = JSON.parse(await readFile(join(freshHome, 'CHEDEX_UN
 const freshSkillBackupPaths = freshUninstallState.managed_paths.skills
   .map((entry) => entry.backup_path)
   .filter(Boolean);
+assert(await pathExists(join(freshHome, 'skills', 'cdx-plan', 'SKILL.md')), 'install should write cdx-prefixed Chedex skills');
+assert(await pathMissing(join(freshHome, 'skills', 'plan', 'SKILL.md')), 'fresh install should not write legacy unprefixed Chedex skills');
 assert(
   freshSkillBackupPaths.every((path) => !path.startsWith(join(freshHome, 'skills'))),
   'install should keep managed skill backups outside the live skills directory',
@@ -402,12 +404,12 @@ assert(staleInstallFailed, 'install:user:dry should fail with guidance when gene
 const reinstallDriftHome = await mkdtemp(join(tmpdir(), 'chedex-install-reinstall-drift-'));
 const reinstallDriftEnv = { ...process.env, CODEX_HOME: reinstallDriftHome };
 runNodeScript(repoRoot, 'scripts/install-user.mjs', reinstallDriftEnv);
-await writeFile(join(reinstallDriftHome, 'skills', 'ralph', 'STALE.md'), '# stale managed file\n');
+await writeFile(join(reinstallDriftHome, 'skills', 'cdx-ralph', 'STALE.md'), '# stale managed file\n');
 await mkdir(join(reinstallDriftHome, 'hooks', 'chedex', 'nested'), { recursive: true });
 await writeFile(join(reinstallDriftHome, 'hooks', 'chedex', 'nested', 'STALE.md'), '# stale managed hook file\n');
 runNodeScript(repoRoot, 'scripts/install-user.mjs', reinstallDriftEnv);
 assert(
-  await pathMissing(join(reinstallDriftHome, 'skills', 'ralph', 'STALE.md')),
+  await pathMissing(join(reinstallDriftHome, 'skills', 'cdx-ralph', 'STALE.md')),
   'reinstall should remove stale files inside managed skill directories',
 );
 assert(

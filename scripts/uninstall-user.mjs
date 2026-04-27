@@ -6,6 +6,7 @@ import {
   installManifestPaths,
   installTargets,
   isEffectivelyEmptyHooksConfig,
+  legacySkillNames,
   listRelativeFiles,
   listSkills,
   readJsonIfExists,
@@ -32,7 +33,7 @@ const nextHooksConfig = stripManagedHooksConfig(currentHooksConfig);
 const uninstallState = await readJsonIfExists(targets.uninstallStatePath, null);
 const managedPromptPaths = roleNames().map((name) => join(targets.promptsDir, `${name}.md`));
 const managedAgentPaths = roleNames().map((name) => join(targets.agentsDir, `${name}.toml`));
-const managedSkillPaths = listSkills().map((name) => join(targets.skillsDir, name));
+const managedSkillPaths = [...listSkills(), ...legacySkillNames()].map((name) => join(targets.skillsDir, name));
 
 async function restoreBackupIfPresent(backupPath, targetPath) {
   if (!backupPath || !(await fileExists(backupPath))) {

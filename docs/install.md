@@ -26,7 +26,7 @@ This installs:
 
 - `AGENTS.template.md` into `~/.codex/AGENTS.md`
 - `prompts/*.md` into `~/.codex/prompts/`
-- the registered `skills/<name>/` directories into `~/.codex/skills/`: `clarify`, `deep-interview`, `autoresearch-plan`, `autoresearch-loop`, `plan`, `review`, `execute`, `tdd`, `ultrawork`, `ralph`, and `autopilot`
+- the registered `skills/cdx-<name>/` directories into `~/.codex/skills/`: `cdx-clarify`, `cdx-deep-interview`, `cdx-autoresearch-plan`, `cdx-autoresearch-loop`, `cdx-plan`, `cdx-review`, `cdx-execute`, `cdx-tdd`, `cdx-ultrawork`, `cdx-ralph`, and `cdx-autopilot`
 - `agents/*.toml` into `~/.codex/agents/`
 - `hooks/*` into `~/.codex/hooks/chedex/`
 - a managed `hooks.json` into `~/.codex/hooks.json`
@@ -34,7 +34,9 @@ This installs:
 - `CHEDEX_UNINSTALL.md` and `CHEDEX_UNINSTALL.json` into `~/.codex/` for reversible uninstall metadata
 - `multi_agent = true` and compatibility `codex_hooks = true` inside the `~/.codex/config.toml` `[features]` section
 
-Codex `0.125.0` still installs bundled system skills under `~/.codex/skills/.system/` and enables tool discovery plus image generation by default. CHEDEX deliberately manages only top-level user skill directories under `~/.codex/skills/<name>`, so the current install shape coexists with native Codex instead of overwriting it. Current bundled Codex names (`imagegen`, `openai-docs`, `plugin-creator`, `skill-creator`, `skill-installer`) do not collide with current CHEDEX names.
+Codex `0.125.0` still installs bundled system skills under `~/.codex/skills/.system/` and enables tool discovery plus image generation by default. CHEDEX deliberately manages only `cdx-*` top-level user skill directories under `~/.codex/skills/`, so the current install shape coexists with native Codex instead of overwriting it or occupying plain native names. Current bundled Codex names (`imagegen`, `openai-docs`, `plugin-creator`, `skill-creator`, `skill-installer`) do not collide with the `cdx-*` CHEDEX namespace.
+
+During install, CHEDEX also removes previously managed legacy unprefixed skill directories such as `plan`, `execute`, and `review` when they are present in the managed install state, so the default install migrates toward the prefixed namespace.
 
 Managed hook events:
 
@@ -53,25 +55,25 @@ Codex `0.122.0` tightened trusted-workspace handling for project hooks and exec 
 
 Chedex writes native agent files only under `~/.codex` unless `CODEX_HOME` is set.
 Artifact-backed workflow skills keep their artifacts under `~/.codex/workflows/`.
-`deep-interview` keeps durable `context.md`, `interview.md`, and `spec.md` artifacts under `~/.codex/workflows/deep-interview/` and does not require `progress.json` or `handoff.json` by default.
-`autoresearch-plan` may keep `context.md`, `spec.md`, and optionally `results.tsv` under `~/.codex/workflows/autoresearch-plan/`, and does not require `progress.json` or `handoff.json` by default.
-`autopilot` keeps governed broad-work artifacts under `~/.codex/workflows/autopilot/`, typically including `context.md`, `spec.md`, `plan.md`, `handoff.json`, `progress.json`, and `verify.md`; nested `ralph` and `ultrawork` slices should report through the current `autopilot` workflow unless ownership is explicitly transferred.
-For `autopilot`, the governor now enforces phase-aware artifacts: `context.md` by `specify`, `spec.md` by `plan`, `plan.md` plus `handoff.json` by `execute`, and `verify.md` by `verify` or terminal states.
-`autoresearch-loop` keeps governed research artifacts under `~/.codex/workflows/autoresearch-loop/`, including `results.tsv`, `handoff.json`, `progress.json`, and `verify.md`.
-Governed workflows such as `autopilot`, `ralph`, and `autoresearch-loop` keep their execution state under `~/.codex/workflows/`.
-Direct top-level `ultrawork` uses a minimal workflow root under `~/.codex/workflows/ultrawork/` with `progress.json`, active index sync, and `verify.md` by the verify phase or terminal states; it may omit `handoff.json`.
+`cdx-deep-interview` keeps durable `context.md`, `interview.md`, and `spec.md` artifacts under `~/.codex/workflows/deep-interview/` and does not require `progress.json` or `handoff.json` by default.
+`cdx-autoresearch-plan` may keep `context.md`, `spec.md`, and optionally `results.tsv` under `~/.codex/workflows/autoresearch-plan/`, and does not require `progress.json` or `handoff.json` by default.
+`cdx-autopilot` keeps governed broad-work artifacts under `~/.codex/workflows/autopilot/`, typically including `context.md`, `spec.md`, `plan.md`, `handoff.json`, `progress.json`, and `verify.md`; nested `cdx-ralph` and `cdx-ultrawork` slices should report through the current `cdx-autopilot` workflow unless ownership is explicitly transferred.
+For `cdx-autopilot`, the governor now enforces phase-aware artifacts: `context.md` by `specify`, `spec.md` by `plan`, `plan.md` plus `handoff.json` by `execute`, and `verify.md` by `verify` or terminal states.
+`cdx-autoresearch-loop` keeps governed research artifacts under `~/.codex/workflows/autoresearch-loop/`, including `results.tsv`, `handoff.json`, `progress.json`, and `verify.md`.
+Governed workflows such as `cdx-autopilot`, `cdx-ralph`, and `cdx-autoresearch-loop` keep their execution state under `~/.codex/workflows/`.
+Direct top-level `cdx-ultrawork` uses a minimal workflow root under `~/.codex/workflows/ultrawork/` with `progress.json`, active index sync, and `verify.md` by the verify phase or terminal states; it may omit `handoff.json`.
 `SessionStart` also performs a best-effort release audit against the published `@openai/codex` package and caches the result in `~/.codex/workflows/_codex_release_audit.json`.
 Dynamic release-delta guidance is cached separately in `~/.codex/workflows/_codex_release_deltas.json`, and incompatible remote delta bundles fall back to bundled or cached guidance.
 Completed and cancelled governed workflows are archived into `~/.codex/workflows/_archive.json` when they leave the active index.
-`handoff.json` is required for governed plans and the richer `autopilot` / `ralph` / `autoresearch-loop` workflows, and those handoffs now require stored `architect` and `verifier` approval entries under `approvals`; direct top-level `ultrawork` may omit `handoff.json`.
-Codex `0.125.0` does not currently ship a native governed workflow runtime with CHEDEX-style `progress.json` / `handoff.json` / `verify.md` ownership, so the current workflow-state collision risk is low; the main future risk is duplicate skill names, not duplicate loop state. The practical 0.125 rechecks are duplicate hook configuration, deny-read or isolated-exec behavior, remote/app-server environment selection, remote plugin installs, provider discovery, and permission-profile behavior if you depend on those paths.
+`handoff.json` is required for governed plans and the richer `cdx-autopilot` / `cdx-ralph` / `cdx-autoresearch-loop` workflows, and those handoffs now require stored `architect` and `verifier` approval entries under `approvals`; direct top-level `cdx-ultrawork` may omit `handoff.json`.
+Codex `0.125.0` does not currently ship a native governed workflow runtime with CHEDEX-style `progress.json` / `handoff.json` / `verify.md` ownership, so the current workflow-state collision risk is low. CHEDEX uses `cdx-*` skill names to avoid occupying future native plain skill names. The practical 0.125 rechecks are duplicate hook configuration, deny-read or isolated-exec behavior, remote/app-server environment selection, remote plugin installs, provider discovery, and permission-profile behavior if you depend on those paths.
 `workflow-sync` preserves the current owner for the same workflow root, rejects a different active owner for the same workspace unless `--replace` is explicit, and records lock-owner metadata that can be cleared with `workflow-lock-repair` when a stale lock is confirmed.
 The release audit is advisory only: it does not auto-upgrade Codex CLI.
 
 ## Notes
 
-- Use `autopilot` when you want one strict broad-work entrypoint that should stay governed across clarify/spec/plan/execute/verify while nested execution slices report through it.
-- Use `autoresearch-plan` when the research spec is still forming and `autoresearch-loop` when the governed loop is ready to run.
+- Use `cdx-autopilot` when you want one strict broad-work entrypoint that should stay governed across clarify/spec/plan/execute/verify while nested execution slices report through it.
+- Use `cdx-autoresearch-plan` when the research spec is still forming and `cdx-autoresearch-loop` when the governed loop is ready to run.
 
 ## Dry Run
 

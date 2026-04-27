@@ -95,8 +95,8 @@ Should preserve the same behaviors at workflow scope.
 
 Examples:
 
-- `clarify` should reduce ambiguity without over-questioning
-- `plan` should produce testable steps and governed handoff artifacts when needed
+- `cdx-clarify` should reduce ambiguity without over-questioning
+- `cdx-plan` should produce testable steps and governed handoff artifacts when needed
 
 ## Skill Invocation Policy
 

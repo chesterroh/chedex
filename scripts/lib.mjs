@@ -359,6 +359,10 @@ export function installManifestPaths() {
 }
 
 export function listSkills() {
+  return ['cdx-clarify', 'cdx-deep-interview', 'cdx-autoresearch-plan', 'cdx-autoresearch-loop', 'cdx-plan', 'cdx-review', 'cdx-execute', 'cdx-tdd', 'cdx-ultrawork', 'cdx-ralph', 'cdx-autopilot'];
+}
+
+export function legacySkillNames() {
   return ['clarify', 'deep-interview', 'autoresearch-plan', 'autoresearch-loop', 'plan', 'review', 'execute', 'tdd', 'ultrawork', 'ralph', 'autopilot'];
 }
 

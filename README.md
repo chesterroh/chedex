@@ -60,33 +60,33 @@ The operating model is simple:
 
 ### Core Skills
 
-- `clarify` for lightweight one-question-at-a-time requirements clarification
-- `deep-interview` for high-rigor requirements work with durable artifacts
-- `autoresearch-plan` for turning an optimization problem into a defensible research spec and handoff
-- `autoresearch-loop` for governed baseline/experiment/ledger optimization work
-- `plan` for producing an actionable work plan
-- `execute` for implementation with verification persistence
-- `review` for reviewer-only evaluation
-- `tdd` for strict failing-test-first work
-- `ultrawork` for parallel execution fan-out
-- `ralph` for persistent multi-step execution with artifacts and verification
-- `autopilot` for strict operator-facing clarify/spec/plan/execute iteration as a governed broad-work shell
+- `cdx-clarify` for lightweight one-question-at-a-time requirements clarification
+- `cdx-deep-interview` for high-rigor requirements work with durable artifacts
+- `cdx-autoresearch-plan` for turning an optimization problem into a defensible research spec and handoff
+- `cdx-autoresearch-loop` for governed baseline/experiment/ledger optimization work
+- `cdx-plan` for producing an actionable work plan
+- `cdx-execute` for implementation with verification persistence
+- `cdx-review` for reviewer-only evaluation
+- `cdx-tdd` for strict failing-test-first work
+- `cdx-ultrawork` for parallel execution fan-out
+- `cdx-ralph` for persistent multi-step execution with artifacts and verification
+- `cdx-autopilot` for strict operator-facing clarify/spec/plan/execute iteration as a governed broad-work shell
 
 ## Workflow Map
 
 ### Lightweight Or Non-Governed Lanes
 
 - Direct turns: no workflow state unless explicitly needed
-- `clarify`: reduce ambiguity quickly
-- `deep-interview`: durable requirements artifacts under `~/.codex/workflows/deep-interview/<slug>/`, typically `context.md`, `interview.md`, and `spec.md`; it is not governed by `progress.json` or `handoff.json` by default
-- `autoresearch-plan`: planning artifacts under `~/.codex/workflows/autoresearch-plan/<slug>/`, typically `context.md`, `spec.md`, and sometimes a seeded `results.tsv`
+- `cdx-clarify`: reduce ambiguity quickly
+- `cdx-deep-interview`: durable requirements artifacts under `~/.codex/workflows/deep-interview/<slug>/`, typically `context.md`, `interview.md`, and `spec.md`; it is not governed by `progress.json` or `handoff.json` by default
+- `cdx-autoresearch-plan`: planning artifacts under `~/.codex/workflows/autoresearch-plan/<slug>/`, typically `context.md`, `spec.md`, and sometimes a seeded `results.tsv`
 
 ### Governed Lanes
 
-- `autoresearch-loop`: governed research execution under `~/.codex/workflows/autoresearch-loop/<slug>/`
-- `autopilot`: governed broad-work iteration under `~/.codex/workflows/autopilot/<slug>/`; nested `ralph` and `ultrawork` slices should report through it unless ownership is explicitly transferred
-- `ralph`: persistent execution with resumable artifacts
-- direct top-level `ultrawork`: minimal governed state for parallel execution
+- `cdx-autoresearch-loop`: governed research execution under `~/.codex/workflows/autoresearch-loop/<slug>/`
+- `cdx-autopilot`: governed broad-work iteration under `~/.codex/workflows/autopilot/<slug>/`; nested `cdx-ralph` and `cdx-ultrawork` slices should report through it unless ownership is explicitly transferred
+- `cdx-ralph`: persistent execution with resumable artifacts
+- direct top-level `cdx-ultrawork`: minimal governed state for parallel execution
 
 ### Governed Artifact Model
 
@@ -157,10 +157,10 @@ Explicit caller-specified sub-agent model or reasoning settings should override 
 
 Chedex keeps a small native-first execution chain:
 
-- `clarify` and `deep-interview` shape requirements
-- `autoresearch-plan` and `autoresearch-loop` own research grounding and governed optimization
-- `ralph` and direct top-level `ultrawork` own the remaining persistent execution cases
-- `autopilot` is the tight governed shell for broad iterative work, while nested `ralph` and `ultrawork` slices still report through it unless ownership is explicitly transferred
+- `cdx-clarify` and `cdx-deep-interview` shape requirements
+- `cdx-autoresearch-plan` and `cdx-autoresearch-loop` own research grounding and governed optimization
+- `cdx-ralph` and direct top-level `cdx-ultrawork` own the remaining persistent execution cases
+- `cdx-autopilot` is the tight governed shell for broad iterative work, while nested `cdx-ralph` and `cdx-ultrawork` slices still report through it unless ownership is explicitly transferred
 
 The governor still stores runtime state globally under `$CODEX_HOME/workflows/` and admits one active governed workflow entry per workspace `cwd`, but workflow synchronization now uses per-workflow locks so separate workspaces do not contend on one global runtime lock. A governed `workflow_root` cannot be attached to multiple workspaces at once, and a different active owner for the same workspace now requires explicit `workflow-sync --replace`.
 Lock directories carry owner metadata and can be inspected or cleared with the governor `workflow-lock-repair` helper when a stale lock is confirmed.
@@ -183,14 +183,14 @@ Codex `0.125.0` builds on the native substrate directly with:
 Chedex `0.125` still fits on top of that surface rather than colliding with it:
 
 - install stays user-global under `~/.codex/hooks.json` and `~/.codex/workflows/`, so the new project-hook trust requirements do not force moving the governor into repo-local `.codex`
-- CHEDEX-managed skills install into `~/.codex/skills/<name>/`, while Codex bundled skills live under `~/.codex/skills/.system/<name>/`
-- current bundled Codex system skill names (`imagegen`, `openai-docs`, `plugin-creator`, `skill-creator`, `skill-installer`) still do not collide with current CHEDEX skill names
+- CHEDEX-managed skills install into `~/.codex/skills/cdx-<name>/`, while Codex bundled skills live under `~/.codex/skills/.system/<name>/`
+- current bundled Codex system skill names (`imagegen`, `openai-docs`, `plugin-creator`, `skill-creator`, `skill-installer`) do not collide with the `cdx-*` CHEDEX skill namespace
 - `multi_agent = true` remains explicit, while `codex_hooks = true` is now a harmless compatibility setting because Codex `0.124.0` and later make hooks stable/default-on
 - install merges managed hook handlers into `~/.codex/hooks.json` instead of replacing unrelated hook groups, stamps them with `Chedex governor: managed:v1:<event>` markers, and rejects exact duplicate managed lifecycle hooks in inline `config.toml` hook tables
 - Chedex does not currently install `PreToolUse`, `PostToolUse`, or `PermissionRequest` hooks; if it later does, those hooks must treat `tool_name` as arbitrary and `tool_input` as schema-free rather than Bash-only
 - spawned-agent model inheritance is already aligned: explicit caller-specified sub-agent model or reasoning settings override repo defaults unless unavailable or incompatible
 - generated agent `config_file` entries remain absolute paths under `~/.codex/agents/`, so Codex `0.125.0` relative agent-role config path fixes are additive rather than required for Chedex install correctness
-- governed workflow ownership remains CHEDEX territory under `~/.codex/workflows/`; Codex `0.125.0` does not ship a native `progress.json` / `handoff.json` / `verify.md` workflow runtime that would conflict with `autopilot`, `ralph`, or `autoresearch-loop`
+- governed workflow ownership remains CHEDEX territory under `~/.codex/workflows/`; Codex `0.125.0` does not ship a native `progress.json` / `handoff.json` / `verify.md` workflow runtime that would conflict with `cdx-autopilot`, `cdx-ralph`, or `cdx-autoresearch-loop`
 - the main 0.125-specific rechecks are app-server, remote plugin, Bedrock/provider-discovery, permission-profile, `codex exec --json`, and rollout-trace workflows if you rely on those paths
 
 The current `SessionStart` difference is intentional rather than accidental:
@@ -203,7 +203,7 @@ The current `SessionStart` difference is intentional rather than accidental:
 - Repo verification still relies partly on required-text checks in `scripts/verify-repo.mjs`. This is good at catching drift, but it is not full semantic validation.
 - The latest verified Codex CLI version is still maintained as repo metadata plus docs wording, not generated into docs from one canonical source.
 - Admission approvals in `handoff.json.approvals` still validate stored role/verdict/evidence shape rather than governor-stamped approval tokens.
-- If a future native Codex bundled skill reuses a generic CHEDEX skill name such as `plan`, `execute`, or `review`, plain-name skill invocation would become ambiguous even though the on-disk install layout would still coexist cleanly.
+- The default install no longer claims plain generic skill names such as `plan`, `execute`, or `review`; use `cdx-plan`, `cdx-execute`, and `cdx-review` for CHEDEX workflows.
 
 ## Notes
 

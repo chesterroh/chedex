@@ -12,6 +12,7 @@ import {
   fileExists,
   installManifestPaths,
   installTargets,
+  legacySkillNames,
   listRelativeFiles,
   listSkills,
   mergeManagedHooksConfig,
@@ -42,7 +43,7 @@ const hookAssetsDirPresentBefore = await fileExists(targets.hookAssetsDir);
 const hookRuntimePresentBefore = await fileExists(targets.hookRuntimePath);
 const managedPromptPaths = roleNames().map((name) => join(targets.promptsDir, `${name}.md`));
 const managedAgentPaths = roleNames().map((name) => join(targets.agentsDir, `${name}.toml`));
-const managedSkillPaths = listSkills().map((name) => join(targets.skillsDir, name));
+const managedSkillPaths = [...listSkills(), ...legacySkillNames()].map((name) => join(targets.skillsDir, name));
 const managedHookPaths = (await listRelativeFiles(manifest.hooksDir)).map((relativePath) => join(targets.hookAssetsDir, relativePath));
 const currentHooksConfig = await readJsonIfExists(targets.hooksConfigPath, { hooks: {} });
 const previousUninstallState = await readJsonIfExists(targets.uninstallStatePath, null);

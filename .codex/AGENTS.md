@@ -79,26 +79,27 @@ Default routing:
 
 Use skills as workflow contracts, not as runtime assumptions:
 
-- `clarify` for one-question-at-a-time requirement clarification
-- `deep-interview` for high-rigor Socratic requirements clarification with durable artifacts
-- `autoresearch-plan` for turning an optimization problem into a defensible research spec
-- `autoresearch-loop` for governed baseline/experiment/ledger optimization loops
-- `plan` for turning a request into an actionable plan
-- `execute` for implement-and-verify persistence
-- `review` for reviewer-only evaluation
-- `tdd` for strict failing-test-first work
-- `ultrawork` for parallel fan-out across independent work
-- `ralph` for persistent multi-step execution with artifacts and verification
-- `autopilot` for high-iteration broad governed work that should tighten requirements, planning, and execution handoffs while remaining the parent workflow owner
+- `cdx-clarify` for one-question-at-a-time requirement clarification
+- `cdx-deep-interview` for high-rigor Socratic requirements clarification with durable artifacts
+- `cdx-autoresearch-plan` for turning an optimization problem into a defensible research spec
+- `cdx-autoresearch-loop` for governed baseline/experiment/ledger optimization loops
+- `cdx-plan` for turning a request into an actionable plan
+- `cdx-execute` for implement-and-verify persistence
+- `cdx-review` for reviewer-only evaluation
+- `cdx-tdd` for strict failing-test-first work
+- `cdx-ultrawork` for parallel fan-out across independent work
+- `cdx-ralph` for persistent multi-step execution with artifacts and verification
+- `cdx-autopilot` for high-iteration broad governed work that should tighten requirements, planning, and execution handoffs while remaining the parent workflow owner
 
 Artifact-backed workflow skills persist their artifacts under `$CODEX_HOME/workflows/`.
 Governed execution workflows keep `progress.json` authoritative and assume the native `SessionStart` and `Stop` hooks will enforce resume and closeout behavior when Chedex is installed.
-Non-governed requirements workflows such as `deep-interview` may persist durable artifacts there without `progress.json` or `handoff.json`.
-`autoresearch-plan` is artifact-backed but non-governed by default.
-`autoresearch-loop` is the governed research execution mode.
+Non-governed requirements workflows such as `cdx-deep-interview` may persist durable artifacts there without `progress.json` or `handoff.json`.
+`cdx-autoresearch-plan` is artifact-backed but non-governed by default.
+`cdx-autoresearch-loop` is the governed research execution mode.
 
 Skill invocation policy:
 
+- Chedex-managed skills use the `cdx-` prefix so plain native Codex skill names remain available.
 - Existing core skills may be recommended by task shape.
 - New skills should be explicitly invoked by name first.
 - Add trigger guidance in `AGENTS` only when the trigger is high-signal, low-ambiguity, and materially worth the extra routing complexity.

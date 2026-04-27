@@ -18,9 +18,10 @@ Do not commit repo-local install byproducts such as `.codex/config.toml`, `.code
 
 ## Add a New Skill
 
-1. Create `skills/<name>/SKILL.md`
+1. Create `skills/cdx-<name>/SKILL.md`
 2. Register it in `scripts/lib.mjs` inside `listSkills()`
 3. Decide invocation policy:
+   - Chedex-managed skills must use the `cdx-` prefix so plain native Codex names stay available
    - default new skills to explicit invocation by name
    - add trigger guidance in `AGENTS` only when the trigger is high-signal, low-ambiguity, and worth the extra routing complexity
 4. Update docs if the skill should be part of the default install set
@@ -87,16 +88,16 @@ Update together:
 - `scripts/install-user.mjs`
 - `scripts/uninstall-user.mjs`
 - `docs/governor.md`
-- `skills/autopilot/SKILL.md`
-- `skills/plan/SKILL.md`
-- `skills/ralph/SKILL.md`
-- `skills/ultrawork/SKILL.md`
+- `skills/cdx-autopilot/SKILL.md`
+- `skills/cdx-plan/SKILL.md`
+- `skills/cdx-ralph/SKILL.md`
+- `skills/cdx-ultrawork/SKILL.md`
 - `scripts/verify-governor.mjs`
 - `scripts/refresh-repo-mirror.mjs`
 
-If the change affects the operator-facing `autopilot` shell beyond governor-owned behavior, update:
+If the change affects the operator-facing `cdx-autopilot` shell beyond governor-owned behavior, update:
 
-- `skills/autopilot/SKILL.md`
+- `skills/cdx-autopilot/SKILL.md`
 - `README.md`
 - `docs/install.md`
 - `scripts/verify-repo.mjs`

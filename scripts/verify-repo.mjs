@@ -11,6 +11,7 @@ import {
   chedexMinimumCodexVersion,
   generatedAgentPath,
   installManifestPaths,
+  legacySkillNames,
   listRelativeFiles,
   listSkills,
   probeCodexHooksSupport,
@@ -64,6 +65,23 @@ const repoSkillDirs = (await readdir(repoPath('skills'), { withFileTypes: true }
   .map((entry) => entry.name)
   .sort();
 const registeredSkills = [...listSkills()].sort();
+const legacySkills = [...legacySkillNames()].sort();
+
+const unprefixedRegisteredSkills = registeredSkills.filter((name) => !name.startsWith('cdx-'));
+if (unprefixedRegisteredSkills.length > 0) {
+  throw new Error(`registered Chedex skills must use the cdx- prefix: ${unprefixedRegisteredSkills.join(', ')}`);
+}
+
+const legacyRepoSkillDirs = repoSkillDirs.filter((name) => legacySkills.includes(name));
+if (legacyRepoSkillDirs.length > 0) {
+  throw new Error(`legacy unprefixed Chedex skill directories are not allowed: ${legacyRepoSkillDirs.join(', ')}`);
+}
+
+const bundledSystemSkills = ['imagegen', 'openai-docs', 'plugin-creator', 'skill-creator', 'skill-installer'];
+const collidingBundledSkills = registeredSkills.filter((name) => bundledSystemSkills.includes(name));
+if (collidingBundledSkills.length > 0) {
+  throw new Error(`registered Chedex skills collide with bundled Codex system skills: ${collidingBundledSkills.join(', ')}`);
+}
 
 if (JSON.stringify(repoSkillDirs) !== JSON.stringify(registeredSkills)) {
   throw new Error(
@@ -130,10 +148,29 @@ for (const path of skillDocSurfaces) {
 const requiredContractDocs = [
   repoPath('docs', 'guidance-schema.md'),
   repoPath('docs', 'prompt-contract.md'),
+  repoPath('docs', 'native-delta-audit.md'),
 ];
 const missingContractDocs = anyMissing(requiredContractDocs);
 if (missingContractDocs.length) {
   throw new Error(`instruction contract docs missing: ${missingContractDocs.join(', ')}`);
+}
+
+const nativeDeltaAudit = await readFile(repoPath('docs', 'native-delta-audit.md'), 'utf8');
+for (const snippet of [
+  'Decision Labels',
+  'avoidable runtime delta',
+  '`keep`',
+  '`narrow`',
+  '`replace`',
+  '`remove`',
+  '`defer`',
+  'Current Surface Classification',
+  'Productivity Enhancement Candidates',
+  'npm run install:user:dry',
+]) {
+  if (!nativeDeltaAudit.includes(snippet)) {
+    throw new Error(`native delta audit missing "${snippet}"`);
+  }
 }
 
 const requiredWorkflowSchemaFiles = [
@@ -164,19 +201,19 @@ const governorSurfaceChecks = [
   [repoPath('docs', 'guidance-schema.md'), ['Role And Intent', 'Execution Protocol', 'Verification And Completion', 'explicitly invoked by name first', 'behavioral contract needs surface-specific wording', 'make it explicit in the prompts and their verification', 'fallback only']],
   [repoPath('docs', 'prompt-contract.md'), ['Compact, Evidence-Dense Output', 'Local Task Updates Override Locally', 'Persist With Tools Until The Claim Is Grounded', 'explicit invocation', 'Respect Explicit User Model Intent', explicitUserModelIntentDocSnippet, explicitUserFallbackDocSnippet, explicitUserDefaultsAreFallbackDocSnippet, 'Must preserve the same behaviors in role-appropriate wording.', 'explicit caller-specified sub-agent model or reasoning settings over inherited or default settings unless unavailable or incompatible', 'fallback only']],
   [repoPath('docs', 'customizing.md'), ['docs/guidance-schema.md', 'docs/prompt-contract.md', 'explicit invocation by name', 'binding over inherited or default settings unless unavailable or incompatible', 'relevant files under `prompts/`', 'generated files under `agents/` when prompts change', 'mirrored files under `.codex/` when mirrored source surfaces change', 'npm run generate:agents', 'npm run refresh:mirror', 'npm run verify', 'fallback only', 'hooks/workflow-mode-schemas.mjs', 'registry/workflow-mode-schemas.mjs']],
-  [repoPath('skills', 'clarify', 'SKILL.md'), ['Recommended next step', 'ralph', 'autopilot']],
-  [repoPath('skills', 'clarify', 'SKILL.md'), ['Decision boundaries']],
-  [repoPath('skills', 'deep-interview', 'SKILL.md'), ['$CODEX_HOME/workflows/deep-interview', 'context.md', 'interview.md', 'spec.md', 'Decision boundaries', 'Do not implement directly inside `deep-interview`', 'source of truth']],
-  [repoPath('skills', 'autoresearch-plan', 'SKILL.md'), ['$CODEX_HOME/workflows/autoresearch-plan', 'spec.md', 'results.tsv', 'research spec']],
-  [repoPath('skills', 'autoresearch-loop', 'SKILL.md'), ['$CODEX_HOME/workflows/autoresearch-loop', 'results.tsv', 'handoff.json', 'progress.json', 'Use `mode: "autoresearch-loop"`', 'verification.review']],
-  [repoPath('skills', 'execute', 'SKILL.md'), ['Escalate to `plan`', 'Escalate to `ralph`', 'Escalate to `autopilot`']],
-  [repoPath('skills', 'review', 'SKILL.md'), ['Verdict: APPROVE / REVISE / REJECT', 'Findings first']],
-  [repoPath('skills', 'tdd', 'SKILL.md'), ['Use this only when', 'execute` or `review`']],
-  [repoPath('skills', 'plan', 'SKILL.md'), ['handoff.json', 'architect', 'verifier', 'Decision boundaries', 'loop contract', 'handoff.json.approvals']],
-  [repoPath('skills', 'ralph', 'SKILL.md'), ['schema_version', 'workflow_root', 'verification', 'risks', 'verification.review', 'approvals']],
-  [repoPath('skills', 'autopilot', 'SKILL.md'), ['governed workflow owner', 'Iteration Boundaries', 'progress.json', 'handoff.json', 'autoresearch-loop', 'verification.review', 'approvals']],
-  [repoPath('skills', 'ultrawork', 'SKILL.md'), ['$CODEX_HOME/workflows/ultrawork', 'verify.md', 'handoff.json', 'autoresearch-loop', 'verification.review']],
-  [repoPath('AGENTS.template.md'), ['SessionStart', 'Stop', 'terminal', 'docs/guidance-schema.md', 'docs/prompt-contract.md', 'explicitly invoked by name first', 'If the user explicitly specifies a sub-agent model, treat that choice as binding over inherited or default settings unless the requested model is unavailable or incompatible.', 'If the user explicitly specifies sub-agent reasoning effort, treat that choice as binding over inherited or default settings unless the requested setting is unavailable or incompatible.', 'Do not override, downgrade, or swap', 'fallback only; they never justify silently overriding an explicit user request', 'Non-governed requirements workflows such as `deep-interview` may persist durable artifacts there without `progress.json` or `handoff.json`.', '`autoresearch-loop` is the governed research execution mode']],
+  [repoPath('skills', 'cdx-clarify', 'SKILL.md'), ['Recommended next step', 'cdx-ralph', 'cdx-autopilot']],
+  [repoPath('skills', 'cdx-clarify', 'SKILL.md'), ['Decision boundaries']],
+  [repoPath('skills', 'cdx-deep-interview', 'SKILL.md'), ['$CODEX_HOME/workflows/deep-interview', 'context.md', 'interview.md', 'spec.md', 'Decision boundaries', 'Do not implement directly inside `cdx-deep-interview`', 'source of truth']],
+  [repoPath('skills', 'cdx-autoresearch-plan', 'SKILL.md'), ['$CODEX_HOME/workflows/autoresearch-plan', 'spec.md', 'results.tsv', 'research spec']],
+  [repoPath('skills', 'cdx-autoresearch-loop', 'SKILL.md'), ['$CODEX_HOME/workflows/autoresearch-loop', 'results.tsv', 'handoff.json', 'progress.json', 'Use `mode: "autoresearch-loop"`', 'verification.review']],
+  [repoPath('skills', 'cdx-execute', 'SKILL.md'), ['Escalate to `cdx-plan`', 'Escalate to `cdx-ralph`', 'Escalate to `cdx-autopilot`']],
+  [repoPath('skills', 'cdx-review', 'SKILL.md'), ['Verdict: APPROVE / REVISE / REJECT', 'Findings first']],
+  [repoPath('skills', 'cdx-tdd', 'SKILL.md'), ['Use this only when', 'cdx-execute` or `cdx-review`']],
+  [repoPath('skills', 'cdx-plan', 'SKILL.md'), ['handoff.json', 'architect', 'verifier', 'Decision boundaries', 'loop contract', 'handoff.json.approvals']],
+  [repoPath('skills', 'cdx-ralph', 'SKILL.md'), ['schema_version', 'workflow_root', 'verification', 'risks', 'verification.review', 'approvals']],
+  [repoPath('skills', 'cdx-autopilot', 'SKILL.md'), ['governed workflow owner', 'Iteration Boundaries', 'progress.json', 'handoff.json', 'cdx-autoresearch-loop', 'verification.review', 'approvals']],
+  [repoPath('skills', 'cdx-ultrawork', 'SKILL.md'), ['$CODEX_HOME/workflows/ultrawork', 'verify.md', 'handoff.json', 'cdx-autoresearch-loop', 'verification.review']],
+  [repoPath('AGENTS.template.md'), ['SessionStart', 'Stop', 'terminal', 'docs/guidance-schema.md', 'docs/prompt-contract.md', 'explicitly invoked by name first', 'If the user explicitly specifies a sub-agent model, treat that choice as binding over inherited or default settings unless the requested model is unavailable or incompatible.', 'If the user explicitly specifies sub-agent reasoning effort, treat that choice as binding over inherited or default settings unless the requested setting is unavailable or incompatible.', 'Do not override, downgrade, or swap', 'fallback only; they never justify silently overriding an explicit user request', 'Non-governed requirements workflows such as `cdx-deep-interview` may persist durable artifacts there without `progress.json` or `handoff.json`.', '`cdx-autoresearch-loop` is the governed research execution mode']],
 ];
 
 for (const [path, snippets] of governorSurfaceChecks) {
