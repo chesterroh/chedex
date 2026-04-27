@@ -5,8 +5,8 @@ export const MODE_SCHEMAS = {
   autopilot: {
     id: 'autopilot',
     phases: ['clarify', 'specify', 'plan', 'execute', 'verify', 'validate', 'closeout'],
-    handoff_policy: 'required',
-    required_artifacts: ['handoff'],
+    handoff_policy: 'phase-required',
+    required_artifacts: [],
     required_disk_artifacts: [],
     phase_artifact_requirements: [
       { phase: 'specify', artifacts: ['context'] },
@@ -41,8 +41,8 @@ export const MODE_SCHEMAS = {
   ralph: {
     id: 'ralph',
     phases: ['ground', 'plan', 'execute', 'verify', 'validate', 'closeout'],
-    handoff_policy: 'required',
-    required_artifacts: ['handoff'],
+    handoff_policy: 'phase-required',
+    required_artifacts: [],
     required_disk_artifacts: [],
     phase_artifact_requirements: [
       { phase: 'execute', artifacts: ['plan', 'handoff'] },

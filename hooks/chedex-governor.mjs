@@ -590,9 +590,6 @@ export function validateGovernedProgress(progress) {
   if (handoff != null && (typeof handoff !== 'string' || !handoff.trim())) {
     errors.push('artifacts.handoff must be a non-empty string when present');
   }
-  if (schema?.handoff_policy === 'required' && (typeof handoff !== 'string' || !handoff.trim())) {
-    errors.push(`${progress.mode} workflows require artifacts.handoff`);
-  }
 
   if (!progress.verification || typeof progress.verification !== 'object' || Array.isArray(progress.verification)) {
     errors.push('verification must be an object');

@@ -95,6 +95,7 @@ The operating model is simple:
 - `verify.md` is the durable evidence log
 - `~/.codex/workflows/_active.json` is the active workflow index
 - governed modes enforce phase-aware artifacts, so broad workflows cannot outrun the `context.md`, `spec.md`, `plan.md`, `handoff.json`, or `verify.md` files their skills depend on
+- `cdx-autopilot` and `cdx-ralph` can sync early shaping phases before `handoff.json`; execution and later phases require the handoff and its stored approvals
 
 Operational details for `hooks.json`, `UserPromptSubmit`, release audit behavior, and install-owned feature flags belong in [docs/install.md](docs/install.md) and [docs/governor.md](docs/governor.md).
 

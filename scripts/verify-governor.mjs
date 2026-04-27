@@ -298,6 +298,31 @@ for (const mode of ['ralph', 'autopilot', 'autoresearch-loop']) {
   assert(missingHandoffFailed, `${mode} should require a handoff artifact`);
 }
 
+for (const { mode, phase } of [
+  { mode: 'autopilot', phase: 'clarify' },
+  { mode: 'autopilot', phase: 'specify' },
+  { mode: 'autopilot', phase: 'plan' },
+  { mode: 'ralph', phase: 'ground' },
+  { mode: 'ralph', phase: 'plan' },
+]) {
+  const noHandoffWorkflow = await makeWorkflow({
+    home,
+    slug: `${mode}-${phase}-no-handoff`,
+    mode,
+    phase,
+    includeHandoff: false,
+  });
+
+  await syncWorkflow({
+    codexHome: home,
+    cwd,
+    progressPath: noHandoffWorkflow.progressPath,
+  });
+
+  const index = JSON.parse(await readFile(activeIndexPath(home), 'utf8'));
+  assert(index.entries[cwd].handoff_path === null, `${mode} ${phase} should not require handoff before execution admission`);
+}
+
 for (const mode of ['ralph', 'autopilot', 'autoresearch-loop']) {
   const missingApprovalsWorkflow = await makeWorkflow({
     home,

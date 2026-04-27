@@ -119,7 +119,13 @@ Stop-gate rules:
 
 ## `handoff.json`
 
-Governed plans and richer governed workflows such as `autopilot`, `ralph`, and `autoresearch-loop` must provide `handoff.json` with:
+Governed plans and richer governed workflows provide `handoff.json` when their mode contract reaches an admitted execution point:
+
+- `autoresearch-loop` requires `handoff.json` for the whole governed loop because the research contract is already fixed before baseline execution.
+- `autopilot` and `ralph` may sync earlier shaping phases without `handoff.json`; they require it by `execute` and keep requiring it through later phases.
+- direct top-level `ultrawork` may omit `handoff.json` when no governed plan admitted the work.
+
+When present or required, `handoff.json` must include:
 
 - `task`
 - `acceptance_criteria`
@@ -138,13 +144,13 @@ The governor validates the presence and shape of these fields.
 - `evidence_ref`
 - `approved_at`
 
-Mode schemas declare required admission approvals. Today `autopilot`, `ralph`, and `autoresearch-loop` require stored approved entries for both `architect` and `verifier` before governed admission will succeed.
+Mode schemas declare required admission approvals. Today `autopilot`, `ralph`, and `autoresearch-loop` require stored approved entries for both `architect` and `verifier` when `handoff.json` is present or required by the current phase.
 
 Direct top-level `ultrawork` may omit `handoff.json` when no governed plan admitted the work. Its minimum governed state is `progress.json` and active index sync, with `verify.md` used when the lane needs a durable evidence log.
 
 ## Mode-Specific Artifact Rules
 
-Workflow mode requirements are declared in `hooks/workflow-mode-schemas.mjs` rather than scattered mode-specific governor branches, and re-exported through `registry/workflow-mode-schemas.mjs` for registry/type surfaces. Each schema declares allowed phases, handoff policy, required artifacts, required approvals, and the completion review role.
+Workflow mode requirements are declared in `hooks/workflow-mode-schemas.mjs` rather than scattered mode-specific governor branches, and re-exported through `registry/workflow-mode-schemas.mjs` for registry/type surfaces. Each schema declares allowed phases, handoff policy, required artifacts, required approvals, and the completion review role. `handoff_policy = "phase-required"` means the handoff is required by phase-aware artifact rules rather than at the first sync.
 
 The schemas also declare phase-aware artifact requirements:
 

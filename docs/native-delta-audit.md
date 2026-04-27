@@ -17,6 +17,8 @@ Current comparison boundary:
 - Bundled system skills live under `~/.codex/skills/.system/`
 - Chedex-managed user skills live under `~/.codex/skills/cdx-<name>/`
 
+Validation note: `0.125` is the Codex release boundary for this audit, not a scalar compatibility score.
+
 If an audit compares against upstream Codex source code instead of installed
 Codex behavior, record that boundary explicitly before making decisions.
 
@@ -62,7 +64,7 @@ Do not count these as avoidable runtime deltas by default:
 | `cdx-*` Chedex skill namespace | `keep` | Native skill directories are the intended extension surface, and the prefix keeps plain names available for bundled Codex skills. | Codex reserves or documents a first-class vendor namespace mechanism. |
 | Legacy unprefixed Chedex skill names such as `plan`, `execute`, `review` | `remove` | Plain-name Chedex skills create future ambiguity with bundled native skills. | Reintroduce only as explicit user-owned aliases outside the default install. |
 | Checked-in `.codex/` mirror | `keep` | Repo-only deterministic install mirror, not live runtime behavior. | Mirror maintenance cost exceeds install verification value. |
-| `handoff.json.approvals` shape validation | `narrow` | Useful admission check, but not yet governor-stamped approval provenance. | Admission approval token design is ready. |
+| `handoff.json.approvals` shape validation | `narrow` | Useful phase-gated admission check, but not yet governor-stamped approval provenance. | Admission approval token design is ready. |
 
 ## Productivity Enhancement Candidates
 

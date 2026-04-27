@@ -1,6 +1,6 @@
 export type ApprovalVerdict = 'approved' | 'rejected' | 'incomplete';
 export type VerificationReviewVerdict = 'pass' | 'fail' | 'incomplete';
-export type HandoffPolicy = 'required' | 'optional';
+export type HandoffPolicy = 'required' | 'phase-required' | 'optional';
 
 export interface WorkflowModeSchema {
   id: string;
