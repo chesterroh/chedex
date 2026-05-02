@@ -100,6 +100,16 @@
         "Re-run `npm run install:user:dry` to confirm managed hooks and generated agent config paths still resolve on 0.125.x.",
         "If you rely on app-server, remote plugin, Bedrock/provider-discovery, permission-profile, `codex exec --json`, or rollout-trace workflows, smoke-test those paths after upgrading."
       ]
+    },
+    {
+      "since": "0.128.0",
+      "summary": "Codex 0.128.x adds persisted `/goal` workflows, native `codex update`, stronger permission profiles, plugin marketplace install/uninstall/cache flows, plugin-bundled hooks, external-agent config/session import, and more explicit MultiAgentV2 controls.",
+      "checks": [
+        "Re-run `npm run verify` after upgrading Codex CLI.",
+        "Re-run `npm run install:user:dry` to confirm Chedex-managed lifecycle hooks still resolve and do not duplicate plugin-bundled or inline hooks.",
+        "Confirm Chedex does not write `codex_hooks = true` or `multi_agent = true`; Codex 0.128 owns those stable/default-on native feature surfaces.",
+        "Do not replace Chedex governed workflow state with `/goal` until the local `goals` feature proves equivalent stop-gated verification ownership."
+      ]
     }
   ]
 }

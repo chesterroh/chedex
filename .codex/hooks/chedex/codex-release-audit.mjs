@@ -10,7 +10,7 @@ export const DEFAULT_RELEASE_AUDIT_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 export const CODEX_PACKAGE_REGISTRY_URL = 'https://registry.npmjs.org/@openai%2Fcodex';
 export const CODEX_CHANGELOG_URL = 'https://developers.openai.com/codex/changelog/';
 export const CODEX_RELEASE_DELTAS_URL = 'https://raw.githubusercontent.com/chesterroh/chedex/main/hooks/codex-release-deltas.json';
-export const CHEDEX_RELEASE_DELTA_COMPAT_VERSION = '0.125.0';
+export const CHEDEX_RELEASE_DELTA_COMPAT_VERSION = '0.128.0';
 
 export function defaultCodexHome() {
   return process.env.CODEX_HOME || join(homedir(), '.codex');
@@ -388,7 +388,7 @@ export function collectKnownReleaseDeltas({ installedVersion, latestVersion, del
 
 export function buildUpgradeSteps({ latestVersion, deltaNotes }) {
   const steps = [
-    `Upgrade Codex CLI to ${latestVersion} using your normal installation path.`,
+    `Run \`codex update\` to upgrade Codex CLI to ${latestVersion}.`,
     'Re-run `npm run verify` inside the Chedex repo.',
   ];
 

@@ -24,8 +24,8 @@ import {
   roleNames,
   staleGeneratedAgents,
   stripChedexBlock,
+  stripManagedFeaturesSection,
   timestampSlug,
-  upsertFeaturesSection,
   writeFileIfChanged,
   writeJsonIfChanged,
 } from './lib.mjs';
@@ -240,9 +240,9 @@ if (!dryRun) {
   await ensureExecutable(targets.hookRuntimePath);
 }
 
-let nextConfig = upsertFeaturesSection(existingConfig || '');
-nextConfig = stripChedexBlock(nextConfig).trimEnd();
-nextConfig = `${nextConfig}\n\n${buildAgentConfigBlock(targets.agentsDir)}\n`;
+let nextConfig = stripManagedFeaturesSection(stripChedexBlock(existingConfig || '')).trimEnd();
+const agentConfigBlock = buildAgentConfigBlock(targets.agentsDir);
+nextConfig = nextConfig ? `${nextConfig}\n\n${agentConfigBlock}\n` : `${agentConfigBlock}\n`;
 const nextHooksConfig = mergeManagedHooksConfig(currentHooksConfig, targets, {
   supportedHookEvents: hookProbe.supportedHookEvents,
 });
@@ -263,7 +263,10 @@ const summary = [
   `dry_run=${dryRun ? 'true' : 'false'}`,
   `codex_version=${hookProbe.version}`,
   `codex_hooks_feature_stage=${hookProbe.feature.stage}`,
-  `codex_hooks_feature_enabled_before_install=${hookProbe.feature.enabled ? 'true' : 'false'}`,
+  `codex_hooks_feature_enabled=${hookProbe.feature.enabled ? 'true' : 'false'}`,
+  `multi_agent_feature_stage=${hookProbe.multiAgentFeature.stage}`,
+  `multi_agent_feature_enabled=${hookProbe.multiAgentFeature.enabled ? 'true' : 'false'}`,
+  'managed_feature_flags=not_written',
   `managed_hook_events=${hookProbe.supportedHookEvents.join(',')}`,
   `inline_hook_duplicate_check=${inlineHookDuplicates.length === 0 ? 'ok' : 'warning'}`,
   `hooks_config=${targets.hooksConfigPath}`,

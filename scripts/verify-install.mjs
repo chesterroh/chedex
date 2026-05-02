@@ -89,9 +89,13 @@ const hookProbe = probeCodexHooksSupport();
 runNodeScript(repoRoot, 'scripts/install-user.mjs', freshEnv);
 
 const freshUninstallState = JSON.parse(await readFile(join(freshHome, 'CHEDEX_UNINSTALL.json'), 'utf8'));
+const freshConfig = await readFile(join(freshHome, 'config.toml'), 'utf8');
 const freshSkillBackupPaths = freshUninstallState.managed_paths.skills
   .map((entry) => entry.backup_path)
   .filter(Boolean);
+assert(!freshConfig.includes('[features]'), 'fresh 0.128 install should not write managed feature flags');
+assert(!freshConfig.includes('multi_agent = true'), 'fresh 0.128 install should not force native multi_agent');
+assert(!freshConfig.includes('codex_hooks = true'), 'fresh 0.128 install should not force native codex_hooks');
 assert(await pathExists(join(freshHome, 'skills', 'cdx-plan', 'SKILL.md')), 'install should write cdx-prefixed Chedex skills');
 assert(await pathMissing(join(freshHome, 'skills', 'plan', 'SKILL.md')), 'fresh install should not write legacy unprefixed Chedex skills');
 assert(
@@ -129,6 +133,23 @@ const emptyClearSessionStartOutput = runShellCommand(
   `${JSON.stringify({ cwd: join(freshHome, 'workspace-empty'), source: 'clear' })}\n`,
 );
 assert(emptyClearSessionStartOutput === '', 'session-start clear should stay quiet when no governed workflow is active');
+
+for (const [featureName, disabledLine, expectedMessage] of [
+  ['codex_hooks', 'codex_hooks = false', 'has codex_hooks disabled'],
+  ['multi_agent', 'multi_agent = false', 'has multi_agent disabled'],
+]) {
+  const disabledFeatureHome = await mkdtemp(join(tmpdir(), `chedex-install-disabled-${featureName}-`));
+  await writeFile(join(disabledFeatureHome, 'config.toml'), `[features]\n${disabledLine}\n`);
+  let disabledFeatureFailed = false;
+  try {
+    runNodeScript(repoRoot, 'scripts/install-user.mjs', { ...process.env, CODEX_HOME: disabledFeatureHome }, ['--dry-run']);
+  } catch (error) {
+    disabledFeatureFailed = error.stderr.includes(expectedMessage)
+      || error.stdout.includes(expectedMessage)
+      || error.message.includes(expectedMessage);
+  }
+  assert(disabledFeatureFailed, `install should fail when native ${featureName} is disabled`);
+}
 
 const duplicateInlineHome = await mkdtemp(join(tmpdir(), 'chedex-install-inline-duplicate-'));
 await writeFile(join(duplicateInlineHome, 'config.toml'), [

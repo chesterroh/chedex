@@ -217,7 +217,7 @@ function dynamicReleaseDeltasPayload(source = 'test-deltas') {
     stale: false,
     deltas: [
       {
-        since: '0.122.0',
+        since: '0.128.0',
         summary: 'Test delta for current release audit coverage.',
         checks: ['Re-run `npm run verify` after upgrading Codex CLI.'],
       },
@@ -227,9 +227,12 @@ function dynamicReleaseDeltasPayload(source = 'test-deltas') {
 
 const latestVerifiedSemver = parseSemver(chedexLatestVerifiedCodexVersion);
 const minimumSupportedSemver = parseSemver(chedexMinimumCodexVersion);
+const outdatedCodexVersion = '0.125.0';
+const outdatedCodexSemver = parseSemver(outdatedCodexVersion);
 
 assert(latestVerifiedSemver, 'expected latest verified Codex version to be valid semver');
 assert(minimumSupportedSemver, 'expected minimum supported Codex version to be valid semver');
+assert(outdatedCodexSemver, 'expected outdated Codex version to be valid semver');
 
 const home = await mkdtemp(join(tmpdir(), 'chedex-governor-'));
 const cwd = join(home, 'workspace');
@@ -1243,9 +1246,9 @@ const releaseAuditOnlyContext = await sessionStartHook({
   releaseAudit: {
     readInstalledVersion() {
       return {
-        raw: `codex-cli ${chedexMinimumCodexVersion}`,
-        normalized: chedexMinimumCodexVersion,
-        semver: minimumSupportedSemver,
+        raw: `codex-cli ${outdatedCodexVersion}`,
+        normalized: outdatedCodexVersion,
+        semver: outdatedCodexSemver,
       };
     },
     async getLatestReleaseInfo() {
@@ -1284,9 +1287,9 @@ const workflowAndAuditContext = await sessionStartHook({
   releaseAudit: {
     readInstalledVersion() {
       return {
-        raw: `codex-cli ${chedexMinimumCodexVersion}`,
-        normalized: chedexMinimumCodexVersion,
-        semver: minimumSupportedSemver,
+        raw: `codex-cli ${outdatedCodexVersion}`,
+        normalized: outdatedCodexVersion,
+        semver: outdatedCodexSemver,
       };
     },
     async getLatestReleaseInfo() {
@@ -1311,9 +1314,9 @@ const releaseAuditFailureContext = await sessionStartHook({
   releaseAudit: {
     readInstalledVersion() {
       return {
-        raw: `codex-cli ${chedexMinimumCodexVersion}`,
-        normalized: chedexMinimumCodexVersion,
-        semver: minimumSupportedSemver,
+        raw: `codex-cli ${outdatedCodexVersion}`,
+        normalized: outdatedCodexVersion,
+        semver: outdatedCodexSemver,
       };
     },
     async getLatestReleaseInfo() {
@@ -1330,9 +1333,9 @@ const malformedDeltaCacheContext = await sessionStartHook({
   releaseAudit: {
     readInstalledVersion() {
       return {
-        raw: `codex-cli ${chedexMinimumCodexVersion}`,
-        normalized: chedexMinimumCodexVersion,
-        semver: minimumSupportedSemver,
+        raw: `codex-cli ${outdatedCodexVersion}`,
+        normalized: outdatedCodexVersion,
+        semver: outdatedCodexSemver,
       };
     },
     async getLatestReleaseInfo() {
@@ -1368,9 +1371,9 @@ const staleCacheAudit = await buildReleaseAudit({
   codexHome: home,
   readInstalledVersion() {
     return {
-      raw: `codex-cli ${chedexMinimumCodexVersion}`,
-      normalized: chedexMinimumCodexVersion,
-      semver: minimumSupportedSemver,
+      raw: `codex-cli ${outdatedCodexVersion}`,
+      normalized: outdatedCodexVersion,
+      semver: outdatedCodexSemver,
     };
   },
   async getLatestReleaseInfo({ codexHome }) {

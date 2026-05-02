@@ -249,6 +249,9 @@ const installScript = await readFile(repoPath('scripts', 'install-user.mjs'), 'u
 if (!installScript.includes('mergeManagedHooksConfig') || !installScript.includes('probeCodexHooksSupport')) {
   throw new Error('install-user.mjs is missing native hook wiring');
 }
+if (!installScript.includes('stripManagedFeaturesSection') || installScript.includes('upsertFeaturesSection')) {
+  throw new Error('install-user.mjs must strip legacy managed feature flags instead of writing 0.128 native feature flags');
+}
 
 const uninstallScript = await readFile(repoPath('scripts', 'uninstall-user.mjs'), 'utf8');
 if (!uninstallScript.includes('stripManagedHooksConfig')) {
@@ -270,7 +273,7 @@ for (const snippet of ['session-start', 'workflow-sync', 'workflow-clear', 'work
 }
 
 const releaseAuditRuntime = await readFile(repoPath('hooks', 'codex-release-audit.mjs'), 'utf8');
-for (const snippet of ['registry.npmjs.org', 'renderReleaseAuditAdvisory', 'CODEX_RELEASE_DELTAS_URL', 'codex-release-deltas.json', 'CHEDEX_RELEASE_DELTA_COMPAT_VERSION']) {
+for (const snippet of ['registry.npmjs.org', 'renderReleaseAuditAdvisory', 'CODEX_RELEASE_DELTAS_URL', 'codex-release-deltas.json', 'CHEDEX_RELEASE_DELTA_COMPAT_VERSION', 'codex update']) {
   if (!releaseAuditRuntime.includes(snippet)) {
     throw new Error(`release audit runtime missing "${snippet}"`);
   }
@@ -284,6 +287,9 @@ for (const snippet of ['chedexMinimumCodexVersion', 'mergeManagedHooksConfig', '
   if (!libContent.includes(snippet)) {
     throw new Error(`lib.mjs missing ${snippet}`);
   }
+}
+if (libContent.includes('function upsertFeaturesSection') || libContent.includes('chedexUserPromptSubmitMinimumCodexVersion')) {
+  throw new Error('lib.mjs still contains pre-0.128 feature-flag or conditional UserPromptSubmit install logic');
 }
 
 const mirrorRequiredPaths = [

@@ -16,9 +16,9 @@ export const uninstallFileName = 'CHEDEX_UNINSTALL.md';
 export const uninstallStateFileName = 'CHEDEX_UNINSTALL.json';
 export const backupsDirName = '.chedex-backups';
 export const chedexHooksFeature = 'codex_hooks';
-export const chedexMinimumCodexVersion = '0.114.0';
-export const chedexUserPromptSubmitMinimumCodexVersion = '0.116.0';
-export const chedexLatestVerifiedCodexVersion = '0.125.0';
+export const chedexMultiAgentFeature = 'multi_agent';
+export const chedexMinimumCodexVersion = '0.128.0';
+export const chedexLatestVerifiedCodexVersion = '0.128.0';
 export const chedexHookStatusPrefix = 'Chedex governor:';
 export const chedexManagedHookMarkerPrefix = `${chedexHookStatusPrefix} managed:v1:`;
 export const chedexLegacySessionStartStatusMessage = `${chedexHookStatusPrefix} restore governed workflow context`;
@@ -208,53 +208,6 @@ export function buildAgentConfigBlock(agentsDir) {
   return lines.join('\n');
 }
 
-export function upsertFeaturesSection(config) {
-  const lines = config.split(/\r?\n/);
-  const featuresStart = lines.findIndex((line) => /^\s*\[features\]\s*$/.test(line));
-
-  if (featuresStart < 0) {
-    const body = config.trimEnd();
-    const featureBlock = [
-      '[features]',
-      'multi_agent = true',
-      `${chedexHooksFeature} = true`,
-    ].join('\n');
-    return body ? `${body}\n\n${featureBlock}\n` : `${featureBlock}\n`;
-  }
-
-  let sectionEnd = lines.length;
-  for (let i = featuresStart + 1; i < lines.length; i++) {
-    if (/^\s*\[/.test(lines[i]) || lines[i].includes(chedexMarkerStart)) {
-      sectionEnd = i;
-      break;
-    }
-  }
-
-  let foundMulti = false;
-  let foundHooks = false;
-
-  for (let i = featuresStart + 1; i < sectionEnd; i++) {
-    if (/^\s*multi_agent\s*=/.test(lines[i])) {
-      lines[i] = 'multi_agent = true';
-      foundMulti = true;
-    } else if (new RegExp(`^\\s*${chedexHooksFeature}\\s*=`).test(lines[i])) {
-      lines[i] = `${chedexHooksFeature} = true`;
-      foundHooks = true;
-    }
-  }
-
-  const insertAt = sectionEnd;
-  if (!foundMulti) {
-    lines.splice(insertAt, 0, 'multi_agent = true');
-    sectionEnd += 1;
-  }
-  if (!foundHooks) {
-    lines.splice(sectionEnd, 0, `${chedexHooksFeature} = true`);
-  }
-
-  return `${lines.join('\n').replace(/\n+$/, '')}\n`;
-}
-
 export function stripChedexBlock(config) {
   const pattern = new RegExp(`${chedexMarkerStart}[\\s\\S]*?${chedexMarkerEnd}\\n?`, 'g');
   return config.replace(pattern, '').replace(/\n{3,}/g, '\n\n');
@@ -276,7 +229,7 @@ export function stripManagedFeaturesSection(config) {
     }
   }
 
-  const featurePattern = new RegExp(`^\\s*(multi_agent|${chedexHooksFeature})\\s*=`);
+  const featurePattern = new RegExp(`^\\s*(${chedexMultiAgentFeature}|${chedexHooksFeature})\\s*=`);
   const nextSectionLines = lines.slice(featuresStart + 1, sectionEnd).filter((line) => !featurePattern.test(line));
   const hasMeaningfulFeatureLines = nextSectionLines.some((line) => line.trim().length > 0);
 
@@ -313,7 +266,7 @@ export function renderUninstallNote(targets, options = {}) {
     '',
     `- ${targets.configPath}`,
     `- managed block markers: ${chedexMarkerStart} / ${chedexMarkerEnd}`,
-    '- features enforced: `multi_agent = true`, compatibility `codex_hooks = true`',
+    '- native feature flags are not written by Chedex 0.128; older managed `multi_agent` and `codex_hooks` entries are cleaned up by uninstall',
     '',
     '## Backup Root',
     '',
@@ -524,18 +477,10 @@ export function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\"'\"'`)}'`;
 }
 
-export function managedHookEventsForCodexVersion(rawVersion) {
-  const installed = parseSemver(rawVersion);
-  const userPromptSubmitMinimum = parseSemver(chedexUserPromptSubmitMinimumCodexVersion);
-  const supportsUserPromptSubmit = Boolean(
-    installed
-    && userPromptSubmitMinimum
-    && compareSemver(installed, userPromptSubmitMinimum) >= 0,
-  );
-
+export function managedHookEventsForCodexVersion() {
   return [
     'SessionStart',
-    ...(supportsUserPromptSubmit ? ['UserPromptSubmit'] : []),
+    'UserPromptSubmit',
     'Stop',
   ];
 }
@@ -690,12 +635,42 @@ export function probeCodexHooksSupport() {
       features,
     };
   }
+  if (!features[chedexHooksFeature].enabled) {
+    return {
+      ok: false,
+      reason: `codex ${installed.raw} has ${chedexHooksFeature} disabled; enable native hooks before installing Chedex`,
+      version: installed.raw,
+      feature: features[chedexHooksFeature],
+      features,
+    };
+  }
+
+  if (!(chedexMultiAgentFeature in features)) {
+    return {
+      ok: false,
+      reason: `codex ${installed.raw} does not expose the ${chedexMultiAgentFeature} feature flag`,
+      version: installed.raw,
+      feature: features[chedexHooksFeature],
+      features,
+    };
+  }
+  if (!features[chedexMultiAgentFeature].enabled) {
+    return {
+      ok: false,
+      reason: `codex ${installed.raw} has ${chedexMultiAgentFeature} disabled; enable native agents before installing Chedex`,
+      version: installed.raw,
+      feature: features[chedexHooksFeature],
+      multiAgentFeature: features[chedexMultiAgentFeature],
+      features,
+    };
+  }
 
   return {
     ok: true,
     version: installed.raw,
     feature: features[chedexHooksFeature],
-    supportedHookEvents: managedHookEventsForCodexVersion(installed.raw),
+    multiAgentFeature: features[chedexMultiAgentFeature],
+    supportedHookEvents: managedHookEventsForCodexVersion(),
   };
 }
 

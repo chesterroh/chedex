@@ -4,13 +4,13 @@ The Chedex governor is the native lifecycle layer for governed workflows.
 
 ## Requirements
 
-- Codex CLI `>= 0.114.0`
-- Latest verified Codex CLI: `0.125.0`
-- `codex_hooks` feature available in `codex features list`
+- Codex CLI `>= 0.128.0`
+- Latest verified Codex CLI: `0.128.0`
+- stable/enabled `codex_hooks` and `multi_agent` features available in `codex features list`
 
-Install enables `multi_agent = true` and compatibility `codex_hooks = true`, and writes a managed `hooks.json` beside `config.toml`.
-On Codex `0.124.0` and later, `codex_hooks` is stable/default-on; CHEDEX keeps the explicit flag for compatibility with older supported installs.
-On Codex `>= 0.116.0`, the managed hook set also includes `UserPromptSubmit`.
+Install validates native `multi_agent` and `codex_hooks` feature availability, but no longer writes those feature flags into `config.toml`.
+Codex `0.128.0` owns both stable/default-on native feature surfaces.
+The managed hook set includes `SessionStart`, `UserPromptSubmit`, and `Stop`.
 Managed hook handlers carry stable `Chedex governor: managed:v1:<event>` status markers. Install and uninstall still recognize the older unversioned Chedex status messages for cleanup compatibility.
 
 ## Installed Paths
@@ -41,7 +41,7 @@ Within one workspace, `autopilot` may remain the governed owner while nested `ra
 
 - `SessionStart` restores compact workflow context only for workflows whose governed state still validates.
 - `SessionStart` warns instead of silently dropping the current workspace's indexed workflow when governed state is unreadable or malformed, so stop protection is preserved until repair or explicit clear.
-- `SessionStart` also runs a non-blocking release audit. If the installed Codex CLI is behind the latest published `@openai/codex` release, it appends a short upgrade advisory and repo follow-up plan.
+- `SessionStart` also runs a non-blocking release audit. If the installed Codex CLI is behind the latest published `@openai/codex` release, it appends a short native `codex update` advisory and repo follow-up plan.
 - Dynamic release-delta guidance is accepted only when its optional Chedex compatibility bounds match this installed contract; incompatible remote guidance falls back to bundled or cached guidance.
 - `UserPromptSubmit` fails closed when the indexed governed state for the current workspace is unreadable or invalid, instead of letting prompt submission continue on top of broken workflow state.
 - `Stop` blocks ambiguous or unreadable governed state until the current workflow is terminal or explicitly repaired/cleared.
@@ -52,7 +52,7 @@ The governor still keys off `cwd` and governed state, not the source value by it
 Codex `0.122.0` tightened trusted-workspace handling for project hooks and exec policies. CHEDEX keeps the governor on the user-global hook surface under `~/.codex/hooks.json`; if you later move that surface into repo-local `.codex`, trust the workspace first and recheck deny-read or isolated-exec behavior.
 Codex `0.124.0` and later can also load inline hooks from `config.toml` and managed hooks from `requirements.toml`. CHEDEX stays on `hooks.json`; install now rejects exact duplicates of the managed Chedex lifecycle hooks in inline `config.toml` hook tables before it writes another copy.
 Codex `0.124.0` and later also broaden `PreToolUse`, `PostToolUse`, and `PermissionRequest` hook payloads beyond Bash. The governor does not consume those tool-use events today, but future CHEDEX tool-use hooks should treat `tool_name` as arbitrary and `tool_input` as schema-free.
-Codex `0.125.0` adds broader app-server, plugin, permission-profile, provider-discovery, exec JSON, and rollout-trace surfaces. The governor's lifecycle contract remains `SessionStart`, `UserPromptSubmit`, and `Stop`; smoke-test those 0.125 surfaces separately if a workflow depends on them.
+Codex `0.128.0` adds persisted `/goal` workflows, native `codex update`, plugin marketplace add/upgrade/remove commands, plugin-bundled hooks, external-agent config/session import, stronger permission-profile controls, app-server schema exposure, and more explicit MultiAgentV2 controls. The governor's lifecycle contract remains `SessionStart`, `UserPromptSubmit`, and `Stop`; smoke-test those 0.128 surfaces separately if a workflow depends on them.
 
 ## Active Workflow Index
 

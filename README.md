@@ -1,4 +1,4 @@
-# Chedex v0.125
+# Chedex v0.128
 
 An homage to preceding projects such as Oh My OpenAgent, Oh My Codex, and Ouroboros.
 
@@ -18,14 +18,14 @@ It intentionally excludes external orchestration machinery such as:
 - legacy external state systems
 - HUD, mailboxing, linked mode state, and runtime overlays
 
-## v0.125 Shape
+## v0.128 Shape
 
-`0.125` keeps the current Chedex shape verified against Codex `0.125.0` and records the official `0.116.0` / `0.117.0` / `0.118.0` / `0.119.0` / `0.120.0` / `0.121.0` / `0.122.0` / `0.123.0` / `0.124.0` / `0.125.0` release-surface upgrades in the startup release audit.
+`0.128` keeps the current Chedex shape verified against Codex `0.128.0` and records the official `0.116.0` / `0.117.0` / `0.118.0` / `0.119.0` / `0.120.0` / `0.121.0` / `0.122.0` / `0.123.0` / `0.124.0` / `0.125.0` / `0.128.0` release-surface upgrades in the startup release audit.
 
 - ordinary turns stay lightweight and native
 - selected governed lanes and artifact-backed planning/requirements lanes keep durable state under `~/.codex/workflows/`
-- Codex `>= 0.116.0` gets the narrow `UserPromptSubmit` integrity gate in addition to `SessionStart` and `Stop`
-- Chedex currently requires Codex `>= 0.114.0` with `codex_hooks` available and is verified against Codex `0.125.0`
+- Chedex requires Codex `>= 0.128.0` with stable/enabled `codex_hooks` and `multi_agent`
+- the managed hook set always includes `SessionStart`, `UserPromptSubmit`, and `Stop`
 - governed workflow sync now rejects accidental replacement of a different active owner unless `--replace` is explicit
 - the repo keeps a deterministic `.codex/` mirror for installable source surfaces and verifies parity explicitly
 
@@ -97,7 +97,7 @@ The operating model is simple:
 - governed modes enforce phase-aware artifacts, so broad workflows cannot outrun the `context.md`, `spec.md`, `plan.md`, `handoff.json`, or `verify.md` files their skills depend on
 - `cdx-autopilot` and `cdx-ralph` can sync early shaping phases before `handoff.json`; execution and later phases require the handoff and its stored approvals
 
-Operational details for `hooks.json`, `UserPromptSubmit`, release audit behavior, and install-owned feature flags belong in [docs/install.md](docs/install.md) and [docs/governor.md](docs/governor.md).
+Operational details for `hooks.json`, `UserPromptSubmit`, release audit behavior, and native feature prerequisites belong in [docs/install.md](docs/install.md) and [docs/governor.md](docs/governor.md).
 
 ## Install Model
 
@@ -110,7 +110,7 @@ Operational details for `hooks.json`, `UserPromptSubmit`, release audit behavior
 - `~/.codex/hooks/chedex/*`
 - `~/.codex/hooks.json`
 - `[agents.*]` entries in `~/.codex/config.toml`
-- `[features] multi_agent = true` and compatibility `codex_hooks = true` in `~/.codex/config.toml`
+- stable/enabled native `multi_agent` and `codex_hooks` features from Codex itself
 
 ### Install And Deploy Commands
 
@@ -166,9 +166,9 @@ Chedex keeps a small native-first execution chain:
 The governor still stores runtime state globally under `$CODEX_HOME/workflows/` and admits one active governed workflow entry per workspace `cwd`, but workflow synchronization now uses per-workflow locks so separate workspaces do not contend on one global runtime lock. A governed `workflow_root` cannot be attached to multiple workspaces at once, and a different active owner for the same workspace now requires explicit `workflow-sync --replace`.
 Lock directories carry owner metadata and can be inspected or cleared with the governor `workflow-lock-repair` helper when a stale lock is confirmed.
 
-## Codex 0.125 Alignment
+## Codex 0.128 Alignment
 
-Codex `0.125.0` builds on the native substrate directly with:
+Codex `0.128.0` builds on the native substrate directly with:
 
 - side conversations and plan-mode fresh-context starts
 - broader marketplace and plugin-source handling
@@ -180,23 +180,25 @@ Codex `0.125.0` builds on the native substrate directly with:
 - Unix-socket app-server transport, pagination-friendly resume/fork, sticky environments, remote thread config/store plumbing, remote plugin install, and marketplace upgrade APIs
 - permission-profile round-tripping across TUI sessions, user turns, MCP sandbox state, shell escalation, and app-server APIs
 - provider-owned model discovery, `codex exec --json` reasoning-token usage, rollout tracing, and config/schema fixes including relative agent-role config path handling
+- persisted `/goal` workflows, native `codex update`, plugin marketplace add/upgrade/remove commands, external-agent config/session import, stronger permission-profile controls, and more explicit MultiAgentV2 knobs
 
-Chedex `0.125` still fits on top of that surface rather than colliding with it:
+Chedex `0.128` fits on top of that surface rather than colliding with it:
 
 - install stays user-global under `~/.codex/hooks.json` and `~/.codex/workflows/`, so the new project-hook trust requirements do not force moving the governor into repo-local `.codex`
 - CHEDEX-managed skills install into `~/.codex/skills/cdx-<name>/`, while Codex bundled skills live under `~/.codex/skills/.system/<name>/`
 - current bundled Codex system skill names (`imagegen`, `openai-docs`, `plugin-creator`, `skill-creator`, `skill-installer`) do not collide with the `cdx-*` CHEDEX skill namespace
-- `multi_agent = true` remains explicit, while `codex_hooks = true` is now a harmless compatibility setting because Codex `0.124.0` and later make hooks stable/default-on
+- Chedex no longer writes `multi_agent = true` or `codex_hooks = true`; Codex `0.128.0` owns those stable/default-on native feature surfaces, and install fails if either one is disabled
 - install merges managed hook handlers into `~/.codex/hooks.json` instead of replacing unrelated hook groups, stamps them with `Chedex governor: managed:v1:<event>` markers, and rejects exact duplicate managed lifecycle hooks in inline `config.toml` hook tables
 - Chedex does not currently install `PreToolUse`, `PostToolUse`, or `PermissionRequest` hooks; if it later does, those hooks must treat `tool_name` as arbitrary and `tool_input` as schema-free rather than Bash-only
 - spawned-agent model inheritance is already aligned: explicit caller-specified sub-agent model or reasoning settings override repo defaults unless unavailable or incompatible
-- generated agent `config_file` entries remain absolute paths under `~/.codex/agents/`, so Codex `0.125.0` relative agent-role config path fixes are additive rather than required for Chedex install correctness
-- governed workflow ownership remains CHEDEX territory under `~/.codex/workflows/`; Codex `0.125.0` does not ship a native `progress.json` / `handoff.json` / `verify.md` workflow runtime that would conflict with `cdx-autopilot`, `cdx-ralph`, or `cdx-autoresearch-loop`
-- the main 0.125-specific rechecks are app-server, remote plugin, Bedrock/provider-discovery, permission-profile, `codex exec --json`, and rollout-trace workflows if you rely on those paths
+- generated agent `config_file` entries remain absolute paths under `~/.codex/agents/`, so Codex `0.128.0` relative agent-role config path fixes and external-agent import are additive rather than required for Chedex install correctness
+- governed workflow ownership remains CHEDEX territory under `~/.codex/workflows/`; Codex `0.128.0` exposes native `/goal`, and the local feature probe reports `goals` as `under development true`, but it has not yet proved equivalent `progress.json` / `handoff.json` / `verify.md` ownership or stop-gated verification closeout for `cdx-autopilot`, `cdx-ralph`, or `cdx-autoresearch-loop`
+- release-audit upgrade guidance now points at native `codex update`; Chedex-specific dynamic deltas remain scoped to hooks, workflows, skills, agents, install/uninstall, and permission/profile compatibility
+- the main 0.128-specific rechecks are `/goal` workflow parity, plugin marketplace add/upgrade/remove behavior, plugin-bundled hooks, external-agent import, permission-profile selection, app-server schemas, and MultiAgentV2 behavior if you rely on those paths
 
 The current `SessionStart` difference is intentional rather than accidental:
 
-- Codex `0.125.0` can still distinguish `SessionStart source = clear`
+- Codex `0.128.0` can still distinguish `SessionStart source = clear`
 - CHEDEX now matches `startup|resume|clear`, but it treats `clear` as a soft-clear path: governed workflow state stays protected and the governor emits a compact notice instead of a full resume-context restore
 
 ## Current Gaps
