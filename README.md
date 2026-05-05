@@ -20,7 +20,7 @@ It intentionally excludes external orchestration machinery such as:
 
 ## v0.128 Shape
 
-`0.128` keeps the current Chedex shape verified against Codex `0.128.0` and records the official `0.116.0` / `0.117.0` / `0.118.0` / `0.119.0` / `0.120.0` / `0.121.0` / `0.122.0` / `0.123.0` / `0.124.0` / `0.125.0` / `0.128.0` release-surface upgrades in the startup release audit.
+`0.128` keeps the current Chedex shape verified against Codex `0.128.0`, records the official `0.116.0` / `0.117.0` / `0.118.0` / `0.119.0` / `0.120.0` / `0.121.0` / `0.122.0` / `0.123.0` / `0.124.0` / `0.125.0` / `0.128.0` release-surface upgrades in the startup release audit, and exposes a local `npm run audit:codex` probe for live 0.128 native-surface evidence.
 
 - ordinary turns stay lightweight and native
 - selected governed lanes and artifact-backed planning/requirements lanes keep durable state under `~/.codex/workflows/`
@@ -117,6 +117,7 @@ Operational details for `hooks.json`, `UserPromptSubmit`, release audit behavior
 ```bash
 npm run generate:agents
 npm run refresh:mirror
+npm run audit:codex
 npm run verify
 npm run install:user
 ```
@@ -192,9 +193,10 @@ Chedex `0.128` fits on top of that surface rather than colliding with it:
 - Chedex does not currently install `PreToolUse`, `PostToolUse`, or `PermissionRequest` hooks; if it later does, those hooks must treat `tool_name` as arbitrary and `tool_input` as schema-free rather than Bash-only
 - spawned-agent model inheritance is already aligned: explicit caller-specified sub-agent model or reasoning settings override repo defaults unless unavailable or incompatible
 - generated agent `config_file` entries remain absolute paths under `~/.codex/agents/`, so Codex `0.128.0` relative agent-role config path fixes and external-agent import are additive rather than required for Chedex install correctness
-- governed workflow ownership remains CHEDEX territory under `~/.codex/workflows/`; Codex `0.128.0` exposes native `/goal`, and the local feature probe reports `goals` as `under development true`, but it has not yet proved equivalent `progress.json` / `handoff.json` / `verify.md` ownership or stop-gated verification closeout for `cdx-autopilot`, `cdx-ralph`, or `cdx-autoresearch-loop`
+- governed workflow ownership remains CHEDEX territory under `~/.codex/workflows/`; Codex `0.128.0` exposes native `/goal` app-server schema surfaces, while the effective `goals` feature gate may be disabled unless the user enables it; either way, `/goal` has not yet proved equivalent `progress.json` / `handoff.json` / `verify.md` ownership or stop-gated verification closeout for `cdx-autopilot`, `cdx-ralph`, or `cdx-autoresearch-loop`
 - release-audit upgrade guidance now points at native `codex update`; Chedex-specific dynamic deltas remain scoped to hooks, workflows, skills, agents, install/uninstall, and permission/profile compatibility
-- the main 0.128-specific rechecks are `/goal` workflow parity, plugin marketplace add/upgrade/remove behavior, plugin-bundled hooks, external-agent import, permission-profile selection, app-server schemas, and MultiAgentV2 behavior if you rely on those paths
+- `npm run audit:codex` checks the required Chedex substrate, command surfaces such as `codex update` and `codex plugin marketplace`, optional 0.128 feature gates, and app-server schemas for `/goal`, plugin, marketplace, permission, external-agent, and thread metadata APIs
+- the main 0.128-specific manual rechecks are `/goal` workflow parity, plugin-bundled hook behavior, external-agent session import, permission-profile selection, and MultiAgentV2 behavior if you rely on those paths
 
 The current `SessionStart` difference is intentional rather than accidental:
 
@@ -206,6 +208,7 @@ The current `SessionStart` difference is intentional rather than accidental:
 - Repo verification still relies partly on required-text checks in `scripts/verify-repo.mjs`. This is good at catching drift, but it is not full semantic validation.
 - The latest verified Codex CLI version is still maintained as repo metadata plus docs wording, not generated into docs from one canonical source.
 - Admission approvals in `handoff.json.approvals` still validate stored role/verdict/evidence shape rather than governor-stamped approval tokens.
+- `/goal`, plugin hooks, external-agent migration, and MultiAgentV2 are still optional native gates in local Codex; the audit reports their state but does not force them enabled.
 - The default install no longer claims plain generic skill names such as `plan`, `execute`, or `review`; use `cdx-plan`, `cdx-execute`, and `cdx-review` for CHEDEX workflows.
 
 ## Notes

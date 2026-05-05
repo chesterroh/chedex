@@ -166,6 +166,7 @@ for (const snippet of [
   '`defer`',
   'Current Surface Classification',
   'Productivity Enhancement Candidates',
+  'npm run audit:codex',
   'npm run install:user:dry',
 ]) {
   if (!nativeDeltaAudit.includes(snippet)) {
@@ -191,9 +192,9 @@ const explicitCallerModelIntentPromptSnippet = 'Honor any explicit caller-specif
 const explicitCallerFallbackPromptSnippet = 'Treat built-in agent defaults as fallback only, and say so before using the closest compliant fallback.';
 
 const governorSurfaceChecks = [
-  [repoPath('README.md'), ['codex_hooks', 'multi_agent', 'hooks.json', '_active.json', 'handoff.json', 'UserPromptSubmit', chedexLatestVerifiedCodexVersion, 'durable evidence log', 'override repo defaults unless unavailable or incompatible', 'hooks/workflow-mode-schemas.mjs', 'registry/workflow-mode-schemas.mjs', '_archive.json']],
-  [repoPath('docs', 'install.md'), ['codex_hooks', 'multi_agent', 'hooks.json', 'UserPromptSubmit', chedexMinimumCodexVersion, chedexLatestVerifiedCodexVersion, '_codex_release_audit.json', '_codex_release_deltas.json', '_archive.json', 'phase-aware artifacts', 'managed:v1']],
-  [repoPath('docs', 'governor.md'), ['workflow-sync', 'SessionStart', 'UserPromptSubmit', 'Stop', 'handoff.json', 'risks', 'release audit', 'multi_agent', 'durable evidence log', 'autoresearch-plan is not a governed mode', chedexMinimumCodexVersion, chedexLatestVerifiedCodexVersion, 'hooks/workflow-mode-schemas.mjs', 'registry/workflow-mode-schemas.mjs', 'verification-complete', '_archive.json', 'completion_token', 'workflow-lock-repair', 'phase-aware artifact requirements']],
+  [repoPath('README.md'), ['codex_hooks', 'multi_agent', 'hooks.json', '_active.json', 'handoff.json', 'UserPromptSubmit', chedexLatestVerifiedCodexVersion, 'durable evidence log', 'override repo defaults unless unavailable or incompatible', 'hooks/workflow-mode-schemas.mjs', 'registry/workflow-mode-schemas.mjs', '_archive.json', 'npm run audit:codex']],
+  [repoPath('docs', 'install.md'), ['codex_hooks', 'multi_agent', 'hooks.json', 'UserPromptSubmit', chedexMinimumCodexVersion, chedexLatestVerifiedCodexVersion, '_codex_release_audit.json', '_codex_release_deltas.json', '_archive.json', 'phase-aware artifacts', 'managed:v1', 'npm run audit:codex']],
+  [repoPath('docs', 'governor.md'), ['workflow-sync', 'SessionStart', 'UserPromptSubmit', 'Stop', 'handoff.json', 'risks', 'release audit', 'multi_agent', 'durable evidence log', 'autoresearch-plan is not a governed mode', chedexMinimumCodexVersion, chedexLatestVerifiedCodexVersion, 'hooks/workflow-mode-schemas.mjs', 'registry/workflow-mode-schemas.mjs', 'verification-complete', '_archive.json', 'completion_token', 'workflow-lock-repair', 'phase-aware artifact requirements', 'npm run audit:codex']],
   [repoPath('README.md'), ['~/.codex/workflows/deep-interview/', 'interview.md', 'not governed by `progress.json` or `handoff.json` by default']],
   [repoPath('docs', 'install.md'), ['~/.codex/workflows/deep-interview/', 'interview.md', 'does not require `progress.json` or `handoff.json` by default']],
   [repoPath('README.md'), ['~/.codex/workflows/autoresearch-plan/', '~/.codex/workflows/autoresearch-loop/', 'results.tsv']],
@@ -276,6 +277,13 @@ const releaseAuditRuntime = await readFile(repoPath('hooks', 'codex-release-audi
 for (const snippet of ['registry.npmjs.org', 'renderReleaseAuditAdvisory', 'CODEX_RELEASE_DELTAS_URL', 'codex-release-deltas.json', 'CHEDEX_RELEASE_DELTA_COMPAT_VERSION', 'codex update']) {
   if (!releaseAuditRuntime.includes(snippet)) {
     throw new Error(`release audit runtime missing "${snippet}"`);
+  }
+}
+
+const codexSurfaceAuditRuntime = await readFile(repoPath('scripts', 'audit-codex-surface.mjs'), 'utf8');
+for (const snippet of ['codex update', 'plugin_marketplace', 'generate-json-schema', 'ThreadGoalSetParams', 'ExternalAgentConfigImportParams', 'optional_release_features']) {
+  if (!codexSurfaceAuditRuntime.includes(snippet)) {
+    throw new Error(`codex surface audit runtime missing "${snippet}"`);
   }
 }
 

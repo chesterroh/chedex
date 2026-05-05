@@ -9,6 +9,7 @@
 
 Chedex now fails install if the native lifecycle hook surface is unavailable.
 The managed lifecycle hook set includes `SessionStart`, `UserPromptSubmit`, and `Stop`.
+Run `npm run audit:codex` to capture the live Codex 0.128 native-surface state, including optional release gates that Chedex reports but does not require.
 
 ## Global Install
 
@@ -67,7 +68,7 @@ Direct top-level `cdx-ultrawork` uses a minimal workflow root under `~/.codex/wo
 Dynamic release-delta guidance is cached separately in `~/.codex/workflows/_codex_release_deltas.json`, and incompatible remote delta bundles fall back to bundled or cached guidance.
 Completed and cancelled governed workflows are archived into `~/.codex/workflows/_archive.json` when they leave the active index, and their managed workflow cache directories are removed after the archive snapshot is written.
 `handoff.json` is required when a governed mode reaches its admitted execution point: `cdx-autopilot` and `cdx-ralph` require it by `execute`, while `cdx-autoresearch-loop` requires it for the whole governed loop. Those handoffs require stored `architect` and `verifier` approval entries under `approvals`; direct top-level `cdx-ultrawork` may omit `handoff.json`.
-Codex `0.128.0` exposes native `/goal`, and the local feature probe reports `goals` as `under development true`. CHEDEX keeps its governed workflow runtime because `/goal` has not yet proved equivalent `progress.json` / `handoff.json` / `verify.md` ownership or stop-gated verification closeout. CHEDEX uses `cdx-*` skill names to avoid occupying future native plain skill names. The practical 0.128 rechecks are duplicate hook configuration, `/goal` workflow parity, plugin marketplace and plugin-bundled hook behavior, external-agent import, permission-profile selection, app-server schemas, and MultiAgentV2 behavior if you depend on those paths.
+Codex `0.128.0` exposes native `/goal` app-server schema surfaces. The effective `goals` feature gate may be disabled unless the user enables it, so CHEDEX treats `/goal` as optional and keeps its governed workflow runtime because `/goal` has not yet proved equivalent `progress.json` / `handoff.json` / `verify.md` ownership or stop-gated verification closeout. CHEDEX uses `cdx-*` skill names to avoid occupying future native plain skill names. The practical 0.128 rechecks are duplicate hook configuration, `/goal` workflow parity, plugin marketplace and plugin-bundled hook behavior, external-agent import, permission-profile selection, app-server schemas, and MultiAgentV2 behavior if you depend on those paths.
 `workflow-sync` preserves the current owner for the same workflow root, rejects a different active owner for the same workspace unless `--replace` is explicit, and records lock-owner metadata that can be cleared with `workflow-lock-repair` when a stale lock is confirmed.
 The release audit is advisory only: it does not auto-upgrade Codex CLI. When an upgrade is needed, its first step is native `codex update`.
 

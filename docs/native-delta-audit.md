@@ -14,8 +14,9 @@ Current comparison boundary:
 - Chedex: `0.128.0`
 - Native hook surface: stable `codex_hooks`
 - Native multi-agent surface: stable `multi_agent`
-- Native goal workflow surface: `under development`, default on in the local
-  `codex features list` probe
+- Native goal workflow surface: app-server schema exists in `0.128.0`; the
+  effective `goals` feature gate is optional and should be read from
+  `npm run audit:codex` for the local install
 - Bundled system skills live under `~/.codex/skills/.system/`
 - Chedex-managed user skills live under `~/.codex/skills/cdx-<name>/`
 
@@ -47,15 +48,23 @@ The important native additions for Chedex are:
   profiles, plugin install/uninstall/read/list, external-agent config import,
   and subagent metadata
 
-Local probe evidence:
+Local probe evidence should come from `npm run audit:codex`. On Codex
+`0.128.0`, the required checks are:
 
 - `codex --version` reports `codex-cli 0.128.0`
 - `codex features list` reports `codex_hooks`, `multi_agent`, `plugins`,
   `tool_search`, `image_generation`, `browser_use`, `computer_use`, and
   `workspace_dependencies` as stable/enabled
-- `codex features list` reports `goals` as `under development true`
 - `codex update --help` is available
 - `codex plugin marketplace --help` exposes `add`, `upgrade`, and `remove`
+- `codex app-server generate-json-schema --experimental` exposes thread goal,
+  plugin, marketplace, permission approval, external-agent import, and thread
+  metadata schemas
+
+Optional release gates such as `goals`, `plugin_hooks`, `external_migration`,
+`multi_agent_v2`, `remote_plugin`, `request_permissions_tool`, and
+`exec_permission_approvals` are reported but not required for the Chedex
+governor to install.
 
 ## 0.128 Alignment Actions
 
@@ -125,6 +134,8 @@ Prefer enhancements that reduce operator effort without adding always-on runtime
 behavior:
 
 - Add verification for this audit when new managed surfaces are introduced.
+- Keep `npm run audit:codex` aligned with the Codex release-note surfaces that
+  Chedex intentionally depends on or defers.
 - Keep skill-name collision checks against bundled `.system` skills and require Chedex-managed skills to use the `cdx-` prefix.
 - Generate latest verified Codex version text from one metadata source.
 - Add governed workflow artifact templates for `progress.json`, `handoff.json`, and `verify.md`.
@@ -137,6 +148,7 @@ Before keeping any native-delta change, run:
 
 ```bash
 npm run verify
+npm run audit:codex
 npm run install:user:dry
 ```
 
