@@ -7,6 +7,7 @@ import {
   anyMissing,
   buildAgentToml,
   buildManagedHooksConfig,
+  chedexGoalsFeature,
   chedexLatestVerifiedCodexVersion,
   chedexMinimumCodexVersion,
   generatedAgentPath,
@@ -14,11 +15,15 @@ import {
   legacySkillNames,
   listRelativeFiles,
   listSkills,
+  parseCodexFeatures,
   probeCodexHooksSupport,
   repoPath,
+  resolveCodexFeature,
   roleNames,
   rolePromptPath,
+  stripManagedFeaturesSection,
   stripFrontmatter,
+  upsertFeatureFlag,
 } from './lib.mjs';
 
 function assert(condition, message) {
@@ -59,6 +64,45 @@ const hookProbe = probeCodexHooksSupport();
 if (!hookProbe.ok) {
   throw new Error(`native hook support check failed: ${hookProbe.reason}`);
 }
+assert(hookProbe.featureName === 'hooks', `native hook feature should resolve to canonical hooks on current Codex; got ${hookProbe.featureName}`);
+
+const parsedLegacyHookFeature = parseCodexFeatures('codex_hooks stable true\nmulti_agent stable true\n');
+const resolvedLegacyHookFeature = resolveCodexFeature(parsedLegacyHookFeature, 'hooks', ['codex_hooks']);
+assert(resolvedLegacyHookFeature?.name === 'codex_hooks', 'hook feature resolver should accept the 0.128 codex_hooks alias');
+const strippedLegacyFeatures = stripManagedFeaturesSection([
+  '[features]',
+  'goals = true',
+  'hooks = false',
+  'codex_hooks = true',
+  'multi_agent = true',
+  'foo = true',
+  '',
+].join('\n'));
+const strippedLegacyFalseFeatures = stripManagedFeaturesSection([
+  '[features]',
+  'goals = false',
+  'codex_hooks = false',
+  'multi_agent = false',
+  '',
+].join('\n'));
+const upsertedGoalsFeature = upsertFeatureFlag([
+  '[features]',
+  'goals = false',
+  'foo = true',
+  '',
+].join('\n'), chedexGoalsFeature, true);
+const appendedGoalsFeature = upsertFeatureFlag('model = "gpt-5.5"', chedexGoalsFeature, true);
+assert(!strippedLegacyFeatures.includes('goals = true'), 'managed feature cleanup should remove Chedex-managed goals=true config');
+assert(strippedLegacyFeatures.includes('hooks = false'), 'legacy feature cleanup must not remove user-owned canonical hooks config');
+assert(strippedLegacyFeatures.includes('foo = true'), 'legacy feature cleanup must preserve unrelated feature config');
+assert(!strippedLegacyFeatures.includes('codex_hooks = true'), 'legacy feature cleanup should remove old managed codex_hooks config');
+assert(!strippedLegacyFeatures.includes('multi_agent = true'), 'legacy feature cleanup should remove old managed multi_agent config');
+assert(strippedLegacyFalseFeatures.includes('goals = false'), 'managed feature cleanup must preserve user-owned goals=false config');
+assert(strippedLegacyFalseFeatures.includes('codex_hooks = false'), 'legacy feature cleanup must preserve user-owned codex_hooks=false config');
+assert(strippedLegacyFalseFeatures.includes('multi_agent = false'), 'legacy feature cleanup must preserve user-owned multi_agent=false config');
+assert(upsertedGoalsFeature.includes('goals = true'), 'feature upsert should enable goals in an existing features table');
+assert(!upsertedGoalsFeature.includes('goals = false'), 'feature upsert should replace disabled goals config');
+assert(appendedGoalsFeature.includes('[features]\ngoals = true'), 'feature upsert should append a features table when one is absent');
 
 const repoSkillDirs = (await readdir(repoPath('skills'), { withFileTypes: true }))
   .filter((entry) => entry.isDirectory())
@@ -192,8 +236,8 @@ const explicitCallerModelIntentPromptSnippet = 'Honor any explicit caller-specif
 const explicitCallerFallbackPromptSnippet = 'Treat built-in agent defaults as fallback only, and say so before using the closest compliant fallback.';
 
 const governorSurfaceChecks = [
-  [repoPath('README.md'), ['codex_hooks', 'multi_agent', 'hooks.json', '_active.json', 'handoff.json', 'UserPromptSubmit', chedexLatestVerifiedCodexVersion, 'durable evidence log', 'override repo defaults unless unavailable or incompatible', 'hooks/workflow-mode-schemas.mjs', 'registry/workflow-mode-schemas.mjs', '_archive.json', 'npm run audit:codex']],
-  [repoPath('docs', 'install.md'), ['codex_hooks', 'multi_agent', 'hooks.json', 'UserPromptSubmit', chedexMinimumCodexVersion, chedexLatestVerifiedCodexVersion, '_codex_release_audit.json', '_codex_release_deltas.json', '_archive.json', 'phase-aware artifacts', 'managed:v1', 'npm run audit:codex']],
+  [repoPath('README.md'), ['hooks', 'codex_hooks', 'multi_agent', 'hooks.json', '_active.json', 'handoff.json', 'UserPromptSubmit', chedexLatestVerifiedCodexVersion, 'durable evidence log', 'override repo defaults unless unavailable or incompatible', 'hooks/workflow-mode-schemas.mjs', 'registry/workflow-mode-schemas.mjs', '_archive.json', 'npm run audit:codex']],
+  [repoPath('docs', 'install.md'), ['hooks', 'codex_hooks', 'multi_agent', 'hooks.json', 'UserPromptSubmit', chedexMinimumCodexVersion, chedexLatestVerifiedCodexVersion, '_codex_release_audit.json', '_codex_release_deltas.json', '_archive.json', 'phase-aware artifacts', 'managed:v1', 'npm run audit:codex']],
   [repoPath('docs', 'governor.md'), ['workflow-sync', 'SessionStart', 'UserPromptSubmit', 'Stop', 'handoff.json', 'risks', 'release audit', 'multi_agent', 'durable evidence log', 'autoresearch-plan is not a governed mode', chedexMinimumCodexVersion, chedexLatestVerifiedCodexVersion, 'hooks/workflow-mode-schemas.mjs', 'registry/workflow-mode-schemas.mjs', 'verification-complete', '_archive.json', 'completion_token', 'workflow-lock-repair', 'phase-aware artifact requirements', 'npm run audit:codex']],
   [repoPath('README.md'), ['~/.codex/workflows/deep-interview/', 'interview.md', 'not governed by `progress.json` or `handoff.json` by default']],
   [repoPath('docs', 'install.md'), ['~/.codex/workflows/deep-interview/', 'interview.md', 'does not require `progress.json` or `handoff.json` by default']],
@@ -250,8 +294,8 @@ const installScript = await readFile(repoPath('scripts', 'install-user.mjs'), 'u
 if (!installScript.includes('mergeManagedHooksConfig') || !installScript.includes('probeCodexHooksSupport')) {
   throw new Error('install-user.mjs is missing native hook wiring');
 }
-if (!installScript.includes('stripManagedFeaturesSection') || installScript.includes('upsertFeaturesSection')) {
-  throw new Error('install-user.mjs must strip legacy managed feature flags instead of writing 0.128 native feature flags');
+if (!installScript.includes('stripManagedFeaturesSection') || !installScript.includes('upsertFeatureFlag')) {
+  throw new Error('install-user.mjs must strip legacy managed feature flags and enable the managed goals feature');
 }
 
 const uninstallScript = await readFile(repoPath('scripts', 'uninstall-user.mjs'), 'utf8');
@@ -281,7 +325,7 @@ for (const snippet of ['registry.npmjs.org', 'renderReleaseAuditAdvisory', 'CODE
 }
 
 const codexSurfaceAuditRuntime = await readFile(repoPath('scripts', 'audit-codex-surface.mjs'), 'utf8');
-for (const snippet of ['codex update', 'plugin_marketplace', 'generate-json-schema', 'ThreadGoalSetParams', 'ExternalAgentConfigImportParams', 'optional_release_features']) {
+for (const snippet of ['codex update', 'plugin_marketplace', 'generate-json-schema', 'ThreadGoalSetParams', 'ExternalAgentConfigImportParams', 'PluginShareSaveParams', 'ProcessSpawnParams', 'HooksListResponse', 'optional_release_features']) {
   if (!codexSurfaceAuditRuntime.includes(snippet)) {
     throw new Error(`codex surface audit runtime missing "${snippet}"`);
   }
@@ -291,13 +335,13 @@ const libContent = await readFile(repoPath('scripts', 'lib.mjs'), 'utf8');
 if (!libContent.includes("return process.env.CODEX_HOME || join(homedir(), '.codex');")) {
   throw new Error('codexHome() no longer resolves to ~/.codex');
 }
-for (const snippet of ['chedexMinimumCodexVersion', 'mergeManagedHooksConfig', 'probeCodexHooksSupport', 'detectInlineManagedHookDuplicates', 'managed:v1']) {
+for (const snippet of ['chedexMinimumCodexVersion', 'chedexRequiredFeatureStage', 'chedexGoalsFeature', 'upsertFeatureFlag', 'mergeManagedHooksConfig', 'probeCodexHooksSupport', 'detectInlineManagedHookDuplicates', 'managed:v1']) {
   if (!libContent.includes(snippet)) {
     throw new Error(`lib.mjs missing ${snippet}`);
   }
 }
 if (libContent.includes('function upsertFeaturesSection') || libContent.includes('chedexUserPromptSubmitMinimumCodexVersion')) {
-  throw new Error('lib.mjs still contains pre-0.128 feature-flag or conditional UserPromptSubmit install logic');
+  throw new Error('lib.mjs still contains legacy feature-flag write or conditional UserPromptSubmit install logic');
 }
 
 const mirrorRequiredPaths = [

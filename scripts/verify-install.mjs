@@ -93,9 +93,15 @@ const freshConfig = await readFile(join(freshHome, 'config.toml'), 'utf8');
 const freshSkillBackupPaths = freshUninstallState.managed_paths.skills
   .map((entry) => entry.backup_path)
   .filter(Boolean);
-assert(!freshConfig.includes('[features]'), 'fresh 0.128 install should not write managed feature flags');
-assert(!freshConfig.includes('multi_agent = true'), 'fresh 0.128 install should not force native multi_agent');
-assert(!freshConfig.includes('codex_hooks = true'), 'fresh 0.128 install should not force native codex_hooks');
+assert(freshConfig.includes('[features]'), 'fresh install should write the Chedex-managed goals feature section');
+assert(freshConfig.includes('goals = true'), 'fresh install should enable native /goal workflows');
+assert(
+  freshConfig.indexOf('[features]') < freshConfig.indexOf('# BEGIN CHEDEX NATIVE AGENTS'),
+  'install should keep the goals feature section outside the Chedex agent block',
+);
+assert(!freshConfig.includes('multi_agent = true'), 'fresh 0.129 install should not force native multi_agent');
+assert(!freshConfig.includes('hooks = true'), 'fresh 0.129 install should not force native hooks');
+assert(!freshConfig.includes('codex_hooks = true'), 'fresh 0.129 install should not force legacy native codex_hooks');
 assert(await pathExists(join(freshHome, 'skills', 'cdx-plan', 'SKILL.md')), 'install should write cdx-prefixed Chedex skills');
 assert(await pathMissing(join(freshHome, 'skills', 'plan', 'SKILL.md')), 'fresh install should not write legacy unprefixed Chedex skills');
 assert(
@@ -135,7 +141,8 @@ const emptyClearSessionStartOutput = runShellCommand(
 assert(emptyClearSessionStartOutput === '', 'session-start clear should stay quiet when no governed workflow is active');
 
 for (const [featureName, disabledLine, expectedMessage] of [
-  ['codex_hooks', 'codex_hooks = false', 'has codex_hooks disabled'],
+  ['hooks', 'hooks = false', 'has hooks disabled'],
+  ['codex_hooks_legacy_alias', 'codex_hooks = false', 'has hooks disabled'],
   ['multi_agent', 'multi_agent = false', 'has multi_agent disabled'],
 ]) {
   const disabledFeatureHome = await mkdtemp(join(tmpdir(), `chedex-install-disabled-${featureName}-`));

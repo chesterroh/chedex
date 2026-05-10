@@ -1,27 +1,34 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  chedexHooksFeature,
+  chedexHooksFeatureAliases,
   chedexMinimumCodexVersion,
+  chedexMultiAgentFeature,
+  chedexRequiredFeatureStage,
   compareSemver,
+  formatCodexFeatureStatus,
   parseSemver,
   readCodexFeatures,
   readCodexVersion,
+  resolveCodexFeature,
 } from './lib.mjs';
 
 const skipSchema = process.argv.includes('--skip-schema');
 
 const requiredFeatureChecks = [
   {
-    feature: 'codex_hooks',
-    requiredStage: 'stable',
+    feature: chedexHooksFeature,
+    aliases: chedexHooksFeatureAliases,
+    requiredStage: chedexRequiredFeatureStage,
     reason: 'Chedex lifecycle governor hooks',
   },
   {
-    feature: 'multi_agent',
-    requiredStage: 'stable',
+    feature: chedexMultiAgentFeature,
+    requiredStage: chedexRequiredFeatureStage,
     reason: 'Chedex native role registry',
   },
 ];
@@ -30,6 +37,18 @@ const optionalReleaseFeatureChecks = [
   {
     feature: 'goals',
     surface: 'persisted /goal workflows',
+  },
+  {
+    feature: 'browser_use_external',
+    surface: 'external browser-use integration',
+  },
+  {
+    feature: 'builtin_mcp',
+    surface: 'product-owned built-in MCP servers',
+  },
+  {
+    feature: 'auth_elicitation',
+    surface: 'Codex Apps auth elicitation',
   },
   {
     feature: 'plugin_hooks',
@@ -54,6 +73,14 @@ const optionalReleaseFeatureChecks = [
   {
     feature: 'exec_permission_approvals',
     surface: 'permission approval plumbing',
+  },
+  {
+    feature: 'remote_compaction_v2',
+    surface: 'remote compaction v2 request path',
+  },
+  {
+    feature: 'responses_websocket_response_processed',
+    surface: 'Responses websocket response.processed notification',
   },
 ];
 
@@ -100,6 +127,10 @@ const schemaChecks = [
     surface: 'thread goal clear API',
   },
   {
+    file: 'v2/HooksListResponse.json',
+    surface: 'hook list, toggle, trust, and compact event metadata',
+  },
+  {
     file: 'v2/MarketplaceAddParams.json',
     surface: 'marketplace add API',
   },
@@ -120,6 +151,26 @@ const schemaChecks = [
     surface: 'plugin uninstall API',
   },
   {
+    file: 'v2/PluginShareSaveParams.json',
+    surface: 'plugin sharing save API',
+  },
+  {
+    file: 'v2/PluginShareListParams.json',
+    surface: 'plugin sharing list API',
+  },
+  {
+    file: 'v2/PluginSkillReadParams.json',
+    surface: 'remote plugin skill read API',
+  },
+  {
+    file: 'v2/ProcessSpawnParams.json',
+    surface: 'app-server process spawn API',
+  },
+  {
+    file: 'v2/WindowsSandboxReadinessResponse.json',
+    surface: 'Windows sandbox readiness API',
+  },
+  {
     file: 'v2/ExternalAgentConfigImportParams.json',
     surface: 'external-agent config import API',
   },
@@ -133,13 +184,33 @@ const schemaChecks = [
   },
 ];
 
-function formatFeatureStatus(features, feature) {
-  const current = features[feature];
-  if (!current) {
-    return `${feature}:missing:false`;
-  }
-  return `${feature}:${current.stage}:${current.enabled ? 'true' : 'false'}`;
-}
+const schemaContentChecks = [
+  {
+    file: 'v2/HooksListResponse.json',
+    snippets: ['preCompact', 'postCompact', 'HookTrustStatus', 'currentHash'],
+    surface: '0.129 hook compact and trust metadata',
+  },
+  {
+    file: 'v2/PluginListParams.json',
+    snippets: ['marketplaceKinds', 'workspace-directory', 'shared-with-me'],
+    surface: '0.129 plugin marketplace source filtering',
+  },
+  {
+    file: 'v2/PluginListResponse.json',
+    snippets: ['PluginAvailability', 'PluginShareContext', 'keywords'],
+    surface: '0.129 plugin availability and share metadata',
+  },
+  {
+    file: 'v2/ProcessSpawnParams.json',
+    snippets: ['processHandle', 'streamStdoutStderr', 'timeoutMs'],
+    surface: '0.129 app-server process spawn contract',
+  },
+  {
+    file: 'v2/ThreadReadResponse.json',
+    snippets: ['sessionId', 'threadSource', 'itemsView'],
+    surface: '0.129 thread history metadata',
+  },
+];
 
 function checkCommand({ id, args, snippets }) {
   try {
@@ -171,20 +242,39 @@ async function checkAppServerSchema() {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
-    const missing = schemaChecks
+    const missingFiles = schemaChecks
       .filter((check) => !existsSync(join(schemaRoot, check.file)))
       .map((check) => check.file);
+    const missingContent = [];
+
+    for (const check of schemaContentChecks) {
+      const path = join(schemaRoot, check.file);
+      if (!existsSync(path)) {
+        missingContent.push(`${check.file}:missing`);
+        continue;
+      }
+      const content = readFileSync(path, 'utf8');
+      const missingSnippets = check.snippets.filter((snippet) => !content.includes(snippet));
+      if (missingSnippets.length > 0) {
+        missingContent.push(`${check.file}:${missingSnippets.join('+')}`);
+      }
+    }
+
+    const missing = [...missingFiles, ...missingContent];
 
     return {
       ok: missing.length === 0,
-      checked: schemaChecks.length,
+      checked: schemaChecks.length + schemaContentChecks.length,
       missing,
     };
   } catch (error) {
     return {
       ok: false,
-      checked: schemaChecks.length,
-      missing: schemaChecks.map((check) => check.file),
+      checked: schemaChecks.length + schemaContentChecks.length,
+      missing: [
+        ...schemaChecks.map((check) => check.file),
+        ...schemaContentChecks.map((check) => check.file),
+      ],
       error: error.stderr || error.message,
     };
   } finally {
@@ -204,16 +294,17 @@ if (!minimumSemver || compareSemver(installedSemver, minimumSemver) < 0) {
 
 const requiredFeatureStatuses = [];
 for (const check of requiredFeatureChecks) {
-  const current = features[check.feature];
-  requiredFeatureStatuses.push(formatFeatureStatus(features, check.feature));
+  const current = resolveCodexFeature(features, check.feature, check.aliases);
+  requiredFeatureStatuses.push(formatCodexFeatureStatus(features, check.feature, check.aliases));
   if (!current) {
-    failures.push(`missing required feature ${check.feature}: ${check.reason}`);
+    const accepted = [check.feature, ...(check.aliases || [])].join(', ');
+    failures.push(`missing required feature ${check.feature}: ${check.reason}; accepted keys: ${accepted}`);
     continue;
   }
-  if (current.stage !== check.requiredStage) {
-    failures.push(`required feature ${check.feature} should be ${check.requiredStage}; got ${current.stage}`);
+  if (current.feature.stage !== check.requiredStage) {
+    failures.push(`required feature ${check.feature} should be ${check.requiredStage}; got ${current.feature.stage}`);
   }
-  if (!current.enabled) {
+  if (!current.feature.enabled) {
     failures.push(`required feature ${check.feature} is disabled: ${check.reason}`);
   }
 }
@@ -229,10 +320,10 @@ const schemaResult = skipSchema
   ? { ok: true, checked: 0, missing: [], skipped: true }
   : await checkAppServerSchema();
 if (!schemaResult.ok) {
-  failures.push(`app-server schema missing 0.128 surfaces: ${schemaResult.missing.join(', ')}`);
+  failures.push(`app-server schema missing verified Codex surfaces: ${schemaResult.missing.join(', ')}`);
 }
 
-const optionalFeatureStatuses = optionalReleaseFeatureChecks.map((check) => formatFeatureStatus(features, check.feature));
+const optionalFeatureStatuses = optionalReleaseFeatureChecks.map((check) => formatCodexFeatureStatus(features, check.feature));
 const optionalDisabled = optionalReleaseFeatureChecks
   .filter((check) => features[check.feature] && !features[check.feature].enabled)
   .map((check) => `${check.feature}(${check.surface})`);

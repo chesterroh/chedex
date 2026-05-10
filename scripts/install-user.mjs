@@ -4,6 +4,7 @@ import {
   buildAgentConfigBlock,
   chedexMarkerEnd,
   chedexMarkerStart,
+  chedexGoalsFeature,
   copyPath,
   copyTree,
   detectInlineManagedHookDuplicates,
@@ -26,6 +27,7 @@ import {
   stripChedexBlock,
   stripManagedFeaturesSection,
   timestampSlug,
+  upsertFeatureFlag,
   writeFileIfChanged,
   writeJsonIfChanged,
 } from './lib.mjs';
@@ -241,6 +243,7 @@ if (!dryRun) {
 }
 
 let nextConfig = stripManagedFeaturesSection(stripChedexBlock(existingConfig || '')).trimEnd();
+nextConfig = upsertFeatureFlag(nextConfig, chedexGoalsFeature, true).trimEnd();
 const agentConfigBlock = buildAgentConfigBlock(targets.agentsDir);
 nextConfig = nextConfig ? `${nextConfig}\n\n${agentConfigBlock}\n` : `${agentConfigBlock}\n`;
 const nextHooksConfig = mergeManagedHooksConfig(currentHooksConfig, targets, {
@@ -262,11 +265,12 @@ const summary = [
   `skills=${listSkills().length}`,
   `dry_run=${dryRun ? 'true' : 'false'}`,
   `codex_version=${hookProbe.version}`,
-  `codex_hooks_feature_stage=${hookProbe.feature.stage}`,
-  `codex_hooks_feature_enabled=${hookProbe.feature.enabled ? 'true' : 'false'}`,
+  `hooks_feature_name=${hookProbe.featureName}`,
+  `hooks_feature_stage=${hookProbe.feature.stage}`,
+  `hooks_feature_enabled=${hookProbe.feature.enabled ? 'true' : 'false'}`,
   `multi_agent_feature_stage=${hookProbe.multiAgentFeature.stage}`,
   `multi_agent_feature_enabled=${hookProbe.multiAgentFeature.enabled ? 'true' : 'false'}`,
-  'managed_feature_flags=not_written',
+  `managed_feature_flags=${chedexGoalsFeature}:true`,
   `managed_hook_events=${hookProbe.supportedHookEvents.join(',')}`,
   `inline_hook_duplicate_check=${inlineHookDuplicates.length === 0 ? 'ok' : 'warning'}`,
   `hooks_config=${targets.hooksConfigPath}`,

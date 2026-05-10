@@ -111,6 +111,17 @@
         "Confirm Chedex does not write `codex_hooks = true` or `multi_agent = true`; Codex 0.128 owns those stable/default-on native feature surfaces.",
         "Do not replace Chedex governed workflow state with `/goal` until the local `goals` feature proves equivalent stop-gated verification ownership."
       ]
+    },
+    {
+      "since": "0.129.0",
+      "summary": "Codex 0.129.x renames the stable hook feature to `hooks`, adds compact lifecycle hooks and hook trust metadata, expands plugin sharing/skill APIs, adds app-server process execution APIs, and changes several thread-history schema fields.",
+      "checks": [
+        "Re-run `npm run verify` after upgrading Codex CLI.",
+        "Run `npm run audit:codex` to confirm Chedex resolves the canonical `hooks` feature and records the new 0.129 app-server schema surfaces.",
+        "Re-run `npm run install:user:dry` to confirm Chedex-managed `SessionStart`, `UserPromptSubmit`, and `Stop` hooks still install while writing only `goals = true` as the managed native feature flag.",
+        "Do not add Chedex `PreCompact` or `PostCompact` hooks until the governor has a verified compact-hook contract and clear stop-gate semantics for compaction.",
+        "Treat app-server `process/spawn` as an unsandboxed host process surface; do not use it in Chedex automation unless a workflow explicitly owns that risk."
+      ]
     }
   ]
 }

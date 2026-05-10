@@ -15,10 +15,19 @@ export const chedexMarkerEnd = '# END CHEDEX NATIVE AGENTS';
 export const uninstallFileName = 'CHEDEX_UNINSTALL.md';
 export const uninstallStateFileName = 'CHEDEX_UNINSTALL.json';
 export const backupsDirName = '.chedex-backups';
-export const chedexHooksFeature = 'codex_hooks';
+export const chedexHooksFeature = 'hooks';
+export const chedexLegacyHooksFeature = 'codex_hooks';
+export const chedexHooksFeatureAliases = [chedexLegacyHooksFeature];
 export const chedexMultiAgentFeature = 'multi_agent';
-export const chedexMinimumCodexVersion = '0.128.0';
-export const chedexLatestVerifiedCodexVersion = '0.128.0';
+export const chedexGoalsFeature = 'goals';
+export const chedexRequiredFeatureStage = 'stable';
+export const chedexManagedFeatureKeys = [
+  chedexGoalsFeature,
+  chedexMultiAgentFeature,
+  chedexLegacyHooksFeature,
+];
+export const chedexMinimumCodexVersion = '0.129.0';
+export const chedexLatestVerifiedCodexVersion = '0.129.0';
 export const chedexHookStatusPrefix = 'Chedex governor:';
 export const chedexManagedHookMarkerPrefix = `${chedexHookStatusPrefix} managed:v1:`;
 export const chedexLegacySessionStartStatusMessage = `${chedexHookStatusPrefix} restore governed workflow context`;
@@ -215,7 +224,7 @@ export function stripChedexBlock(config) {
 
 export function stripManagedFeaturesSection(config) {
   const lines = config.split(/\r?\n/);
-  const featuresStart = lines.findIndex((line) => /^\s*\[features\]\s*$/.test(line));
+  const featuresStart = lines.findIndex((line) => /^\s*\[features\]\s*(?:#.*)?$/.test(line));
 
   if (featuresStart < 0) {
     return config;
@@ -229,7 +238,7 @@ export function stripManagedFeaturesSection(config) {
     }
   }
 
-  const featurePattern = new RegExp(`^\\s*(${chedexMultiAgentFeature}|${chedexHooksFeature})\\s*=`);
+  const featurePattern = new RegExp(`^\\s*(${chedexManagedFeatureKeys.map(escapeRegExp).join('|')})\\s*=\\s*true\\s*(?:#.*)?$`);
   const nextSectionLines = lines.slice(featuresStart + 1, sectionEnd).filter((line) => !featurePattern.test(line));
   const hasMeaningfulFeatureLines = nextSectionLines.some((line) => line.trim().length > 0);
 
@@ -240,6 +249,41 @@ export function stripManagedFeaturesSection(config) {
   }
 
   return lines.join('\n').replace(/\n{3,}/g, '\n\n');
+}
+
+export function upsertFeatureFlag(config, featureName, enabled = true) {
+  const flagLine = `${featureName} = ${enabled ? 'true' : 'false'}`;
+  const normalizedConfig = String(config || '').trimEnd();
+
+  if (!normalizedConfig) {
+    return `[features]\n${flagLine}`;
+  }
+
+  const lines = normalizedConfig.split(/\r?\n/);
+  const featuresStart = lines.findIndex((line) => /^\s*\[features\]\s*(?:#.*)?$/.test(line));
+
+  if (featuresStart < 0) {
+    return `${normalizedConfig}\n\n[features]\n${flagLine}`;
+  }
+
+  let sectionEnd = lines.length;
+  for (let i = featuresStart + 1; i < lines.length; i += 1) {
+    if (/^\s*\[/.test(lines[i]) || lines[i].includes(chedexMarkerStart)) {
+      sectionEnd = i;
+      break;
+    }
+  }
+
+  const featurePattern = new RegExp(`^\\s*(?:"${escapeRegExp(featureName)}"|${escapeRegExp(featureName)})\\s*=`);
+  for (let i = featuresStart + 1; i < sectionEnd; i += 1) {
+    if (!featurePattern.test(lines[i])) continue;
+    const indent = lines[i].match(/^\s*/)?.[0] || '';
+    lines[i] = `${indent}${flagLine}`;
+    return lines.join('\n');
+  }
+
+  lines.splice(sectionEnd, 0, flagLine);
+  return lines.join('\n');
 }
 
 export function renderUninstallNote(targets, options = {}) {
@@ -266,7 +310,7 @@ export function renderUninstallNote(targets, options = {}) {
     '',
     `- ${targets.configPath}`,
     `- managed block markers: ${chedexMarkerStart} / ${chedexMarkerEnd}`,
-    '- native feature flags are not written by Chedex 0.128; older managed `multi_agent` and `codex_hooks` entries are cleaned up by uninstall',
+    '- Chedex writes `goals = true`; older managed `multi_agent = true` and `codex_hooks = true` entries are cleaned up by uninstall',
     '',
     '## Backup Root',
     '',
@@ -477,6 +521,10 @@ export function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\"'\"'`)}'`;
 }
 
+export function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function managedHookEventsForCodexVersion() {
   return [
     'SessionStart',
@@ -603,7 +651,7 @@ export function parseCodexFeatures(output) {
     if (!stage) continue;
     features[name] = {
       stage,
-      enabled: enabled === 'true',
+      enabled: enabled.toLowerCase() === 'true',
     };
   }
   return features;
@@ -612,6 +660,30 @@ export function parseCodexFeatures(output) {
 export function readCodexFeatures() {
   const stdout = execFileSync('codex', ['features', 'list'], { encoding: 'utf8' });
   return parseCodexFeatures(stdout);
+}
+
+export function resolveCodexFeature(features, canonicalName, aliases = []) {
+  const names = [canonicalName, ...aliases].filter(Boolean);
+  for (const name of names) {
+    if (features[name]) {
+      return {
+        canonicalName,
+        name,
+        feature: features[name],
+        alias: name !== canonicalName,
+      };
+    }
+  }
+  return null;
+}
+
+export function formatCodexFeatureStatus(features, canonicalName, aliases = []) {
+  const resolved = resolveCodexFeature(features, canonicalName, aliases);
+  if (!resolved) {
+    return `${canonicalName}:missing:false`;
+  }
+  const suffix = resolved.alias ? `[${resolved.name}]` : '';
+  return `${canonicalName}${suffix}:${resolved.feature.stage}:${resolved.feature.enabled ? 'true' : 'false'}`;
 }
 
 export function probeCodexHooksSupport() {
@@ -627,7 +699,8 @@ export function probeCodexHooksSupport() {
   }
 
   const features = readCodexFeatures();
-  if (!(chedexHooksFeature in features)) {
+  const hookFeature = resolveCodexFeature(features, chedexHooksFeature, chedexHooksFeatureAliases);
+  if (!hookFeature) {
     return {
       ok: false,
       reason: `codex ${installed.raw} does not expose the ${chedexHooksFeature} feature flag`,
@@ -635,12 +708,23 @@ export function probeCodexHooksSupport() {
       features,
     };
   }
-  if (!features[chedexHooksFeature].enabled) {
+  if (hookFeature.feature.stage !== chedexRequiredFeatureStage) {
+    return {
+      ok: false,
+      reason: `codex ${installed.raw} exposes ${chedexHooksFeature} as ${hookFeature.feature.stage}; Chedex requires ${chedexRequiredFeatureStage} native hooks`,
+      version: installed.raw,
+      feature: hookFeature.feature,
+      featureName: hookFeature.name,
+      features,
+    };
+  }
+  if (!hookFeature.feature.enabled) {
     return {
       ok: false,
       reason: `codex ${installed.raw} has ${chedexHooksFeature} disabled; enable native hooks before installing Chedex`,
       version: installed.raw,
-      feature: features[chedexHooksFeature],
+      feature: hookFeature.feature,
+      featureName: hookFeature.name,
       features,
     };
   }
@@ -650,7 +734,19 @@ export function probeCodexHooksSupport() {
       ok: false,
       reason: `codex ${installed.raw} does not expose the ${chedexMultiAgentFeature} feature flag`,
       version: installed.raw,
-      feature: features[chedexHooksFeature],
+      feature: hookFeature.feature,
+      featureName: hookFeature.name,
+      features,
+    };
+  }
+  if (features[chedexMultiAgentFeature].stage !== chedexRequiredFeatureStage) {
+    return {
+      ok: false,
+      reason: `codex ${installed.raw} exposes ${chedexMultiAgentFeature} as ${features[chedexMultiAgentFeature].stage}; Chedex requires ${chedexRequiredFeatureStage} native agents`,
+      version: installed.raw,
+      feature: hookFeature.feature,
+      featureName: hookFeature.name,
+      multiAgentFeature: features[chedexMultiAgentFeature],
       features,
     };
   }
@@ -659,7 +755,8 @@ export function probeCodexHooksSupport() {
       ok: false,
       reason: `codex ${installed.raw} has ${chedexMultiAgentFeature} disabled; enable native agents before installing Chedex`,
       version: installed.raw,
-      feature: features[chedexHooksFeature],
+      feature: hookFeature.feature,
+      featureName: hookFeature.name,
       multiAgentFeature: features[chedexMultiAgentFeature],
       features,
     };
@@ -668,7 +765,8 @@ export function probeCodexHooksSupport() {
   return {
     ok: true,
     version: installed.raw,
-    feature: features[chedexHooksFeature],
+    feature: hookFeature.feature,
+    featureName: hookFeature.name,
     multiAgentFeature: features[chedexMultiAgentFeature],
     supportedHookEvents: managedHookEventsForCodexVersion(),
   };
