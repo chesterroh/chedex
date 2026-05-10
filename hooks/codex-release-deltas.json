@@ -122,6 +122,16 @@
         "Do not add Chedex `PreCompact` or `PostCompact` hooks until the governor has a verified compact-hook contract and clear stop-gate semantics for compaction.",
         "Treat app-server `process/spawn` as an unsandboxed host process surface; do not use it in Chedex automation unless a workflow explicitly owns that risk."
       ]
+    },
+    {
+      "since": "0.130.0",
+      "summary": "Codex 0.130.x keeps the Chedex-required `hooks` and `multi_agent` surfaces stable while enforcing review/trust state for user-global hook definitions before those hooks can run.",
+      "checks": [
+        "Re-run `npm run verify` and `npm run audit:codex` after upgrading Codex CLI.",
+        "After `npm run install:user`, open `/hooks` in Codex and trust the three Chedex user-global lifecycle hooks if Codex reports they need review: `SessionStart`, `UserPromptSubmit`, and `Stop`.",
+        "Do not auto-write `hooks.state.*.trusted_hash` from Chedex install; the native Codex hook review gate should remain an explicit user action.",
+        "Confirm `Stop` removes completed governed workflow cache directories and clears release-audit caches so stale Codex-version guidance is regenerated on the next trusted `SessionStart`."
+      ]
     }
   ]
 }

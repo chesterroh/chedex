@@ -11,7 +11,12 @@ import {
   MODE_SCHEMAS,
   VERIFICATION_REVIEW_VERDICTS,
 } from './workflow-mode-schemas.mjs';
-import { buildReleaseAudit, renderReleaseAuditAdvisory } from './codex-release-audit.mjs';
+import {
+  buildReleaseAudit,
+  releaseAuditCachePath,
+  releaseDeltaCachePath,
+  renderReleaseAuditAdvisory,
+} from './codex-release-audit.mjs';
 
 export const GOVERNOR_SCHEMA_VERSION = 1;
 export const GOVERNOR_ARCHIVE_SCHEMA_VERSION = 1;
@@ -967,6 +972,55 @@ export async function cleanupWorkflowRootCache({
   };
 }
 
+export async function cleanupReleaseAuditCaches({
+  codexHome = defaultCodexHome(),
+} = {}) {
+  const cachePaths = [
+    releaseAuditCachePath(codexHome),
+    releaseDeltaCachePath(codexHome),
+  ];
+  const cache_cleanup = [];
+
+  for (const path of cachePaths) {
+    try {
+      await rm(path, { force: true });
+      cache_cleanup.push({
+        removed: true,
+        skipped: false,
+        path,
+        reason: null,
+      });
+    } catch (error) {
+      cache_cleanup.push({
+        removed: false,
+        skipped: false,
+        path,
+        reason: formatErrorReason(error),
+      });
+    }
+  }
+
+  return cache_cleanup;
+}
+
+async function cleanupStopCaches({
+  codexHome = defaultCodexHome(),
+  index,
+}) {
+  const workflowCleanup = await cleanupFinishedIndexedWorkflows({
+    codexHome,
+    index,
+  });
+  const release_audit_cache_cleanup = await cleanupReleaseAuditCaches({
+    codexHome,
+  });
+
+  return {
+    ...workflowCleanup,
+    release_audit_cache_cleanup,
+  };
+}
+
 export async function cleanupFinishedIndexedWorkflows({
   codexHome = defaultCodexHome(),
   index,
@@ -1397,11 +1451,11 @@ export async function stopHook({ codexHome = defaultCodexHome(), cwd = process.c
         const index = loadResult.index;
         const entry = index.entries[normalizedCwd];
         if (!entry) {
-          await cleanupFinishedIndexedWorkflows({
+          const cleanup = await cleanupStopCaches({
             codexHome,
             index,
           });
-          return { action: 'allow' };
+          return { action: 'allow', cleanup };
         }
 
         const inspection = await inspectIndexedWorkflowEntry(entry);
@@ -1423,12 +1477,12 @@ export async function stopHook({ codexHome = defaultCodexHome(), cwd = process.c
           };
         }
 
-        await cleanupFinishedIndexedWorkflows({
+        const cleanup = await cleanupStopCaches({
           codexHome,
           index,
         });
 
-        return { action: 'allow' };
+        return { action: 'allow', cleanup };
       });
     });
   } catch (error) {

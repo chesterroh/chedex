@@ -272,6 +272,7 @@ const summary = [
   `multi_agent_feature_enabled=${hookProbe.multiAgentFeature.enabled ? 'true' : 'false'}`,
   `managed_feature_flags=${chedexGoalsFeature}:true`,
   `managed_hook_events=${hookProbe.supportedHookEvents.join(',')}`,
+  `hook_review=review ${hookProbe.supportedHookEvents.length} Chedex user-global hooks in /hooks if Codex reports they need review`,
   `inline_hook_duplicate_check=${inlineHookDuplicates.length === 0 ? 'ok' : 'warning'}`,
   `hooks_config=${targets.hooksConfigPath}`,
   `hook_runtime=${targets.hookRuntimePath}`,

@@ -291,7 +291,7 @@ for (const name of roleNames()) {
 }
 
 const installScript = await readFile(repoPath('scripts', 'install-user.mjs'), 'utf8');
-if (!installScript.includes('mergeManagedHooksConfig') || !installScript.includes('probeCodexHooksSupport')) {
+if (!installScript.includes('mergeManagedHooksConfig') || !installScript.includes('probeCodexHooksSupport') || !installScript.includes('hook_review=')) {
   throw new Error('install-user.mjs is missing native hook wiring');
 }
 if (!installScript.includes('stripManagedFeaturesSection') || !installScript.includes('upsertFeatureFlag')) {
@@ -311,7 +311,7 @@ for (const snippet of ['copyTree', '.codex', 'mirrorHookAssetsDir']) {
 }
 
 const governorRuntime = await readFile(repoPath('hooks', 'chedex-governor.mjs'), 'utf8');
-for (const snippet of ['session-start', 'workflow-sync', 'workflow-clear', 'workflow-lock-repair', 'verification-complete', 'risks must be an array', 'buildReleaseAudit', 'MODE_SCHEMAS', '_archive.json', 'repairStaleWorkflowLocks', 'collectRequiredArtifactsForProgress', 'active workflow owner replacement requires --replace']) {
+for (const snippet of ['session-start', 'workflow-sync', 'workflow-clear', 'workflow-lock-repair', 'verification-complete', 'risks must be an array', 'buildReleaseAudit', 'cleanupReleaseAuditCaches', 'MODE_SCHEMAS', '_archive.json', 'repairStaleWorkflowLocks', 'collectRequiredArtifactsForProgress', 'active workflow owner replacement requires --replace']) {
   if (!governorRuntime.includes(snippet)) {
     throw new Error(`governor runtime missing "${snippet}"`);
   }
@@ -325,7 +325,7 @@ for (const snippet of ['registry.npmjs.org', 'renderReleaseAuditAdvisory', 'CODE
 }
 
 const codexSurfaceAuditRuntime = await readFile(repoPath('scripts', 'audit-codex-surface.mjs'), 'utf8');
-for (const snippet of ['codex update', 'plugin_marketplace', 'generate-json-schema', 'ThreadGoalSetParams', 'ExternalAgentConfigImportParams', 'PluginShareSaveParams', 'ProcessSpawnParams', 'HooksListResponse', 'optional_release_features']) {
+for (const snippet of ['codex update', 'plugin_marketplace', 'generate-json-schema', 'ThreadGoalSetParams', 'ExternalAgentConfigImportParams', 'PluginShareSaveParams', 'ProcessSpawnParams', 'HooksListResponse', 'isManaged', 'trustStatus', 'optional_release_features']) {
   if (!codexSurfaceAuditRuntime.includes(snippet)) {
     throw new Error(`codex surface audit runtime missing "${snippet}"`);
   }

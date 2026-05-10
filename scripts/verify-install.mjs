@@ -99,9 +99,9 @@ assert(
   freshConfig.indexOf('[features]') < freshConfig.indexOf('# BEGIN CHEDEX NATIVE AGENTS'),
   'install should keep the goals feature section outside the Chedex agent block',
 );
-assert(!freshConfig.includes('multi_agent = true'), 'fresh 0.129 install should not force native multi_agent');
-assert(!freshConfig.includes('hooks = true'), 'fresh 0.129 install should not force native hooks');
-assert(!freshConfig.includes('codex_hooks = true'), 'fresh 0.129 install should not force legacy native codex_hooks');
+assert(!freshConfig.includes('multi_agent = true'), 'fresh 0.130 install should not force native multi_agent');
+assert(!freshConfig.includes('hooks = true'), 'fresh 0.130 install should not force native hooks');
+assert(!freshConfig.includes('codex_hooks = true'), 'fresh 0.130 install should not force legacy native codex_hooks');
 assert(await pathExists(join(freshHome, 'skills', 'cdx-plan', 'SKILL.md')), 'install should write cdx-prefixed Chedex skills');
 assert(await pathMissing(join(freshHome, 'skills', 'plan', 'SKILL.md')), 'fresh install should not write legacy unprefixed Chedex skills');
 assert(

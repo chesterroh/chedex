@@ -662,6 +662,27 @@ const indexAfterNoCurrentStop = JSON.parse(await readFile(activeIndexPath(home),
 assert(!(completedNoCurrentCwd in indexAfterNoCurrentStop.entries), 'stop without a current entry should clear finished workflow entries');
 assert(!(await pathExists(completedNoCurrent.workflowRoot)), 'stop without a current entry should remove finished workflow cache directories');
 
+await writeJson(releaseAuditCachePath(home), {
+  schema_version: 1,
+  latest_version: '0.129.0',
+  published_at: '2026-05-08T00:00:00Z',
+  checked_at: '2026-05-08T00:00:00Z',
+  source: 'stale-cache',
+});
+await writeJson(releaseDeltaCachePath(home), {
+  schema_version: 1,
+  checked_at: '2026-05-08T00:00:00Z',
+  source: 'stale-deltas',
+  deltas: [],
+});
+const releaseCacheCleanupAllowed = await stopHook({
+  codexHome: home,
+  cwd: join(home, 'release-cache-cleanup-workspace'),
+});
+assert(releaseCacheCleanupAllowed.action === 'allow', 'stop without active workflow should allow after release cache cleanup');
+assert(!(await pathExists(releaseAuditCachePath(home))), 'stop should remove stale release audit cache files');
+assert(!(await pathExists(releaseDeltaCachePath(home))), 'stop should remove stale release delta cache files');
+
 const missingResearchSpecWorkflow = await makeWorkflow({
   home,
   slug: 'autoresearch-loop-missing-spec',

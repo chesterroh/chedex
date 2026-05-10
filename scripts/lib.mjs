@@ -27,7 +27,7 @@ export const chedexManagedFeatureKeys = [
   chedexLegacyHooksFeature,
 ];
 export const chedexMinimumCodexVersion = '0.129.0';
-export const chedexLatestVerifiedCodexVersion = '0.129.0';
+export const chedexLatestVerifiedCodexVersion = '0.130.0';
 export const chedexHookStatusPrefix = 'Chedex governor:';
 export const chedexManagedHookMarkerPrefix = `${chedexHookStatusPrefix} managed:v1:`;
 export const chedexLegacySessionStartStatusMessage = `${chedexHookStatusPrefix} restore governed workflow context`;

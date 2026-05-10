@@ -187,8 +187,8 @@ const schemaChecks = [
 const schemaContentChecks = [
   {
     file: 'v2/HooksListResponse.json',
-    snippets: ['preCompact', 'postCompact', 'HookTrustStatus', 'currentHash'],
-    surface: '0.129 hook compact and trust metadata',
+    snippets: ['preCompact', 'postCompact', 'HookTrustStatus', 'currentHash', 'isManaged', 'trustStatus'],
+    surface: '0.130 hook compact, review, and trust metadata',
   },
   {
     file: 'v2/PluginListParams.json',
