@@ -54,6 +54,8 @@ npm run verify
 The reviewed upstream is Oh My Codex `v0.20.3` at commit
 `6c970cc12da256bfc7667edd0a9183b158d4a7a7`:
 <https://github.com/Yeachan-Heo/oh-my-codex/tree/v0.20.3>.
+This receipt is refreshed through [the default upstream workflow](upstream-review.md),
+not treated as a permanent current version.
 
 Adopted:
 

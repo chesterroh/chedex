@@ -73,6 +73,10 @@ for (const snippet of [
   'DROP',
   'no OMX command',
   'Codex CLI `0.145.0`',
+  'Current Review Receipt',
+  '25af12f7e61572b0bc18ddb1008be543b91519b0',
+  '435d4a9cc982ffaf83fabbfbb8711ae6c178ffca',
+  'no new extraction',
 ]) {
   assert(extraction.includes(snippet), `extraction audit is missing ${snippet}`);
 }
@@ -93,8 +97,30 @@ for (const snippet of [
 }
 
 const readme = await readFile(repoPath('README.md'), 'utf8');
-for (const snippet of ['native Goal mode', 'native subagents', '.agents/skills', '.codex/agents', '.codex/hooks.json', 'npm run audit:codex', 'rust-v0.145.0']) {
+for (const snippet of ['native Goal mode', 'native subagents', '.agents/skills', '.codex/agents', '.codex/hooks.json', 'npm run audit:codex', 'rust-v0.145.0', 'Product Direction', 'docs/upstream-review.md']) {
   assert(readme.includes(snippet), `README is missing ${snippet}`);
+}
+
+const upstreamReview = await readFile(repoPath('docs', 'upstream-review.md'), 'utf8');
+for (const snippet of [
+  'latest stable Codex CLI',
+  'exact stable release source',
+  'default-branch commit',
+  'Build The Three-Way Delta',
+  'NATIVE',
+  'MERGE',
+  'PORT',
+  'DROP',
+  'no-change result',
+  'not grandfathered',
+  'npm run verify',
+]) {
+  assert(upstreamReview.includes(snippet), `upstream review workflow is missing ${snippet}`);
+}
+
+const repoGuidance = await readFile(repoPath('AGENTS.md'), 'utf8');
+for (const snippet of ['Default Upstream Workflow', 'docs/upstream-review.md', 'Do not begin extraction from a stale recorded snapshot']) {
+  assert(repoGuidance.includes(snippet), `repository guidance is missing ${snippet}`);
 }
 
 const hookDocs = await readFile(repoPath('docs', 'hooks.md'), 'utf8');

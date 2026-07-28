@@ -19,6 +19,21 @@ status UI, MCP server, or package dependency. Its short-lived project hook
 enforces repository mechanics only; native Goal mode owns persistent
 continuation and native subagents own delegation and parallelism.
 
+## Product Direction
+
+Chedex primarily owns two kinds of additions:
+
+- focused skills for reusable methods that a clean, current stable Codex
+  installation does not already provide
+- bounded native hooks for deterministic lifecycle enforcement that guidance,
+  skills, and native permissions cannot provide
+
+Everything else in the repository supports those two surfaces. A capability is
+removed or reduced when Codex gains sufficient native coverage. Before changing
+that surface, maintainers must review the latest stable Codex implementation and
+changelog, retrieve the latest upstream implementation used for comparison, and
+record the three-way delta. See [docs/upstream-review.md](docs/upstream-review.md).
+
 ## Repository Hooks
 
 Trusted checkouts load `.codex/hooks.json`. All three events route through one
@@ -129,6 +144,7 @@ Important source surfaces:
 - `.codex/hooks.json` and `hooks/` — bounded project hook registration and adapter
 - `scripts/` — generation, compatibility audit, install, uninstall, verification
 - `docs/native-delta-audit.md` — Codex 0.145 replacement decisions
-- `docs/omx-skill-extraction.md` — historical aggregation inventory and native disposition
+- `docs/omx-skill-extraction.md` — comparison review ledger and native dispositions
+- `docs/upstream-review.md` — mandatory Codex-first comparison and extraction workflow
 
 See [docs/customizing.md](docs/customizing.md) before adding a skill or role.

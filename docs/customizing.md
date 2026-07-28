@@ -9,16 +9,22 @@ Chedex keeps one canonical native location for each installable surface:
 - global guidance source: `AGENTS.template.md`
 - project hooks: `.codex/hooks.json` routed through `hooks/chedex-native-hook.mjs`
 
+Before adding, changing, or removing a skill or hook, complete the current
+[upstream review](upstream-review.md). A prior version receipt is not a valid
+substitute for retrieving the current Codex and comparison sources.
+
 ## Add Or Change A Skill
 
-1. Create or edit `.agents/skills/cdx-<name>/SKILL.md`.
-2. Give frontmatter an exact `name` and a concrete trigger-oriented `description`.
-3. Keep the skill focused on one reusable method.
-4. Prefer native Goal mode, subagents, browser, image, and retrieval tools over helper runtimes.
-5. Add the name to `chedexSkills` in `scripts/lib.mjs`.
-6. Document it in `README.md`, `docs/install.md`, and `AGENTS.template.md`.
-7. Add or update verification expectations in `scripts/verify-repo.mjs` when the skill creates a new contract.
-8. Run `npm run verify`.
+1. Prove that the method is absent from the clean current stable Codex baseline
+   and does not fit an existing Chedex skill.
+2. Create or edit `.agents/skills/cdx-<name>/SKILL.md`.
+3. Give frontmatter an exact `name` and a concrete trigger-oriented `description`.
+4. Keep the skill focused on one reusable method.
+5. Prefer native Goal mode, subagents, browser, image, and retrieval tools over helper runtimes.
+6. Add the name to `chedexSkills` in `scripts/lib.mjs`.
+7. Document it in `README.md`, `docs/install.md`, and `AGENTS.template.md`.
+8. Add or update verification expectations in `scripts/verify-repo.mjs` when the skill creates a new contract.
+9. Record the disposition and run `npm run verify`.
 
 New skills must use the `cdx-` prefix. Merge aliases or minor variants into an
 existing skill instead of expanding the public vocabulary.
@@ -57,12 +63,14 @@ justifies them.
 
 ## Add Or Change A Hook
 
-1. Confirm that guidance, a skill, or a native permission rule cannot provide the same deterministic behavior.
-2. Register the smallest event and matcher in `.codex/hooks.json`.
-3. Route it through `hooks/chedex-native-hook.mjs`; do not add a second event runtime.
-4. Keep the handler inert outside the Chedex checkout and avoid transcript parsing or persistent hook state.
-5. Add a focused case to `scripts/verify-hooks.mjs`.
-6. Update `docs/hooks.md` and run `npm run verify`.
+1. Prove from the current Codex release source and manual that the deterministic
+   lifecycle behavior is not already native.
+2. Confirm that guidance, a skill, or a native permission rule cannot provide the same deterministic behavior.
+3. Register the smallest event and matcher in `.codex/hooks.json`.
+4. Route it through `hooks/chedex-native-hook.mjs`; do not add a second event runtime.
+5. Keep the handler inert outside the Chedex checkout and avoid transcript parsing or persistent hook state.
+6. Add a focused case to `scripts/verify-hooks.mjs`.
+7. Record the disposition, update `docs/hooks.md`, and run `npm run verify`.
 
 Do not write `hooks.state.*.trusted_hash`. Non-managed hooks must remain subject
 to Codex's `/hooks` review and hash-based trust flow.

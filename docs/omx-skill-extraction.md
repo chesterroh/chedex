@@ -1,11 +1,14 @@
 # Legacy Aggregation Extraction Audit
 
-This document records a one-time catalog review of the Oh My Codex (OMX)
-package. Chedex treats OMX only as a historical aggregation/index of workflow
-excerpts associated with other agent harnesses, not as an authoritative source,
-implementation dependency, or origin claim. The catalog was useful for finding
-ideas to evaluate; every retained method was re-specified against native Codex
-behavior and the Chedex product boundary.
+This document is the evidence ledger for reviews of the Oh My Codex (OMX)
+package. Chedex treats OMX as a comparison source for methods to evaluate, not
+as an authoritative source, implementation dependency, or origin claim. Every
+retained method is re-specified against current native Codex behavior and the
+Chedex product boundary.
+
+Each refresh must follow [upstream-review.md](upstream-review.md). The snapshot
+below is evidence from a completed review, never permission to skip retrieving
+the current Codex and OMX implementations on the next review.
 
 ## Objective
 
@@ -44,6 +47,26 @@ establish original authorship for its catalog entries, Chedex does not treat it
 as provenance for retained methods. The reviewed tag also lacked an obvious
 root license file even though its package metadata declares MIT, so Chedex
 re-specifies behavior from first principles instead of copying skill files.
+
+## Current Review Receipt
+
+The 2026-07-28 refresh resolved and retrieved both upstreams before evaluating
+the delta:
+
+| Evidence | Value |
+| --- | --- |
+| Codex stable package/tag | `0.145.0` / `rust-v0.145.0` |
+| Codex release commit | `25af12f7e61572b0bc18ddb1008be543b91519b0` |
+| OMX stable package/tag | `0.20.3` / `v0.20.3` |
+| OMX stable commit | `6c970cc12da256bfc7667edd0a9183b158d4a7a7` |
+| OMX default-branch commit | `435d4a9cc982ffaf83fabbfbb8711ae6c178ffca` |
+| OMX stable-to-default delta | translated README invite links only; no skill or hook changes |
+| Result | no new extraction; the existing dispositions remain current |
+
+Sources were retrieved into system temporary directories and were not added to
+the repository. Codex `0.145.0` release notes, its full changelog and source,
+the current Codex manual, OMX `CHANGELOG.md`, OMX `0.20.3` release notes, and
+the stable-to-default source diff were reviewed.
 
 ## Native Codex Boundary
 

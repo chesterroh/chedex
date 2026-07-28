@@ -19,6 +19,9 @@ The Chedex package version tracks this latest verified compatibility boundary.
 Evidence is checked locally by `npm run audit:codex`, against the current Codex
 manual at <https://developers.openai.com/codex/codex-manual.md>, and against the
 [official Codex 0.145.0 release](https://github.com/openai/codex/releases/tag/rust-v0.145.0).
+Every refresh follows [upstream-review.md](upstream-review.md) so release notes,
+source implementation, and the comparison upstream are retrieved before a
+retention or extraction decision is made.
 
 ## 0.131-0.145 Relevant Delta
 
@@ -87,9 +90,10 @@ CLI permission help currently spells the profile placeholder
 `CONFIG_PROFILE_V2`; the audit accepts that current spelling and the previous
 `CONFIG_PROFILE` spelling to avoid a brittle non-semantic failure.
 
-## Recheck Triggers
+## Recheck Cadence And Triggers
 
-Revisit this boundary only if:
+Run the full upstream review for every Chedex release and every proposed skill
+or hook change, including removals. Recheck immediately between releases if:
 
 - native goals lose stable/default-on status
 - standalone agent or skill locations change
