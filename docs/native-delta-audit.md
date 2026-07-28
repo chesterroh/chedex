@@ -1,224 +1,98 @@
 # Native Delta Audit
 
-Use this checklist when changing Chedex surfaces that may diverge from native Codex.
-
-The goal is not to remove every Chedex behavior. The goal is to keep only the
-delta that is justified by a clear workflow need, while preferring native Codex
-surfaces for everything else.
+This audit decides what Chedex should still own after the Codex `0.131` through
+`0.145` upgrade sequence.
 
 ## Baseline
 
-Current comparison boundary:
+- Minimum Codex CLI: `0.145.0`
+- Latest verified Codex CLI: `0.145.0`
+- Chedex: `0.145.0`
+- native goals are stable and on by default
+- native multi-agent support is stable and on by default
+- native hooks are stable; Chedex uses them only for bounded repository mechanics
+- repo skills use `.agents/skills`
+- project custom agents use `.codex/agents`
+- standalone agent TOMLs require `name`, `description`, and `developer_instructions`
 
-- Minimum Codex CLI: `0.129.0`
-- Latest verified Codex CLI: `0.130.0`
-- Chedex: `0.130.0`
-- Native hook surface: stable `hooks`; legacy `codex_hooks` config is accepted by Codex as an alias but should not be treated as the canonical feature key
-- Native multi-agent surface: stable `multi_agent`
-- Native goal workflow surface: app-server schema exists in `0.130.0`; the
-  effective `goals` feature gate is experimental and Chedex install enables
-  `goals = true` so `/goal` remains available after deployment
-- Bundled system skills live under `~/.codex/skills/.system/`
-- Chedex-managed user skills live under `~/.codex/skills/cdx-<name>/`
+The Chedex package version tracks this latest verified compatibility boundary.
+Evidence is checked locally by `npm run audit:codex`, against the current Codex
+manual at <https://developers.openai.com/codex/codex-manual.md>, and against the
+[official Codex 0.145.0 release](https://github.com/openai/codex/releases/tag/rust-v0.145.0).
 
-Validation note: `0.130` is the latest verified Codex release boundary for this audit, not a scalar compatibility score.
+## 0.131-0.145 Relevant Delta
 
-If an audit compares against upstream Codex source code instead of installed
-Codex behavior, record that boundary explicitly before making decisions.
+| Codex | Chedex-relevant change | Decision |
+| --- | --- | --- |
+| 0.131 | `codex doctor`, richer plugin hooks, remote and SDK surfaces | Keep Chedex compatibility checks development-time only. |
+| 0.132 | Goal blocker and usage handling improved; exec schema resume improved | Prefer native goal state over custom blocked/usage bookkeeping. |
+| 0.133 | Goals became stable/default-on with durable storage; subagent lifecycle expanded | Remove Chedex progress, handoff, and stop-gate runtime. |
+| 0.134 | Permission-profile CLI and subagent hook context matured | Preserve native permissions; make help checks tolerant to placeholder changes. |
+| 0.135 | Doctor output and named permission profiles improved | Do not add a Chedex doctor or permission layer. |
+| 0.136 | Image generation and extra skill roots expanded | Port visual workflows as prompt skills, not tool wrappers. |
+| 0.137 | Multi-agent v2 added per-thread runtime behavior | Keep native delegation and avoid a parallel worker protocol. |
+| 0.138 | Goal robustness and plugin JSON paths improved | Continue replacing custom orchestration state. |
+| 0.139 | Code-mode web search and schema support expanded | Research skills should use native retrieval surfaces. |
+| 0.140 | Import and richer goal attachments expanded | Do not build a migration daemon or attachment store. |
+| 0.141 | Hook trust bypasses were fixed; agent wait steering improved | Avoid nonessential hooks; use native wait/steering. |
+| 0.142 | Token-budgeted goals and explicit delegation modes arrived | Let native goal and session policy control budgets/delegation. |
+| 0.143 | Remote plugins and tool search matured | Prefer bundled/native skill tooling over a Chedex skill manager. |
+| 0.144 | Auth elicitation and approval modes matured | Preserve native approval and authentication boundaries. |
+| 0.145 | Multi-Agent V2 is a stable opt-in; import/thread surfaces expanded | Verify schemas, but keep Chedex independent of experimental v2 enablement. |
 
-## Codex 0.130 Delta
+## Replacement Decisions
 
-Codex `0.130.0` keeps the Chedex-required `hooks` and `multi_agent` surfaces
-stable. The relevant drift is operational: user-global hook definitions now
-surface as reviewable native hooks, and an untrusted or modified hook will not
-run until approved through `/hooks`.
+| Former Chedex surface | Decision | Native replacement |
+| --- | --- | --- |
+| Hook-governed workflow state | Remove | Native Goal mode and same-thread continuation |
+| `progress.json`, `handoff.json`, `verify.md`, active index, archive | Remove | Native goal state plus fresh command evidence in the thread |
+| Startup release-audit hook and cache | Remove | `codex update`, `codex doctor`, and explicit `npm run audit:codex` |
+| Managed `goals = true` write | Remove | Goals are stable and default-on |
+| Managed agent entries in `config.toml` | Remove | Standalone `.codex/agents/*.toml` discovery |
+| Installed role prompts | Remove | Generated agent `developer_instructions` already contain them |
+| Repo `.codex/skills` mirror | Replace | Canonical native `.agents/skills` |
+| Root `agents/` generated mirror | Replace | Canonical generated `.codex/agents` |
+| Model/reasoning values in agent TOMLs | Remove | Native caller, agent defaults, and parent inheritance |
+| Runtime release delta JSON | Remove | This human-readable audit plus the read-only compatibility probe |
 
-Local probe evidence should come from `npm run audit:codex`. On Codex
-`0.130.0`, the required checks are:
+## Bounded Hook Delta
 
-- `codex --version` reports `codex-cli 0.130.0`
-- `codex features list` reports stable/enabled `hooks` and `multi_agent`
-- `codex app-server generate-json-schema --experimental --out <dir>` exposes
-  hook metadata fields such as `currentHash`, `isManaged`, and `trustStatus`
+Chedex has no always-on runtime delta. Installation adds guidance, skills, and
+custom agents only; it does not install hooks, processes, workflow state,
+feature flags, model routing, or terminal orchestration.
 
-The Chedex reaction is intentionally narrow:
+The trusted Chedex checkout itself has a project-local `.codex/hooks.json`.
+`SessionStart`, `PreToolUse`, and `PostToolUse` route through one short-lived,
+dependency-free adapter. The adapter protects generated custom-agent TOMLs and
+reminds Codex to regenerate after source edits. It does not govern workflows,
+persist state, intercept Stop, or bypass Codex hook review and trust.
 
-- keep installing the lifecycle governor as user-global `hooks.json` entries
-- do not auto-write `hooks.state.*.trusted_hash`; trust is a Codex user action
-- document that `/hooks` must be used to approve the three Chedex hooks after
-  install or reinstall when Codex reports they need review
-- clear release-audit caches from the `Stop` allow path so stale version
-  guidance is regenerated by the next trusted `SessionStart`
+See [hooks.md](hooks.md) for the boundary and upstream comparison.
 
-## Codex 0.129 Delta
+## Local 0.145 Evidence
 
-Codex `0.129.0` changes the Chedex-relevant native surface from the `0.128.0`
-baseline in these ways:
+The verified local surface reports:
 
-- the visible lifecycle-hook feature key is now `hooks`; `codex_hooks` remains
-  only a legacy config alias
-- hook schemas add `PreCompact` and `PostCompact`, and app-server hook metadata
-  now exposes trust/hash state such as `trustStatus` and `currentHash`
-- `goals` is now an experimental feature gate rather than under development,
-  but it remains disabled by default locally
-- app-server schema adds plugin sharing APIs, remote plugin skill reads,
-  plugin availability/share context/keywords, and marketplace source filters
-- app-server schema adds unsandboxed process APIs such as `process/spawn`
-- thread schemas add `sessionId`, `threadSource`, and `itemsView`; service
-  tier fields are open strings, and `persistExtendedHistory` is deprecated
+- `goals stable true`
+- `hooks stable true`
+- `multi_agent stable true`
+- `multi_agent_v2 stable false` (available but not required)
+- `remote_plugin stable true`
+- `remote_compaction_v2 stable true`
+- `auth_elicitation stable true`
 
-Local probe evidence should come from `npm run audit:codex`. On Codex
-`0.129.0`, the required checks are:
+The app-server schema exposes goal set/clear, hook metadata, skill discovery,
+permission profiles, external-agent migration, and thread start settings. The
+CLI permission help currently spells the profile placeholder
+`CONFIG_PROFILE_V2`; the audit accepts that current spelling and the previous
+`CONFIG_PROFILE` spelling to avoid a brittle non-semantic failure.
 
-- `codex --version` reports `codex-cli 0.129.0`
-- `codex features list` reports `hooks`, `multi_agent`, `plugins`,
-  `tool_search`, `image_generation`, `browser_use`, `computer_use`, and
-  `workspace_dependencies` as stable/enabled
-- `codex update --help` is available
-- `codex plugin marketplace --help` exposes `add`, `upgrade`, and `remove`
-- `codex app-server generate-json-schema --experimental --out <dir>` exposes
-  thread goal, hook, plugin sharing, plugin skill-read, app-server process,
-  marketplace, permission approval, external-agent import, and thread metadata
-  schemas
+## Recheck Triggers
 
-Optional release gates such as `goals`, `plugin_hooks`, `external_migration`,
-`multi_agent_v2`, `remote_plugin`, `request_permissions_tool`,
-`exec_permission_approvals`, `auth_elicitation`, `builtin_mcp`, and
-`remote_compaction_v2` are reported but not required for the Chedex governor to
-install.
+Revisit this boundary only if:
 
-## Historical 0.128 Delta
-
-Codex `0.128.0` is a direct stable-release jump from `0.125.0` in the
-published `@openai/codex` package; the observed npm stream has `0.126.0`
-alpha builds but no stable `0.126.0` or `0.127.0` boundary.
-
-The important native additions for Chedex are:
-
-- persisted `/goal` workflows with app-server APIs, model tools, runtime
-  continuation, and TUI create/pause/resume/clear controls
-- native `codex update`
-- expanded permission profiles with built-in defaults, sandbox CLI profile
-  selection, cwd controls, active-profile metadata, and `--full-auto`
-  deprecation
-- plugin marketplace install, remote bundle caching, remote uninstall,
-  plugin-bundled hooks, hook enablement state, and external-agent config import
-- external agent session import
-- more explicit MultiAgentV2 thread caps, wait controls, root/subagent hints,
-  and depth handling
-- app-server schema exposure for thread goals, goal notifications, permission
-  profiles, plugin install/uninstall/read/list, external-agent config import,
-  and subagent metadata
-
-Historical 0.128 probe evidence came from `npm run audit:codex`. On Codex
-`0.128.0`, the required checks were:
-
-- `codex --version` reports `codex-cli 0.128.0`
-- `codex features list` reports `codex_hooks`, `multi_agent`, `plugins`,
-  `tool_search`, `image_generation`, `browser_use`, `computer_use`, and
-  `workspace_dependencies` as stable/enabled
-- `codex update --help` is available
-- `codex plugin marketplace --help` exposes `add`, `upgrade`, and `remove`
-- `codex app-server generate-json-schema --experimental` exposes thread goal,
-  plugin, marketplace, permission approval, external-agent import, and thread
-  metadata schemas
-
-Those checks are retained here as historical context only; the current audit
-boundary is `0.130.0`.
-
-## 0.129 Alignment Actions
-
-Treat this as the extracted replacement list for the Chedex 0.129 compatibility
-bump. These actions exist because native Codex now owns the same capability, or
-because the old Chedex behavior only existed for pre-0.129 compatibility.
-
-| Surface | Label | Why 0.129 changes it | Recommended action |
-| --- | --- | --- | --- |
-| Required hook feature probe keyed only to `codex_hooks` | `replace` | Codex 0.129 reports the canonical stable hook feature as `hooks`; `codex_hooks` is only a legacy alias. | Resolve required hook support through canonical `hooks`, accept `codex_hooks` only as a legacy alias, and keep cleanup limited to older managed `codex_hooks = true` entries. |
-| `hooks = true` compatibility config write | `remove` | Hooks are stable/default-on in the 0.129 baseline, and install only needs to detect lifecycle hook support. | Do not write the flag on install; also do not strip user-owned `hooks = false` during cleanup. |
-| `codex_hooks = true` compatibility config write | `remove` | `codex_hooks` is a legacy alias and should not be written by current Chedex. | Stop writing the flag on install; keep install/uninstall cleanup for older managed true entries. |
-| `multi_agent = true` compatibility config write | `remove` | Multi-agent is stable/enabled in the 0.129 local feature surface. | Stop forcing the flag on install; fail fast if the user disabled native multi-agent support and only clean up older managed true entries. |
-| `chedexMinimumCodexVersion = 0.128.0` | `replace` | Chedex 0.129 now depends on the canonical `hooks` feature key and verifies 0.129 app-server schema surfaces. | Raise the minimum to `0.129.0`; keep legacy `codex_hooks` cleanup for older installs. |
-| Generic release-upgrade advisory in `SessionStart` | `narrow` | Native `codex update` now exists. | Point upgrade guidance at native `codex update`, with Chedex-specific verification and delta follow-up. |
-| Dynamic release-delta guidance for ordinary Codex upgrades | `narrow` | Native release/update surfaces now cover more of the operator path. | Keep deltas focused on Chedex-managed runtime behavior: hooks, workflows, skills, agents, install/uninstall, and permission/profile compatibility. |
-| Direct Chedex install copying hooks/skills/agents into `~/.codex` | `defer` | 0.129 improves plugin sharing and remote plugin skill reads, but plugin hooks and remote plugin install behavior are still optional gates locally. | Recheck whether Chedex should become a native plugin package before adding more install machinery; do not migrate until plugin hook behavior is stable enough for the governor. |
-| Absolute generated agent `config_file` paths | `defer` | Relative config path handling and external-agent import are additive but not required for the current install shape. | Keep until install portability is prioritized, then test relative paths or native external-agent import as a replacement. |
-| Chedex governed workflow runtime (`progress.json`, `handoff.json`, `verify.md`, `_active.json`, `Stop` gate) | `defer` | 0.129 marks `/goal` experimental, but it still does not prove Chedex-style stop-gated verification ownership. | Do not obsolete yet. Reclassify only after `/goal` can enforce resumable workflow ownership plus verified closeout. |
-| Native `goals = true` feature write | `narrow` | `/goal` is useful operator-facing native UI, but remains experimental and does not replace Chedex governed workflow ownership. | Keep enabling it on install, outside the managed agent block, and recheck parity before using it as the governed workflow substrate. |
-| `PreCompact` / `PostCompact` hooks | `defer` | 0.129 exposes compact lifecycle hooks, but Chedex has no verified compact closeout contract yet. | Do not install compact hooks until governor behavior across compaction is specified and tested. |
-| App-server `process/spawn` APIs | `defer` | 0.129 exposes unsandboxed process execution APIs through app-server. | Treat as high risk; do not use in Chedex automation unless a workflow explicitly owns host-process risk and verification. |
-
-## Decision Labels
-
-Use exactly one label for each managed surface:
-
-- `keep`: required by the current Chedex contract and no native equivalent is available.
-- `narrow`: justified, but scope can be reduced without weakening the contract.
-- `replace`: native Codex now provides an equivalent path.
-- `remove`: no longer justified by the contract.
-- `defer`: decision needs a newer Codex baseline, better evidence, or user policy.
-
-## Audit Rubric
-
-Count a surface as an avoidable runtime delta only when all are true:
-
-- It changes Codex behavior outside plain prompt, skill, or agent content.
-- Codex provides an equivalent native capability for the same job.
-- Chedex does not need the behavior to preserve governed workflow safety.
-- Removal or replacement can be verified with the existing test and install paths.
-
-Do not count these as avoidable runtime deltas by default:
-
-- instruction content in `AGENTS.template.md`, `prompts/`, or `skills/`
-- docs-only artifacts
-- the checked-in `.codex/` mirror
-- legacy compatibility flag cleanup for older Chedex installs
-- lifecycle-governor behavior with no native equivalent for Chedex `progress.json`, `handoff.json`, and `verify.md` ownership
-
-## Current Surface Classification
-
-| Surface | Label | Rationale | Recheck Trigger |
-| --- | --- | --- | --- |
-| `~/.codex/hooks.json` lifecycle wiring | `keep` | Native hooks run the governor, but Codex does not provide Chedex governed workflow state or closeout semantics. | Codex ships native resumable workflow ownership with stop-gated verification. |
-| `/hooks` review for Chedex user-global hooks | `keep` | Codex 0.130 requires explicit trust for user-global hook definitions; Chedex should document and preserve that native review gate instead of auto-trusting itself. | Chedex moves to a native managed requirements surface or Codex changes user-global hook trust semantics. |
-| `SessionStart` restore and soft-clear notice | `keep` | Required to resume governed workflow context and preserve protection after chat clear. | Codex exposes equivalent workflow restore state. |
-| `UserPromptSubmit` integrity guard | `keep` | Narrow fail-closed guard for unreadable or invalid governed state. | Codex exposes native governed-state integrity checks. |
-| `Stop` closeout gate and cache cleanup | `keep` | Required to prevent active or unverified governed workflows from disappearing silently and to prune finished workflow plus release-audit caches on allowed closeout. | Codex exposes native stop-gated workflow completion and Chedex no longer owns release-delta guidance. |
-| Release audit on `SessionStart` | `narrow` | Native `codex update` now owns the generic upgrade path; Chedex only needs compatibility drift guidance. | Keep advisory behavior, but make the first upgrade step `codex update` and keep deltas Chedex-specific. |
-| `goals = true` feature write | `narrow` | `/goal` is an experimental native command Chedex wants available after deployment, while Chedex-owned governed workflows still need their existing runtime. | Write on install outside the Chedex agent block; strip Chedex-managed `goals = true` during cleanup when no backup restore is available. |
-| Canonical `hooks = true` compatibility feature write | `remove` | Hooks are stable/default-on in the 0.129 baseline. | Do not write on install, and do not strip user-owned `hooks = false` during legacy cleanup. |
-| Legacy `codex_hooks = true` compatibility feature write | `remove` | Required only while Chedex supported Codex versions where hooks were exposed under the legacy key. | Do not write on install; strip older managed true entries during install/uninstall cleanup. |
-| Legacy `multi_agent = true` compatibility feature write | `remove` | Required only while Chedex supported older versions where multi-agent may not be stable/enabled. | Do not write on install; strip older managed true entries during install/uninstall cleanup. |
-| Generated agent TOMLs | `keep` | Native Codex agent roles consume TOML config files; generation keeps prompt and registry surfaces aligned. | Codex provides a better native registry format or generation is no longer needed. |
-| Absolute agent `config_file` paths | `defer` | Valid today and avoids path-resolution ambiguity; Codex relative path fixes and external-agent import are additive. | Install path changes, plugin packaging, or portable config becomes a priority. |
-| `cdx-*` Chedex skill namespace | `keep` | Native skill directories are the intended extension surface, and the prefix keeps plain names available for bundled Codex skills. | Codex reserves or documents a first-class vendor namespace mechanism. |
-| Legacy unprefixed Chedex skill names such as `plan`, `execute`, `review` | `remove` | Plain-name Chedex skills create future ambiguity with bundled native skills. | Reintroduce only as explicit user-owned aliases outside the default install. |
-| Checked-in `.codex/` mirror | `keep` | Repo-only deterministic install mirror, not live runtime behavior. | Mirror maintenance cost exceeds install verification value. |
-| `handoff.json.approvals` shape validation | `narrow` | Useful phase-gated admission check, but not yet governor-stamped approval provenance. | Admission approval token design is ready. |
-
-## Productivity Enhancement Candidates
-
-Prefer enhancements that reduce operator effort without adding always-on runtime
-behavior:
-
-- Add verification for this audit when new managed surfaces are introduced.
-- Keep `npm run audit:codex` aligned with the Codex release-note surfaces that
-  Chedex intentionally depends on or defers.
-- Keep skill-name collision checks against bundled `.system` skills and require Chedex-managed skills to use the `cdx-` prefix.
-- Generate latest verified Codex version text from one metadata source.
-- Add governed workflow artifact templates for `progress.json`, `handoff.json`, and `verify.md`.
-- Capture `codex exec --json` usage data in research ledgers when available.
-- Add optional smoke tests for app-server, plugin, provider-discovery, permission-profile, and rollout-trace paths only when a workflow depends on them.
-
-## Required Verification
-
-Before keeping any native-delta change, run:
-
-```bash
-npm run verify
-npm run audit:codex
-npm run install:user:dry
-```
-
-If the change touches prompt, skill, agent, hook, install, uninstall, docs, or
-mirror surfaces, also follow the coupling rules in `docs/customizing.md`.
+- native goals lose stable/default-on status
+- standalone agent or skill locations change
+- Chedex needs enforceable organizational policy that plain guidance cannot provide
+- a hook use case cannot be expressed as deterministic repository policy without persistent state
+- a required workflow needs a connector or tool bundle, in which case a native plugin may be a better package than more installer machinery

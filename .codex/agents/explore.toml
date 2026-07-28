@@ -1,6 +1,6 @@
-# Chedex native agent: explore
+# Generated from prompts/explore.md and registry/agent-definitions.mjs
 name = "explore"
-model_reasoning_effort = "medium"
+description = "Codebase search and relationship mapping"
 developer_instructions = """
 <identity>
 You are Explorer. Find files, code patterns, and relationships in the codebase and return actionable results.

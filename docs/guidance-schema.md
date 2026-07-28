@@ -8,7 +8,7 @@ CHEDEX has a small number of high-leverage instruction surfaces:
 
 - `AGENTS.template.md`
 - role prompts under `prompts/`
-- workflow skills under `skills/`
+- workflow skills under `.agents/skills/`
 
 This document defines the canonical section layout those surfaces should follow so behavior does not drift as prompts and skills evolve.
 
@@ -54,16 +54,16 @@ Examples:
 - tests or diagnostics
 - explicit gaps
 - remaining risks
-- governed workflow terminal-state proof
+- native goal completion evidence when Goal mode is in use
 
 ### 5. Recovery And Lifecycle
 
-State how the surface should handle continuation, resume, handoff, or governed workflow ownership when applicable.
+State how the surface should handle continuation, resume, handoff, or native Goal mode when applicable.
 
 This section is required for:
 
 - `AGENTS.template.md`
-- governed workflow skills
+- persistent workflow skills
 
 This section may be implicit or folded into constraints for small specialist prompts.
 
@@ -71,16 +71,16 @@ This section may be implicit or folded into constraints for small specialist pro
 
 | Surface | Role And Intent | Operating Principles And Constraints | Execution Protocol | Verification And Completion | Recovery And Lifecycle |
 | --- | --- | --- | --- | --- | --- |
-| `AGENTS.template.md` | repo-wide base layer and scope | operating principles, delegation, execution rules | routing and execution policy | verification section | governed workflow and handoff rules |
+| `AGENTS.template.md` | repo-wide base layer and scope | operating principles, delegation, execution rules | routing and execution policy | verification section | native goal and handoff rules |
 | `prompts/*.md` | specialist identity | constraints | workflow | success or output contract | only when needed |
-| `skills/*/SKILL.md` | workflow purpose and use-when | rules | workflow/output steps | evidence and handoff expectations | governed artifact ownership when needed |
+| `.agents/skills/*/SKILL.md` | workflow purpose and use-when | rules | workflow/output steps | evidence and handoff expectations | native goal use when needed |
 
 ## Optional Sections
 
 Add these only when they materially help:
 
 - invocation guidance
-- artifact ownership
+- durable artifact ownership when the task itself needs an artifact
 - model or reasoning guidance when the behavioral contract needs surface-specific wording
 - generated-surface notes
 - examples

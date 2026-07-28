@@ -1,0 +1,46 @@
+{
+  "description": "Chedex repository guardrails for generated native-agent files.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "^(startup|resume|clear|compact)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/hooks/chedex-native-hook.mjs\"",
+            "statusMessage": "Loading Chedex repository guardrails",
+            "additionalContextLimit": 800,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "^(apply_patch|Edit|Write)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/hooks/chedex-native-hook.mjs\"",
+            "statusMessage": "Checking Chedex generated-file policy",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^(apply_patch|Edit|Write)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/hooks/chedex-native-hook.mjs\"",
+            "statusMessage": "Checking Chedex regeneration requirements",
+            "additionalContextLimit": 500,
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

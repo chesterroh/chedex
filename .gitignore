@@ -1,7 +1,7 @@
 # Editor / OS
 .DS_Store
 
-# Node / build
+# Local dependencies / build
 node_modules/
 dist/
 
@@ -9,13 +9,11 @@ dist/
 .tmp/
 .tmp-hook-probe/
 .tmp-install-home/
-workflows/
 
-# Repo-local .codex mirror byproducts
+# Repo-local Codex byproducts
 .codex/CHEDEX_UNINSTALL.md
+.codex/CHEDEX_UNINSTALL.json
 .codex/config.toml
-.codex/hooks.json
-.codex/workflows/
 
 # Install backups
 *.chedex.bak-*

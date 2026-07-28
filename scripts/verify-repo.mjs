@@ -1,432 +1,119 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ROLE_DEFINITIONS } from '../registry/agent-definitions.mjs';
 import {
   anyMissing,
   buildAgentToml,
-  buildManagedHooksConfig,
-  chedexGoalsFeature,
   chedexLatestVerifiedCodexVersion,
   chedexMinimumCodexVersion,
   generatedAgentPath,
   installManifestPaths,
-  legacySkillNames,
-  listRelativeFiles,
   listSkills,
-  parseCodexFeatures,
-  probeCodexHooksSupport,
   repoPath,
-  resolveCodexFeature,
   roleNames,
   rolePromptPath,
-  stripManagedFeaturesSection,
   stripFrontmatter,
-  upsertFeatureFlag,
 } from './lib.mjs';
 
 function assert(condition, message) {
-  if (!condition) {
-    throw new Error(message);
-  }
+  if (!condition) throw new Error(message);
 }
 
-async function assertFileEqual(left, right, label) {
-  const [leftContent, rightContent] = await Promise.all([
-    readFile(left, 'utf8'),
-    readFile(right, 'utf8'),
-  ]);
-
-  if (leftContent !== rightContent) {
-    throw new Error(`${label} differs:\n${left}\n${right}`);
-  }
-}
-
-async function assertTreeEqual(leftRoot, rightRoot, label) {
-  const [leftFiles, rightFiles] = await Promise.all([
-    listRelativeFiles(leftRoot),
-    listRelativeFiles(rightRoot),
-  ]);
-
-  if (JSON.stringify(leftFiles) !== JSON.stringify(rightFiles)) {
-    throw new Error(
-      `${label} file list differs:\nleft=${leftFiles.join(', ')}\nright=${rightFiles.join(', ')}`,
-    );
-  }
-
-  for (const relativePath of leftFiles) {
-    await assertFileEqual(join(leftRoot, relativePath), join(rightRoot, relativePath), `${label}:${relativePath}`);
-  }
-}
-
-const hookProbe = probeCodexHooksSupport();
-if (!hookProbe.ok) {
-  throw new Error(`native hook support check failed: ${hookProbe.reason}`);
-}
-assert(hookProbe.featureName === 'hooks', `native hook feature should resolve to canonical hooks on current Codex; got ${hookProbe.featureName}`);
-
-const parsedLegacyHookFeature = parseCodexFeatures('codex_hooks stable true\nmulti_agent stable true\n');
-const resolvedLegacyHookFeature = resolveCodexFeature(parsedLegacyHookFeature, 'hooks', ['codex_hooks']);
-assert(resolvedLegacyHookFeature?.name === 'codex_hooks', 'hook feature resolver should accept the 0.128 codex_hooks alias');
-const strippedLegacyFeatures = stripManagedFeaturesSection([
-  '[features]',
-  'goals = true',
-  'hooks = false',
-  'codex_hooks = true',
-  'multi_agent = true',
-  'foo = true',
-  '',
-].join('\n'));
-const strippedLegacyFalseFeatures = stripManagedFeaturesSection([
-  '[features]',
-  'goals = false',
-  'codex_hooks = false',
-  'multi_agent = false',
-  '',
-].join('\n'));
-const upsertedGoalsFeature = upsertFeatureFlag([
-  '[features]',
-  'goals = false',
-  'foo = true',
-  '',
-].join('\n'), chedexGoalsFeature, true);
-const appendedGoalsFeature = upsertFeatureFlag('model = "gpt-5.5"', chedexGoalsFeature, true);
-assert(!strippedLegacyFeatures.includes('goals = true'), 'managed feature cleanup should remove Chedex-managed goals=true config');
-assert(strippedLegacyFeatures.includes('hooks = false'), 'legacy feature cleanup must not remove user-owned canonical hooks config');
-assert(strippedLegacyFeatures.includes('foo = true'), 'legacy feature cleanup must preserve unrelated feature config');
-assert(!strippedLegacyFeatures.includes('codex_hooks = true'), 'legacy feature cleanup should remove old managed codex_hooks config');
-assert(!strippedLegacyFeatures.includes('multi_agent = true'), 'legacy feature cleanup should remove old managed multi_agent config');
-assert(strippedLegacyFalseFeatures.includes('goals = false'), 'managed feature cleanup must preserve user-owned goals=false config');
-assert(strippedLegacyFalseFeatures.includes('codex_hooks = false'), 'legacy feature cleanup must preserve user-owned codex_hooks=false config');
-assert(strippedLegacyFalseFeatures.includes('multi_agent = false'), 'legacy feature cleanup must preserve user-owned multi_agent=false config');
-assert(upsertedGoalsFeature.includes('goals = true'), 'feature upsert should enable goals in an existing features table');
-assert(!upsertedGoalsFeature.includes('goals = false'), 'feature upsert should replace disabled goals config');
-assert(appendedGoalsFeature.includes('[features]\ngoals = true'), 'feature upsert should append a features table when one is absent');
-
-const repoSkillDirs = (await readdir(repoPath('skills'), { withFileTypes: true }))
+const expectedSkills = [...listSkills()].sort();
+const actualSkills = (await readdir(repoPath('.agents', 'skills'), { withFileTypes: true }))
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
   .sort();
-const registeredSkills = [...listSkills()].sort();
-const legacySkills = [...legacySkillNames()].sort();
-
-const unprefixedRegisteredSkills = registeredSkills.filter((name) => !name.startsWith('cdx-'));
-if (unprefixedRegisteredSkills.length > 0) {
-  throw new Error(`registered Chedex skills must use the cdx- prefix: ${unprefixedRegisteredSkills.join(', ')}`);
-}
-
-const legacyRepoSkillDirs = repoSkillDirs.filter((name) => legacySkills.includes(name));
-if (legacyRepoSkillDirs.length > 0) {
-  throw new Error(`legacy unprefixed Chedex skill directories are not allowed: ${legacyRepoSkillDirs.join(', ')}`);
-}
-
-const bundledSystemSkills = ['imagegen', 'openai-docs', 'plugin-creator', 'skill-creator', 'skill-installer'];
-const collidingBundledSkills = registeredSkills.filter((name) => bundledSystemSkills.includes(name));
-if (collidingBundledSkills.length > 0) {
-  throw new Error(`registered Chedex skills collide with bundled Codex system skills: ${collidingBundledSkills.join(', ')}`);
-}
-
-if (JSON.stringify(repoSkillDirs) !== JSON.stringify(registeredSkills)) {
-  throw new Error(
-    `registered skills do not match skills/ directory:\nregistered=${registeredSkills.join(', ')}\nrepo=${repoSkillDirs.join(', ')}`,
-  );
-}
-
-const missingPrompts = anyMissing(roleNames().map((name) => rolePromptPath(name)));
-const missingAgents = anyMissing(roleNames().map((name) => generatedAgentPath(name)));
-const missingSkills = anyMissing(repoSkillDirs.map((name) => repoPath('skills', name, 'SKILL.md')));
-
-if (missingPrompts.length || missingAgents.length || missingSkills.length) {
-  throw new Error([
-    missingPrompts.length ? `missing prompts: ${missingPrompts.join(', ')}` : '',
-    missingAgents.length ? `missing agents: ${missingAgents.join(', ')}` : '',
-    missingSkills.length ? `missing skills: ${missingSkills.join(', ')}` : '',
-  ].filter(Boolean).join('\n'));
-}
-
-for (const name of roleNames()) {
-  const prompt = await readFile(rolePromptPath(name), 'utf8');
-  const agent = await readFile(generatedAgentPath(name), 'utf8');
-  if (!prompt.includes('description:')) {
-    throw new Error(`prompt missing frontmatter description for ${name}`);
-  }
-  const expectedAgent = buildAgentToml(ROLE_DEFINITIONS[name], stripFrontmatter(prompt));
-  if (agent !== expectedAgent) {
-    throw new Error(`generated agent is stale for ${name}: ${generatedAgentPath(name)}`);
-  }
-}
-
-for (const name of repoSkillDirs) {
-  const skill = await readFile(repoPath('skills', name, 'SKILL.md'), 'utf8');
-  if (!skill.includes(`name: ${name}`)) {
-    throw new Error(`skill frontmatter name mismatch for ${name}`);
-  }
-  if (!skill.includes('description:')) {
-    throw new Error(`skill missing frontmatter description for ${name}`);
-  }
-}
+assert(JSON.stringify(actualSkills) === JSON.stringify(expectedSkills), 'registered skills do not match .agents/skills');
+assert(actualSkills.every((name) => name.startsWith('cdx-')), 'all Chedex skills must use the cdx- prefix');
 
 const manifest = installManifestPaths();
-const requiredPaths = [manifest.templateAgents, manifest.promptsDir, manifest.skillsDir, manifest.agentsDir, manifest.hooksDir];
-const missingInstallPaths = anyMissing(requiredPaths);
-if (missingInstallPaths.length) {
-  throw new Error(`install manifest paths missing: ${missingInstallPaths.join(', ')}`);
-}
+const requiredPaths = [manifest.templateAgents, manifest.promptsDir, manifest.skillsDir, manifest.agentsDir];
+const missing = anyMissing(requiredPaths);
+assert(missing.length === 0, `missing install surfaces: ${missing.join(', ')}`);
 
-const skillDocSurfaces = [
-  repoPath('README.md'),
-  repoPath('docs', 'install.md'),
-  manifest.templateAgents,
-];
-
-for (const path of skillDocSurfaces) {
+for (const name of actualSkills) {
+  const path = join(manifest.skillsDir, name, 'SKILL.md');
   const content = await readFile(path, 'utf8');
-  for (const skill of registeredSkills) {
-    if (!content.includes(`\`${skill}\``)) {
-      throw new Error(`doc surface missing registered skill ${skill}: ${path}`);
-    }
-  }
-}
-
-const requiredContractDocs = [
-  repoPath('docs', 'guidance-schema.md'),
-  repoPath('docs', 'prompt-contract.md'),
-  repoPath('docs', 'native-delta-audit.md'),
-];
-const missingContractDocs = anyMissing(requiredContractDocs);
-if (missingContractDocs.length) {
-  throw new Error(`instruction contract docs missing: ${missingContractDocs.join(', ')}`);
-}
-
-const nativeDeltaAudit = await readFile(repoPath('docs', 'native-delta-audit.md'), 'utf8');
-for (const snippet of [
-  'Decision Labels',
-  'avoidable runtime delta',
-  '`keep`',
-  '`narrow`',
-  '`replace`',
-  '`remove`',
-  '`defer`',
-  'Current Surface Classification',
-  'Productivity Enhancement Candidates',
-  'npm run audit:codex',
-  'npm run install:user:dry',
-]) {
-  if (!nativeDeltaAudit.includes(snippet)) {
-    throw new Error(`native delta audit missing "${snippet}"`);
-  }
-}
-
-const requiredWorkflowSchemaFiles = [
-  repoPath('hooks', 'workflow-mode-schemas.mjs'),
-  repoPath('registry', 'workflow-mode-schemas.mjs'),
-  repoPath('registry', 'workflow-mode-schemas.ts'),
-  repoPath('hooks', 'codex-release-deltas.json'),
-];
-const missingWorkflowSchemaFiles = anyMissing(requiredWorkflowSchemaFiles);
-if (missingWorkflowSchemaFiles.length) {
-  throw new Error(`workflow schema surfaces missing: ${missingWorkflowSchemaFiles.join(', ')}`);
-}
-
-const explicitUserModelIntentDocSnippet = 'If the user explicitly specifies a sub-agent model or reasoning setting, treat that as binding over inherited or default settings unless it is unavailable or incompatible.';
-const explicitUserFallbackDocSnippet = 'If the explicit request cannot be honored, say so and use the closest compliant fallback instead of silently overriding it.';
-const explicitUserDefaultsAreFallbackDocSnippet = 'Built-in role defaults, inherited defaults, and generated agent defaults are fallback only and must not be used to justify ignoring an explicit user request.';
-const explicitCallerModelIntentPromptSnippet = 'Honor any explicit caller-specified sub-agent model or reasoning setting over inherited or default settings unless unavailable or incompatible.';
-const explicitCallerFallbackPromptSnippet = 'Treat built-in agent defaults as fallback only, and say so before using the closest compliant fallback.';
-
-const governorSurfaceChecks = [
-  [repoPath('README.md'), ['hooks', 'codex_hooks', 'multi_agent', 'hooks.json', '_active.json', 'handoff.json', 'UserPromptSubmit', chedexLatestVerifiedCodexVersion, 'durable evidence log', 'override repo defaults unless unavailable or incompatible', 'hooks/workflow-mode-schemas.mjs', 'registry/workflow-mode-schemas.mjs', '_archive.json', 'npm run audit:codex']],
-  [repoPath('docs', 'install.md'), ['hooks', 'codex_hooks', 'multi_agent', 'hooks.json', 'UserPromptSubmit', chedexMinimumCodexVersion, chedexLatestVerifiedCodexVersion, '_codex_release_audit.json', '_codex_release_deltas.json', '_archive.json', 'phase-aware artifacts', 'managed:v1', 'npm run audit:codex']],
-  [repoPath('docs', 'governor.md'), ['workflow-sync', 'SessionStart', 'UserPromptSubmit', 'Stop', 'handoff.json', 'risks', 'release audit', 'multi_agent', 'durable evidence log', 'autoresearch-plan is not a governed mode', chedexMinimumCodexVersion, chedexLatestVerifiedCodexVersion, 'hooks/workflow-mode-schemas.mjs', 'registry/workflow-mode-schemas.mjs', 'verification-complete', '_archive.json', 'completion_token', 'workflow-lock-repair', 'phase-aware artifact requirements', 'npm run audit:codex']],
-  [repoPath('README.md'), ['~/.codex/workflows/deep-interview/', 'interview.md', 'not governed by `progress.json` or `handoff.json` by default']],
-  [repoPath('docs', 'install.md'), ['~/.codex/workflows/deep-interview/', 'interview.md', 'does not require `progress.json` or `handoff.json` by default']],
-  [repoPath('README.md'), ['~/.codex/workflows/autoresearch-plan/', '~/.codex/workflows/autoresearch-loop/', 'results.tsv']],
-  [repoPath('docs', 'install.md'), ['~/.codex/workflows/autoresearch-plan/', '~/.codex/workflows/autoresearch-loop/', 'results.tsv']],
-  [repoPath('docs', 'guidance-schema.md'), ['Role And Intent', 'Execution Protocol', 'Verification And Completion', 'explicitly invoked by name first', 'behavioral contract needs surface-specific wording', 'make it explicit in the prompts and their verification', 'fallback only']],
-  [repoPath('docs', 'prompt-contract.md'), ['Compact, Evidence-Dense Output', 'Local Task Updates Override Locally', 'Persist With Tools Until The Claim Is Grounded', 'explicit invocation', 'Respect Explicit User Model Intent', explicitUserModelIntentDocSnippet, explicitUserFallbackDocSnippet, explicitUserDefaultsAreFallbackDocSnippet, 'Must preserve the same behaviors in role-appropriate wording.', 'explicit caller-specified sub-agent model or reasoning settings over inherited or default settings unless unavailable or incompatible', 'fallback only']],
-  [repoPath('docs', 'customizing.md'), ['docs/guidance-schema.md', 'docs/prompt-contract.md', 'explicit invocation by name', 'binding over inherited or default settings unless unavailable or incompatible', 'relevant files under `prompts/`', 'generated files under `agents/` when prompts change', 'mirrored files under `.codex/` when mirrored source surfaces change', 'npm run generate:agents', 'npm run refresh:mirror', 'npm run verify', 'fallback only', 'hooks/workflow-mode-schemas.mjs', 'registry/workflow-mode-schemas.mjs']],
-  [repoPath('skills', 'cdx-clarify', 'SKILL.md'), ['Recommended next step', 'cdx-ralph', 'cdx-autopilot']],
-  [repoPath('skills', 'cdx-clarify', 'SKILL.md'), ['Decision boundaries']],
-  [repoPath('skills', 'cdx-deep-interview', 'SKILL.md'), ['$CODEX_HOME/workflows/deep-interview', 'context.md', 'interview.md', 'spec.md', 'Decision boundaries', 'Do not implement directly inside `cdx-deep-interview`', 'source of truth']],
-  [repoPath('skills', 'cdx-autoresearch-plan', 'SKILL.md'), ['$CODEX_HOME/workflows/autoresearch-plan', 'spec.md', 'results.tsv', 'research spec']],
-  [repoPath('skills', 'cdx-autoresearch-loop', 'SKILL.md'), ['$CODEX_HOME/workflows/autoresearch-loop', 'results.tsv', 'handoff.json', 'progress.json', 'Use `mode: "autoresearch-loop"`', 'verification.review']],
-  [repoPath('skills', 'cdx-execute', 'SKILL.md'), ['Escalate to `cdx-plan`', 'Escalate to `cdx-ralph`', 'Escalate to `cdx-autopilot`']],
-  [repoPath('skills', 'cdx-review', 'SKILL.md'), ['Verdict: APPROVE / REVISE / REJECT', 'Findings first']],
-  [repoPath('skills', 'cdx-tdd', 'SKILL.md'), ['Use this only when', 'cdx-execute` or `cdx-review`']],
-  [repoPath('skills', 'cdx-plan', 'SKILL.md'), ['handoff.json', 'architect', 'verifier', 'Decision boundaries', 'loop contract', 'handoff.json.approvals']],
-  [repoPath('skills', 'cdx-ralph', 'SKILL.md'), ['schema_version', 'workflow_root', 'verification', 'risks', 'verification.review', 'approvals']],
-  [repoPath('skills', 'cdx-autopilot', 'SKILL.md'), ['governed workflow owner', 'Iteration Boundaries', 'progress.json', 'handoff.json', 'cdx-autoresearch-loop', 'verification.review', 'approvals']],
-  [repoPath('skills', 'cdx-ultrawork', 'SKILL.md'), ['$CODEX_HOME/workflows/ultrawork', 'verify.md', 'handoff.json', 'cdx-autoresearch-loop', 'verification.review']],
-  [repoPath('AGENTS.template.md'), ['SessionStart', 'Stop', 'terminal', 'docs/guidance-schema.md', 'docs/prompt-contract.md', 'explicitly invoked by name first', 'If the user explicitly specifies a sub-agent model, treat that choice as binding over inherited or default settings unless the requested model is unavailable or incompatible.', 'If the user explicitly specifies sub-agent reasoning effort, treat that choice as binding over inherited or default settings unless the requested setting is unavailable or incompatible.', 'Do not override, downgrade, or swap', 'fallback only; they never justify silently overriding an explicit user request', 'Non-governed requirements workflows such as `cdx-deep-interview` may persist durable artifacts there without `progress.json` or `handoff.json`.', '`cdx-autoresearch-loop` is the governed research execution mode']],
-];
-
-for (const [path, snippets] of governorSurfaceChecks) {
-  const content = await readFile(path, 'utf8');
-  for (const snippet of snippets) {
-    if (!content.includes(snippet)) {
-      throw new Error(`governor surface missing "${snippet}": ${path}`);
-    }
-  }
+  assert(content.startsWith('---\n'), `skill ${name} is missing frontmatter`);
+  assert(content.includes(`name: ${name}`), `skill ${name} has the wrong frontmatter name`);
+  assert(/^description:\s*\S/m.test(content), `skill ${name} is missing a description`);
 }
 
 for (const name of roleNames()) {
   const prompt = await readFile(rolePromptPath(name), 'utf8');
-  if (!prompt.includes(explicitCallerModelIntentPromptSnippet)) {
-    throw new Error(`role prompt missing explicit caller model-intent rule for ${name}: ${rolePromptPath(name)}`);
-  }
-  if (!prompt.includes(explicitCallerFallbackPromptSnippet)) {
-    throw new Error(`role prompt missing explicit caller fallback rule for ${name}: ${rolePromptPath(name)}`);
-  }
+  assert(/^description:\s*\S/m.test(prompt), `prompt ${name} is missing a description`);
+  const generated = await readFile(generatedAgentPath(name), 'utf8');
+  const expected = buildAgentToml(ROLE_DEFINITIONS[name], stripFrontmatter(prompt));
+  assert(generated === expected, `generated agent is stale: ${generatedAgentPath(name)}`);
+  assert(generated.includes(`name = "${name}"`), `agent ${name} is missing name`);
+  assert(generated.includes(`description = "${ROLE_DEFINITIONS[name].summary}"`), `agent ${name} is missing description`);
+  assert(generated.includes('developer_instructions = """'), `agent ${name} is missing developer instructions`);
+  assert(!generated.includes('model_reasoning_effort ='), `agent ${name} should inherit native caller/default effort`);
 }
 
-for (const name of roleNames()) {
-  const agent = await readFile(generatedAgentPath(name), 'utf8');
-  if (!agent.includes(explicitCallerModelIntentPromptSnippet)) {
-    throw new Error(`generated agent missing explicit caller model-intent rule for ${name}: ${generatedAgentPath(name)}`);
-  }
-  if (!agent.includes(explicitCallerFallbackPromptSnippet)) {
-    throw new Error(`generated agent missing explicit caller fallback rule for ${name}: ${generatedAgentPath(name)}`);
-  }
-}
-
-const installScript = await readFile(repoPath('scripts', 'install-user.mjs'), 'utf8');
-if (!installScript.includes('mergeManagedHooksConfig') || !installScript.includes('probeCodexHooksSupport') || !installScript.includes('hook_review=')) {
-  throw new Error('install-user.mjs is missing native hook wiring');
-}
-if (!installScript.includes('stripManagedFeaturesSection') || !installScript.includes('upsertFeatureFlag')) {
-  throw new Error('install-user.mjs must strip legacy managed feature flags and enable the managed goals feature');
-}
-
-const uninstallScript = await readFile(repoPath('scripts', 'uninstall-user.mjs'), 'utf8');
-if (!uninstallScript.includes('stripManagedHooksConfig')) {
-  throw new Error('uninstall-user.mjs is missing managed hook cleanup');
-}
-
-const mirrorScript = await readFile(repoPath('scripts', 'refresh-repo-mirror.mjs'), 'utf8');
-for (const snippet of ['copyTree', '.codex', 'mirrorHookAssetsDir']) {
-  if (!mirrorScript.includes(snippet)) {
-    throw new Error(`refresh-repo-mirror.mjs missing "${snippet}"`);
-  }
-}
-
-const governorRuntime = await readFile(repoPath('hooks', 'chedex-governor.mjs'), 'utf8');
-for (const snippet of ['session-start', 'workflow-sync', 'workflow-clear', 'workflow-lock-repair', 'verification-complete', 'risks must be an array', 'buildReleaseAudit', 'cleanupReleaseAuditCaches', 'MODE_SCHEMAS', '_archive.json', 'repairStaleWorkflowLocks', 'collectRequiredArtifactsForProgress', 'active workflow owner replacement requires --replace']) {
-  if (!governorRuntime.includes(snippet)) {
-    throw new Error(`governor runtime missing "${snippet}"`);
-  }
-}
-
-const releaseAuditRuntime = await readFile(repoPath('hooks', 'codex-release-audit.mjs'), 'utf8');
-for (const snippet of ['registry.npmjs.org', 'renderReleaseAuditAdvisory', 'CODEX_RELEASE_DELTAS_URL', 'codex-release-deltas.json', 'CHEDEX_RELEASE_DELTA_COMPAT_VERSION', 'codex update']) {
-  if (!releaseAuditRuntime.includes(snippet)) {
-    throw new Error(`release audit runtime missing "${snippet}"`);
-  }
-}
-
-const codexSurfaceAuditRuntime = await readFile(repoPath('scripts', 'audit-codex-surface.mjs'), 'utf8');
-for (const snippet of ['codex update', 'plugin_marketplace', 'generate-json-schema', 'ThreadGoalSetParams', 'ExternalAgentConfigImportParams', 'PluginShareSaveParams', 'ProcessSpawnParams', 'HooksListResponse', 'isManaged', 'trustStatus', 'optional_release_features']) {
-  if (!codexSurfaceAuditRuntime.includes(snippet)) {
-    throw new Error(`codex surface audit runtime missing "${snippet}"`);
-  }
-}
-
-const libContent = await readFile(repoPath('scripts', 'lib.mjs'), 'utf8');
-if (!libContent.includes("return process.env.CODEX_HOME || join(homedir(), '.codex');")) {
-  throw new Error('codexHome() no longer resolves to ~/.codex');
-}
-for (const snippet of ['chedexMinimumCodexVersion', 'chedexRequiredFeatureStage', 'chedexGoalsFeature', 'upsertFeatureFlag', 'mergeManagedHooksConfig', 'probeCodexHooksSupport', 'detectInlineManagedHookDuplicates', 'managed:v1']) {
-  if (!libContent.includes(snippet)) {
-    throw new Error(`lib.mjs missing ${snippet}`);
-  }
-}
-if (libContent.includes('function upsertFeaturesSection') || libContent.includes('chedexUserPromptSubmitMinimumCodexVersion')) {
-  throw new Error('lib.mjs still contains legacy feature-flag write or conditional UserPromptSubmit install logic');
-}
-
-const mirrorRequiredPaths = [
-  repoPath('.codex', 'AGENTS.md'),
-  repoPath('.codex', 'prompts'),
-  repoPath('.codex', 'skills'),
-  repoPath('.codex', 'agents'),
-  repoPath('.codex', 'hooks', 'chedex'),
-];
-const missingMirrorPaths = anyMissing(mirrorRequiredPaths);
-if (missingMirrorPaths.length) {
-  throw new Error(`.codex mirror is incomplete: ${missingMirrorPaths.join(', ')}`);
-}
-
-await assertFileEqual(manifest.templateAgents, repoPath('.codex', 'AGENTS.md'), '.codex/AGENTS.md');
-await assertTreeEqual(manifest.promptsDir, repoPath('.codex', 'prompts'), '.codex/prompts');
-await assertTreeEqual(manifest.skillsDir, repoPath('.codex', 'skills'), '.codex/skills');
-await assertTreeEqual(manifest.agentsDir, repoPath('.codex', 'agents'), '.codex/agents');
-await assertTreeEqual(manifest.hooksDir, repoPath('.codex', 'hooks', 'chedex'), '.codex/hooks/chedex');
-
-const quotedHookCommand = buildManagedHooksConfig({
-  hookRuntimePath: '/tmp/Codex Home/hooks/chedex/chedex-governor.mjs',
-}).hooks.SessionStart[0].hooks[0].command;
-assert(quotedHookCommand.startsWith("'"), 'managed hook commands must shell-quote the node executable');
-assert(quotedHookCommand.includes("'/tmp/Codex Home/hooks/chedex/chedex-governor.mjs'"), 'managed hook commands must shell-quote governor paths');
-const quotedUserPromptSubmitCommand = buildManagedHooksConfig({
-  hookRuntimePath: '/tmp/Codex Home/hooks/chedex/chedex-governor.mjs',
-}).hooks.UserPromptSubmit[0].hooks[0].command;
-assert(quotedUserPromptSubmitCommand.includes(' user-prompt-submit'), 'managed hook config should expose the prompt-submit governor command');
-
-for (const path of [repoPath('README.md'), repoPath('docs', 'customizing.md')]) {
+const docSurfaces = [repoPath('README.md'), repoPath('docs', 'install.md'), repoPath('AGENTS.template.md')];
+for (const path of docSurfaces) {
   const content = await readFile(path, 'utf8');
-  if (!content.includes('registry/agent-definitions.mjs')) {
-    throw new Error(`doc surface missing registry/agent-definitions.mjs guidance: ${path}`);
+  for (const skill of actualSkills) {
+    assert(content.includes(`\`${skill}\``), `${path} does not document ${skill}`);
   }
 }
 
-const architectAgentBeforeDryRun = await readFile(repoPath('agents', 'architect.toml'), 'utf8');
-execFileSync(process.execPath, [repoPath('scripts', 'install-user.mjs'), '--dry-run'], {
-  cwd: repoPath(),
-  env: process.env,
-  encoding: 'utf8',
-});
-const architectAgentAfterDryRun = await readFile(repoPath('agents', 'architect.toml'), 'utf8');
-assert(architectAgentBeforeDryRun === architectAgentAfterDryRun, 'install-user --dry-run must not rewrite generated agents');
+const extraction = await readFile(repoPath('docs', 'omx-skill-extraction.md'), 'utf8');
+for (const snippet of [
+  '0.20.3',
+  '6c970cc12da256bfc7667edd0a9183b158d4a7a7',
+  'Complete OMX Skill Disposition',
+  'Catalog skills | 50',
+  'PORT',
+  'MERGE',
+  'NATIVE',
+  'DROP',
+  'no OMX command',
+  'Codex CLI `0.145.0`',
+]) {
+  assert(extraction.includes(snippet), `extraction audit is missing ${snippet}`);
+}
+const dispositionRows = extraction.split('\n').filter((line) => /^\| \d+ \| `/.test(line));
+assert(dispositionRows.length === 50, `extraction audit should classify 50 skills; found ${dispositionRows.length}`);
 
-const installHomeRoot = await mkdtemp(join(tmpdir(), 'chedex verify '));
-const installHome = join(installHomeRoot, 'Codex Home');
-const customAgents = '# custom user agents\n';
-const customHook = '#!/usr/bin/env node\nprocess.stdout.write("custom hook\\n");\n';
-const siblingHookAsset = join(installHome, 'hooks', 'chedex', 'custom-helper.txt');
-await mkdir(join(installHome, 'hooks', 'chedex'), { recursive: true });
-await writeFile(join(installHome, 'AGENTS.md'), customAgents);
-await writeFile(join(installHome, 'hooks', 'chedex', 'chedex-governor.mjs'), customHook);
-await writeFile(siblingHookAsset, 'keep me\n');
-
-const installEnv = {
-  ...process.env,
-  CODEX_HOME: installHome,
-};
-
-execFileSync(process.execPath, [repoPath('scripts', 'install-user.mjs')], {
-  cwd: repoPath(),
-  env: installEnv,
-  encoding: 'utf8',
-});
-
-const installedHooksConfig = JSON.parse(await readFile(join(installHome, 'hooks.json'), 'utf8'));
-const sessionStartCommand = installedHooksConfig.hooks.SessionStart[0].hooks[0].command;
-assert(sessionStartCommand.includes(`'${join(installHome, 'hooks', 'chedex', 'chedex-governor.mjs')}'`), 'install-user should quote managed hook runtime paths');
-assert(installedHooksConfig.hooks.SessionStart[0].matcher === '^(startup|resume|clear)$', 'install-user should preserve the SessionStart startup/resume/clear matcher');
-if (hookProbe.supportedHookEvents.includes('UserPromptSubmit')) {
-  assert(installedHooksConfig.hooks.UserPromptSubmit[0].hooks[0].command.includes('user-prompt-submit'), 'install-user should wire the prompt-submit governor command when supported');
+const nativeDelta = await readFile(repoPath('docs', 'native-delta-audit.md'), 'utf8');
+for (const snippet of [
+  `Minimum Codex CLI: \`${chedexMinimumCodexVersion}\``,
+  `Latest verified Codex CLI: \`${chedexLatestVerifiedCodexVersion}\``,
+  'goals are stable and on by default',
+  '.agents/skills',
+  'description',
+  'Bounded Hook Delta',
+  'rust-v0.145.0',
+]) {
+  assert(nativeDelta.includes(snippet), `native delta audit is missing ${snippet}`);
 }
 
-execFileSync(process.execPath, [repoPath('scripts', 'uninstall-user.mjs')], {
-  cwd: repoPath(),
-  env: installEnv,
-  encoding: 'utf8',
-});
+const readme = await readFile(repoPath('README.md'), 'utf8');
+for (const snippet of ['native Goal mode', 'native subagents', '.agents/skills', '.codex/agents', '.codex/hooks.json', 'npm run audit:codex', 'rust-v0.145.0']) {
+  assert(readme.includes(snippet), `README is missing ${snippet}`);
+}
 
-assert((await readFile(join(installHome, 'AGENTS.md'), 'utf8')) === customAgents, 'uninstall-user should restore a pre-existing AGENTS.md');
-assert((await readFile(join(installHome, 'hooks', 'chedex', 'chedex-governor.mjs'), 'utf8')) === customHook, 'uninstall-user should restore a pre-existing hook runtime');
-assert((await readFile(siblingHookAsset, 'utf8')) === 'keep me\n', 'uninstall-user should not remove sibling hook assets');
-assert(anyMissing([join(installHome, 'config.toml')]).length === 1, 'uninstall-user should remove config.toml when install created it and no user config remains');
-assert(anyMissing([join(installHome, 'hooks.json')]).length === 1, 'uninstall-user should remove hooks.json when install created it and no user hooks remain');
+const hookDocs = await readFile(repoPath('docs', 'hooks.md'), 'utf8');
+for (const snippet of ['Codex discovers', 'PreToolUse', 'PostToolUse', 'hash-based review', 'v0.20.3']) {
+  assert(hookDocs.includes(snippet), `hook docs are missing ${snippet}`);
+}
 
-process.stdout.write(`verify-ok roles=${Object.keys(ROLE_DEFINITIONS).length} skills=${repoSkillDirs.length}\n`);
+const installDocs = await readFile(repoPath('docs', 'install.md'), 'utf8');
+for (const snippet of ['~/.agents/skills', '~/.codex/agents', 'does not install hooks', 'does not write feature flags', 'npm run uninstall:user']) {
+  assert(installDocs.includes(snippet), `install docs are missing ${snippet}`);
+}
+
+const mjsFiles = [
+  ...((await readdir(repoPath('scripts'))).filter((name) => name.endsWith('.mjs')).map((name) => repoPath('scripts', name))),
+  repoPath('hooks', 'chedex-native-hook.mjs'),
+  repoPath('registry', 'agent-definitions.mjs'),
+];
+for (const path of mjsFiles) {
+  execFileSync(process.execPath, ['--check', path], { stdio: 'pipe' });
+}
+
+process.stdout.write(`verify-repo-ok roles=${roleNames().length} skills=${actualSkills.length}\n`);

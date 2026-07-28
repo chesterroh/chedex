@@ -1,150 +1,92 @@
 import { copyFile, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import {
   copyTree,
+  ensureDir,
   fileExists,
-  installManifestPaths,
   installTargets,
   isEffectivelyEmptyHooksConfig,
-  legacySkillNames,
-  listRelativeFiles,
-  listSkills,
   readJsonIfExists,
   readTextIfExists,
   removeDirIfEmpty,
-  roleNames,
-  stripChedexBlock,
-  stripManagedFeaturesSection,
-  stripManagedHooksConfig,
+  removeTree,
+  stripLegacyChedexConfig,
+  stripLegacyChedexHooks,
+  stripManagedAgentsBlock,
   writeFileIfChanged,
   writeJsonIfChanged,
 } from './lib.mjs';
 
 const dryRun = process.argv.includes('--dry-run');
 const targets = installTargets();
-const manifest = installManifestPaths();
+const state = await readJsonIfExists(targets.uninstallStatePath, null);
 
-const configPresent = await fileExists(targets.configPath);
-const currentConfig = await readTextIfExists(targets.configPath);
-const configWithoutManagedBlock = stripChedexBlock(currentConfig).trimEnd();
-const nextConfig = stripManagedFeaturesSection(configWithoutManagedBlock).trimEnd();
-const currentHooksConfig = await readJsonIfExists(targets.hooksConfigPath, null);
-const nextHooksConfig = stripManagedHooksConfig(currentHooksConfig);
-const uninstallState = await readJsonIfExists(targets.uninstallStatePath, null);
-const managedPromptPaths = roleNames().map((name) => join(targets.promptsDir, `${name}.md`));
-const managedAgentPaths = roleNames().map((name) => join(targets.agentsDir, `${name}.toml`));
-const managedSkillPaths = [...listSkills(), ...legacySkillNames()].map((name) => join(targets.skillsDir, name));
-
-async function restoreBackupIfPresent(backupPath, targetPath) {
-  if (!backupPath || !(await fileExists(backupPath))) {
-    return false;
-  }
-  await copyFile(backupPath, targetPath);
-  return true;
+if (!state) {
+  process.stderr.write('warning: rollback state is missing; preserving agent and skill files because ownership cannot be proven\n');
 }
 
-async function restoreManagedPath(targetPath, entry) {
-  if (!entry || !entry.backup_path || !(await fileExists(entry.backup_path))) {
-    await rm(targetPath, { recursive: true, force: true });
-    return;
+async function restoreEntry(entry) {
+  if (!entry?.target_path) return;
+  await removeTree(entry.target_path);
+  if (!entry.backup_path || !(await fileExists(entry.backup_path))) return;
+  if (entry.type === 'directory') await copyTree(entry.backup_path, entry.target_path);
+  else {
+    await ensureDir(dirname(entry.target_path));
+    await copyFile(entry.backup_path, entry.target_path);
   }
-
-  await rm(targetPath, { recursive: true, force: true });
-  if (entry.type === 'directory') {
-    await copyTree(entry.backup_path, targetPath);
-  } else {
-    await copyFile(entry.backup_path, targetPath);
-  }
-}
-
-function unionManagedPaths(currentPaths, recordedEntries) {
-  const allPaths = new Set(currentPaths);
-  for (const entry of recordedEntries || []) {
-    if (entry?.target_path) {
-      allPaths.add(entry.target_path);
-    }
-  }
-  return [...allPaths];
-}
-
-const hookEntries = Array.isArray(uninstallState?.managed_paths?.hooks)
-  ? [...uninstallState.managed_paths.hooks]
-  : [];
-const hookAssetsEntry = hookEntries.find((entry) => entry?.target_path === targets.hookAssetsDir)
-  || (uninstallState?.backups?.hookAssetsDir
-    ? {
-      target_path: targets.hookAssetsDir,
-      backup_path: uninstallState.backups.hookAssetsDir,
-      type: 'directory',
-    }
-    : null);
-
-if (!hookAssetsEntry && !hookEntries.some((entry) => entry?.target_path === targets.hookRuntimePath) && uninstallState?.backups?.hookRuntime) {
-  hookEntries.push({
-    target_path: targets.hookRuntimePath,
-    backup_path: uninstallState.backups.hookRuntime,
-    type: 'file',
-  });
 }
 
 if (!dryRun) {
-  if (configPresent) {
-    const restoredConfig = await restoreBackupIfPresent(uninstallState?.backups?.config, targets.configPath);
-    if (!restoredConfig) {
-      if (nextConfig) {
-        await writeFileIfChanged(targets.configPath, `${nextConfig}\n`);
-      } else {
-        await rm(targets.configPath, { force: true });
-      }
-    }
+  const entriesByBucket = state?.managed_paths || {};
+  for (const entry of entriesByBucket.agents || []) await restoreEntry(entry);
+  for (const entry of entriesByBucket.skills || []) await restoreEntry(entry);
+  for (const entry of entriesByBucket.prompts || []) await restoreEntry(entry);
+
+  let restoredLegacyHookBackup = false;
+  for (const entry of entriesByBucket.hooks || []) {
+    await restoreEntry(entry);
+    if (entry?.backup_path && await fileExists(entry.backup_path)) restoredLegacyHookBackup = true;
   }
 
-  if (currentHooksConfig) {
-    const restoredHooks = await restoreBackupIfPresent(uninstallState?.backups?.hooksConfig, targets.hooksConfigPath);
-    if (!restoredHooks) {
-      if (isEffectivelyEmptyHooksConfig(nextHooksConfig)) {
-        await rm(targets.hooksConfigPath, { force: true });
-      } else {
-        await writeJsonIfChanged(targets.hooksConfigPath, nextHooksConfig);
-      }
-    }
-  }
-
-  for (const targetPath of unionManagedPaths(managedPromptPaths, uninstallState?.managed_paths?.prompts)) {
-    const entry = uninstallState?.managed_paths?.prompts?.find((candidate) => candidate.target_path === targetPath);
-    await restoreManagedPath(targetPath, entry);
-  }
-
-  for (const targetPath of unionManagedPaths(managedAgentPaths, uninstallState?.managed_paths?.agents)) {
-    const entry = uninstallState?.managed_paths?.agents?.find((candidate) => candidate.target_path === targetPath);
-    await restoreManagedPath(targetPath, entry);
-  }
-
-  for (const targetPath of unionManagedPaths(managedSkillPaths, uninstallState?.managed_paths?.skills)) {
-    const entry = uninstallState?.managed_paths?.skills?.find((candidate) => candidate.target_path === targetPath);
-    await restoreManagedPath(targetPath, entry);
-  }
-
-  const restoredAgentsMd = await restoreBackupIfPresent(uninstallState?.backups?.agentsMd, targets.agentsMdPath);
-  if (!restoredAgentsMd) {
+  if (state?.schema_version === 1 && state?.backups?.agentsMd && await fileExists(state.backups.agentsMd)) {
+    await copyFile(state.backups.agentsMd, targets.agentsMdPath);
+  } else if (state?.schema_version === 1 && state?.existing_before?.agentsMd === false) {
     await rm(targets.agentsMdPath, { force: true });
+  } else {
+    const currentAgents = await readTextIfExists(targets.agentsMdPath);
+    const cleanAgents = stripManagedAgentsBlock(currentAgents);
+    if (cleanAgents) await writeFileIfChanged(targets.agentsMdPath, `${cleanAgents}\n`);
+    else await rm(targets.agentsMdPath, { force: true });
   }
 
-  if (hookAssetsEntry) {
-    await restoreManagedPath(targets.hookAssetsDir, hookAssetsEntry);
-  } else {
-    const managedHookPaths = (await listRelativeFiles(manifest.hooksDir)).map((relativePath) => join(targets.hookAssetsDir, relativePath));
-    for (const targetPath of unionManagedPaths(managedHookPaths, hookEntries)) {
-      const entry = hookEntries.find((candidate) => candidate.target_path === targetPath);
-      await restoreManagedPath(targetPath, entry);
+  const currentConfig = await readTextIfExists(targets.configPath);
+  const cleanConfig = stripLegacyChedexConfig(currentConfig, {
+    stripFeatureFlags: Boolean(state),
+  });
+  if (cleanConfig !== currentConfig.trim()) {
+    if (cleanConfig) await writeFileIfChanged(targets.configPath, `${cleanConfig}\n`);
+    else await rm(targets.configPath, { force: true });
+  }
+
+  const currentHooks = await readJsonIfExists(targets.hooksConfigPath, null);
+  if (currentHooks) {
+    const cleanHooks = stripLegacyChedexHooks(currentHooks);
+    if (isEffectivelyEmptyHooksConfig(cleanHooks)) await rm(targets.hooksConfigPath, { force: true });
+    else await writeJsonIfChanged(targets.hooksConfigPath, cleanHooks);
+  }
+
+  if (!restoredLegacyHookBackup) {
+    for (const filename of ['chedex-governor.mjs', 'codex-release-audit.mjs', 'codex-release-deltas.json', 'workflow-mode-schemas.mjs']) {
+      await rm(join(targets.legacyHookAssetsDir, filename), { force: true });
     }
   }
+  await removeDirIfEmpty(targets.legacyHookAssetsDir);
+  await removeDirIfEmpty(dirname(targets.legacyHookAssetsDir));
+  await removeDirIfEmpty(targets.agentsDir);
+  await removeDirIfEmpty(targets.skillsDir);
 
-  await removeDirIfEmpty(targets.hookAssetsDir);
-  await removeDirIfEmpty(targets.hooksDir);
-
-  await rm(targets.uninstallPath, { recursive: true, force: true });
+  await rm(targets.uninstallPath, { force: true });
   await rm(targets.uninstallStatePath, { force: true });
 }
 
-process.stdout.write(`dry_run=${dryRun ? 'true' : 'false'}\n`);
+process.stdout.write(`dry_run=${dryRun}\n`);

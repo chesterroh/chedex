@@ -11,7 +11,7 @@ Use this when editing:
 
 - `AGENTS.template.md`
 - role prompts in `prompts/`
-- workflow skills in `skills/`
+- workflow skills in `.agents/skills/`
 
 ## Core Behaviors
 
@@ -96,7 +96,7 @@ Should preserve the same behaviors at workflow scope.
 Examples:
 
 - `cdx-clarify` should reduce ambiguity without over-questioning
-- `cdx-plan` should produce testable steps and governed handoff artifacts when needed
+- `cdx-plan` should produce testable steps and use native continuation surfaces when needed
 
 ## Skill Invocation Policy
 
@@ -120,5 +120,5 @@ Before concluding a prompt or skill contract edit, check:
 5. verification is still evidence-backed
 6. risks and gaps are still explicit
 7. explicit user model or reasoning requests are still honored over defaults rather than silently overridden
-8. regenerated agents and mirrored prompt surfaces still preserve the updated prompt contract
+8. regenerated agents in `.codex/agents/` still preserve the updated prompt contract
 9. built-in defaults are still described and treated as fallback only

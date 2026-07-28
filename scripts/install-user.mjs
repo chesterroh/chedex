@@ -1,33 +1,29 @@
-import { copyFile } from 'node:fs/promises';
+import { copyFile, rm } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import {
-  buildAgentConfigBlock,
-  chedexMarkerEnd,
-  chedexMarkerStart,
-  chedexGoalsFeature,
+  chedexMinimumCodexVersion,
+  compareSemver,
   copyPath,
   copyTree,
-  detectInlineManagedHookDuplicates,
-  ensureExecutable,
   ensureDir,
   fileExists,
   installManifestPaths,
   installTargets,
-  legacySkillNames,
-  listRelativeFiles,
+  isEffectivelyEmptyHooksConfig,
   listSkills,
-  mergeManagedHooksConfig,
-  probeCodexHooksSupport,
+  parseSemver,
+  readCodexVersion,
   readJsonIfExists,
   readTextIfExists,
+  removeDirIfEmpty,
   removeTree,
   renderUninstallNote,
   roleNames,
   staleGeneratedAgents,
-  stripChedexBlock,
-  stripManagedFeaturesSection,
+  stripLegacyChedexConfig,
+  stripLegacyChedexHooks,
+  mergeManagedAgentsBlock,
   timestampSlug,
-  upsertFeatureFlag,
   writeFileIfChanged,
   writeJsonIfChanged,
 } from './lib.mjs';
@@ -35,249 +31,139 @@ import {
 const dryRun = process.argv.includes('--dry-run');
 const targets = installTargets();
 const manifest = installManifestPaths();
-const backupSlug = timestampSlug();
-const backupRoot = join(targets.backupsDir, backupSlug);
-const configPresentBefore = await fileExists(targets.configPath);
-const existingConfig = await readTextIfExists(targets.configPath);
-const hooksConfigPresentBefore = await fileExists(targets.hooksConfigPath);
-const agentsMdPresentBefore = await fileExists(targets.agentsMdPath);
-const hookAssetsDirPresentBefore = await fileExists(targets.hookAssetsDir);
-const hookRuntimePresentBefore = await fileExists(targets.hookRuntimePath);
-const managedPromptPaths = roleNames().map((name) => join(targets.promptsDir, `${name}.md`));
-const managedAgentPaths = roleNames().map((name) => join(targets.agentsDir, `${name}.toml`));
-const managedSkillPaths = [...listSkills(), ...legacySkillNames()].map((name) => join(targets.skillsDir, name));
-const managedHookPaths = (await listRelativeFiles(manifest.hooksDir)).map((relativePath) => join(targets.hookAssetsDir, relativePath));
-const currentHooksConfig = await readJsonIfExists(targets.hooksConfigPath, { hooks: {} });
-const previousUninstallState = await readJsonIfExists(targets.uninstallStatePath, null);
-const hookProbe = probeCodexHooksSupport();
-const inlineHookDuplicates = detectInlineManagedHookDuplicates(existingConfig, {
-  supportedHookEvents: hookProbe.supportedHookEvents,
-});
-const uninstallBackups = [];
-const uninstallState = {
-  schema_version: 1,
-  existing_before: {
-    config: configPresentBefore,
-    hooksConfig: hooksConfigPresentBefore,
-    agentsMd: agentsMdPresentBefore,
-    hookAssetsDir: hookAssetsDirPresentBefore,
-    hookRuntime: hookRuntimePresentBefore,
-  },
-  backups: {
-    config: null,
-    hooksConfig: null,
-    agentsMd: null,
-    hookAssetsDir: null,
-    hookRuntime: null,
-  },
-  managed_paths: {
-    prompts: [],
-    agents: [],
-    skills: [],
-    hooks: [],
-  },
-};
+const previousState = await readJsonIfExists(targets.uninstallStatePath, null);
+const versionText = readCodexVersion();
+const installedVersion = parseSemver(versionText);
 
-function unionManagedPaths(currentPaths, recordedEntries) {
-  const allPaths = new Set(currentPaths);
-  for (const entry of recordedEntries || []) {
-    if (entry?.target_path) {
-      allPaths.add(entry.target_path);
-    }
-  }
-  return [...allPaths];
-}
-
-function backupDestinationFor(targetPath) {
-  const relativePath = relative(targets.codexHome, targetPath);
-  if (!relativePath || relativePath.startsWith('..')) {
-    throw new Error(`refusing to write backup outside CODEX_HOME: ${targetPath}`);
-  }
-  return join(backupRoot, relativePath);
-}
-
-async function backupManagedPath(targetPath, bucket) {
-  if (!(await fileExists(targetPath))) {
-    uninstallState.managed_paths[bucket].push({
-      target_path: targetPath,
-      backup_path: null,
-      type: null,
-    });
-    return;
-  }
-
-  const backupPath = backupDestinationFor(targetPath);
-  const type = await copyPath(targetPath, backupPath);
-  uninstallBackups.push(backupPath);
-  uninstallState.managed_paths[bucket].push({
-    target_path: targetPath,
-    backup_path: backupPath,
-    type,
-  });
-}
-
-if (!hookProbe.ok) {
-  throw new Error(`Chedex requires Codex native hooks support: ${hookProbe.reason}`);
-}
-
-const inlineHookErrors = inlineHookDuplicates.filter((item) => item.severity === 'error');
-if (inlineHookErrors.length > 0) {
-  throw new Error([
-    'Chedex managed hook duplicate detected in config.toml.',
-    ...inlineHookErrors.map((item) => `- ${item.reason}`),
-    'Remove the duplicate inline hook table or keep Chedex-managed lifecycle hooks in hooks.json only.',
-  ].join('\n'));
-}
-
-for (const warning of inlineHookDuplicates.filter((item) => item.severity === 'warning')) {
-  process.stderr.write(`warning: ${warning.reason}\n`);
+if (!installedVersion || compareSemver(installedVersion, chedexMinimumCodexVersion) < 0) {
+  throw new Error(`Chedex requires Codex CLI >= ${chedexMinimumCodexVersion}; found ${versionText || 'unavailable'}`);
 }
 
 const staleAgents = await staleGeneratedAgents();
 if (staleAgents.length > 0) {
-  throw new Error(
-    `generated agents are stale for: ${staleAgents.join(', ')}\nRun npm run generate:agents before install.`,
-  );
+  throw new Error(`generated native agents are stale: ${staleAgents.join(', ')}\nRun npm run generate:agents.`);
 }
 
-for (const dir of [
-  targets.codexHome,
-  targets.backupsDir,
-  targets.promptsDir,
-  targets.skillsDir,
-  targets.agentsDir,
-  targets.hooksDir,
-  targets.hookAssetsDir,
-  targets.workflowsDir,
-]) {
-  if (!dryRun) await ensureDir(dir);
+const backupRoot = join(targets.backupsDir, timestampSlug());
+const managedAgentPaths = roleNames().map((name) => join(targets.agentsDir, `${name}.toml`));
+const managedSkillPaths = listSkills().map((name) => join(targets.skillsDir, name));
+const state = {
+  schema_version: 2,
+  managed_paths: { agents: [], skills: [] },
+};
+
+function previousEntry(bucket, targetPath) {
+  return previousState?.managed_paths?.[bucket]?.find((entry) => entry?.target_path === targetPath) || null;
 }
 
-if (!dryRun) {
-  if (configPresentBefore) {
-    const backupPath = backupDestinationFor(targets.configPath);
-    await ensureDir(dirname(backupPath));
-    await copyFile(targets.configPath, backupPath);
-    uninstallBackups.push(backupPath);
-    uninstallState.backups.config = backupPath;
-  }
+function backupDestinationFor(targetPath) {
+  const root = targetPath.startsWith(`${targets.agentsHome}/`) ? targets.agentsHome : targets.codexHome;
+  const relativePath = relative(root, targetPath);
+  if (!relativePath || relativePath.startsWith('..')) throw new Error(`backup path escapes managed home: ${targetPath}`);
+  const namespace = root === targets.agentsHome ? 'agents-home' : 'codex-home';
+  return join(backupRoot, namespace, relativePath);
+}
 
-  if (hooksConfigPresentBefore) {
-    const backupPath = backupDestinationFor(targets.hooksConfigPath);
-    await ensureDir(dirname(backupPath));
-    await copyFile(targets.hooksConfigPath, backupPath);
-    uninstallBackups.push(backupPath);
-    uninstallState.backups.hooksConfig = backupPath;
+async function recordManagedPath(bucket, targetPath) {
+  const existingEntry = previousEntry(bucket, targetPath);
+  if (existingEntry) {
+    state.managed_paths[bucket].push(existingEntry);
+    return;
   }
-
-  if (agentsMdPresentBefore) {
-    const backupPath = backupDestinationFor(targets.agentsMdPath);
-    await ensureDir(dirname(backupPath));
-    await copyFile(targets.agentsMdPath, backupPath);
-    uninstallBackups.push(backupPath);
-    uninstallState.backups.agentsMd = backupPath;
+  if (!(await fileExists(targetPath))) {
+    state.managed_paths[bucket].push({ target_path: targetPath, backup_path: null, type: null });
+    return;
   }
+  const backupPath = backupDestinationFor(targetPath);
+  const type = await copyPath(targetPath, backupPath);
+  state.managed_paths[bucket].push({ target_path: targetPath, backup_path: backupPath, type });
+}
 
-  if (hookAssetsDirPresentBefore) {
-    const backupPath = backupDestinationFor(targets.hookAssetsDir);
-    const type = await copyPath(targets.hookAssetsDir, backupPath);
-    uninstallBackups.push(backupPath);
-    uninstallState.backups.hookAssetsDir = backupPath;
-    uninstallState.managed_paths.hooks.push({
-      target_path: targets.hookAssetsDir,
-      backup_path: backupPath,
-      type,
-    });
-    if (hookRuntimePresentBefore && type === 'directory') {
-      uninstallState.backups.hookRuntime = join(backupPath, 'chedex-governor.mjs');
+async function restoreRetiredEntries(entries = []) {
+  let restoredBackup = false;
+  for (const entry of entries) {
+    if (!entry?.target_path) continue;
+    await removeTree(entry.target_path);
+    if (!entry.backup_path || !(await fileExists(entry.backup_path))) continue;
+    restoredBackup = true;
+    if (entry.type === 'directory') await copyTree(entry.backup_path, entry.target_path);
+    else {
+      await ensureDir(dirname(entry.target_path));
+      await copyFile(entry.backup_path, entry.target_path);
     }
-  } else {
-    uninstallState.managed_paths.hooks.push({
-      target_path: targets.hookAssetsDir,
-      backup_path: null,
-      type: 'directory',
-    });
   }
-
-  for (const path of unionManagedPaths(managedPromptPaths, previousUninstallState?.managed_paths?.prompts)) {
-    await backupManagedPath(path, 'prompts');
-  }
-
-  for (const path of unionManagedPaths(managedAgentPaths, previousUninstallState?.managed_paths?.agents)) {
-    await backupManagedPath(path, 'agents');
-  }
-
-  for (const path of unionManagedPaths(managedSkillPaths, previousUninstallState?.managed_paths?.skills)) {
-    await backupManagedPath(path, 'skills');
-  }
-
-  // Persist rollback metadata before managed files are copied so a later
-  // install failure still leaves enough state for `uninstall:user`.
-  await writeJsonIfChanged(targets.uninstallStatePath, uninstallState);
-
-  for (const path of unionManagedPaths(managedPromptPaths, previousUninstallState?.managed_paths?.prompts)) {
-    await removeTree(path);
-  }
-
-  for (const path of unionManagedPaths(managedAgentPaths, previousUninstallState?.managed_paths?.agents)) {
-    await removeTree(path);
-  }
-
-  for (const path of unionManagedPaths(managedSkillPaths, previousUninstallState?.managed_paths?.skills)) {
-    await removeTree(path);
-  }
-
-  await removeTree(targets.hookAssetsDir);
+  return restoredBackup;
 }
 
-const templateContent = await readTextIfExists(manifest.templateAgents);
 if (!dryRun) {
-  await writeFileIfChanged(targets.agentsMdPath, templateContent);
-  await copyTree(manifest.promptsDir, targets.promptsDir);
+  await ensureDir(targets.codexHome);
+  await ensureDir(targets.agentsHome);
+  await ensureDir(targets.agentsDir);
+  await ensureDir(targets.skillsDir);
+  await ensureDir(targets.backupsDir);
+
+  // Migrate surfaces managed by Chedex <=0.130 but no longer installed.
+  await restoreRetiredEntries(previousState?.managed_paths?.prompts);
+  const restoredLegacyHookBackup = await restoreRetiredEntries(previousState?.managed_paths?.hooks);
+
+  for (const targetPath of managedAgentPaths) await recordManagedPath('agents', targetPath);
+  for (const targetPath of managedSkillPaths) await recordManagedPath('skills', targetPath);
+
+  // Persist rollback state before replacing managed files.
+  await writeJsonIfChanged(targets.uninstallStatePath, state);
+
+  for (const targetPath of managedAgentPaths) await removeTree(targetPath);
+  for (const targetPath of managedSkillPaths) await removeTree(targetPath);
+
+  await copyTree(manifest.agentsDir, targets.agentsDir);
   for (const skill of listSkills()) {
     await copyTree(join(manifest.skillsDir, skill), join(targets.skillsDir, skill));
   }
-  await copyTree(manifest.agentsDir, targets.agentsDir);
-  await copyTree(manifest.hooksDir, targets.hookAssetsDir);
-  await ensureExecutable(targets.hookRuntimePath);
-}
 
-let nextConfig = stripManagedFeaturesSection(stripChedexBlock(existingConfig || '')).trimEnd();
-nextConfig = upsertFeatureFlag(nextConfig, chedexGoalsFeature, true).trimEnd();
-const agentConfigBlock = buildAgentConfigBlock(targets.agentsDir);
-nextConfig = nextConfig ? `${nextConfig}\n\n${agentConfigBlock}\n` : `${agentConfigBlock}\n`;
-const nextHooksConfig = mergeManagedHooksConfig(currentHooksConfig, targets, {
-  supportedHookEvents: hookProbe.supportedHookEvents,
-});
+  let currentAgents = await readTextIfExists(targets.agentsMdPath);
+  if (previousState?.schema_version === 1) {
+    const oldBackup = previousState?.backups?.agentsMd;
+    if (oldBackup && await fileExists(oldBackup)) currentAgents = await readTextIfExists(oldBackup);
+    else if (previousState?.existing_before?.agentsMd === false) currentAgents = '';
+  }
+  const template = await readTextIfExists(manifest.templateAgents);
+  await writeFileIfChanged(targets.agentsMdPath, mergeManagedAgentsBlock(currentAgents, template));
 
-if (!dryRun) {
-  await writeFileIfChanged(targets.configPath, nextConfig);
-  await writeJsonIfChanged(targets.hooksConfigPath, nextHooksConfig);
-  const uninstall = renderUninstallNote(targets, {
-    backups: uninstallBackups,
+  const currentConfig = await readTextIfExists(targets.configPath);
+  const cleanConfig = stripLegacyChedexConfig(currentConfig, {
+    stripFeatureFlags: Boolean(previousState),
   });
-  await writeFileIfChanged(targets.uninstallPath, uninstall);
+  if (cleanConfig !== currentConfig.trim()) {
+    if (cleanConfig) await writeFileIfChanged(targets.configPath, `${cleanConfig}\n`);
+    else await rm(targets.configPath, { force: true });
+  }
+
+  const currentHooks = await readJsonIfExists(targets.hooksConfigPath, null);
+  if (currentHooks) {
+    const cleanHooks = stripLegacyChedexHooks(currentHooks);
+    if (JSON.stringify(cleanHooks) !== JSON.stringify(currentHooks)) {
+      if (isEffectivelyEmptyHooksConfig(cleanHooks)) await rm(targets.hooksConfigPath, { force: true });
+      else await writeJsonIfChanged(targets.hooksConfigPath, cleanHooks);
+    }
+  }
+
+  if (!restoredLegacyHookBackup) {
+    for (const filename of ['chedex-governor.mjs', 'codex-release-audit.mjs', 'codex-release-deltas.json', 'workflow-mode-schemas.mjs']) {
+      await rm(join(targets.legacyHookAssetsDir, filename), { force: true });
+    }
+  }
+  await removeDirIfEmpty(targets.legacyHookAssetsDir);
+  await removeDirIfEmpty(dirname(targets.legacyHookAssetsDir));
+
+  await writeFileIfChanged(targets.uninstallPath, renderUninstallNote(targets));
 }
 
-const summary = [
-  `codex_home=${targets.codexHome}`,
-  `roles=${roleNames().length}`,
+process.stdout.write([
+  `dry_run=${dryRun}`,
+  `codex_version=${versionText}`,
+  `agents=${roleNames().length}`,
   `skills=${listSkills().length}`,
-  `dry_run=${dryRun ? 'true' : 'false'}`,
-  `codex_version=${hookProbe.version}`,
-  `hooks_feature_name=${hookProbe.featureName}`,
-  `hooks_feature_stage=${hookProbe.feature.stage}`,
-  `hooks_feature_enabled=${hookProbe.feature.enabled ? 'true' : 'false'}`,
-  `multi_agent_feature_stage=${hookProbe.multiAgentFeature.stage}`,
-  `multi_agent_feature_enabled=${hookProbe.multiAgentFeature.enabled ? 'true' : 'false'}`,
-  `managed_feature_flags=${chedexGoalsFeature}:true`,
-  `managed_hook_events=${hookProbe.supportedHookEvents.join(',')}`,
-  `hook_review=review ${hookProbe.supportedHookEvents.length} Chedex user-global hooks in /hooks if Codex reports they need review`,
-  `inline_hook_duplicate_check=${inlineHookDuplicates.length === 0 ? 'ok' : 'warning'}`,
-  `hooks_config=${targets.hooksConfigPath}`,
-  `hook_runtime=${targets.hookRuntimePath}`,
-  `uninstall_state=${targets.uninstallStatePath}`,
-  `markers=${chedexMarkerStart} .. ${chedexMarkerEnd}`,
-];
-
-process.stdout.write(`${summary.join('\n')}\n`);
+  `agents_home=${targets.agentsHome}`,
+  `runtime_hooks=none`,
+  `feature_flags=none`,
+].join('\n') + '\n');

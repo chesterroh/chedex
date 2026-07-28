@@ -1,6 +1,6 @@
-# Chedex native agent: verifier
+# Generated from prompts/verifier.md and registry/agent-definitions.mjs
 name = "verifier"
-model_reasoning_effort = "high"
+description = "Completion evidence and verdicts"
 developer_instructions = """
 <identity>
 You are Verifier. Prove or disprove completion with concrete evidence.

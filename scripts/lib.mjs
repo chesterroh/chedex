@@ -1,70 +1,89 @@
-import { chmod, mkdir, readFile, readdir, rm, stat, writeFile, copyFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ROLE_DEFINITIONS } from '../registry/agent-definitions.mjs';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export const repoRoot = resolve(__dirname, '..');
-export const chedexMarkerStart = '# BEGIN CHEDEX NATIVE AGENTS';
-export const chedexMarkerEnd = '# END CHEDEX NATIVE AGENTS';
+export const chedexMarkerStart = '<!-- BEGIN CHEDEX NATIVE -->';
+export const chedexMarkerEnd = '<!-- END CHEDEX NATIVE -->';
+export const legacyConfigMarkerStart = '# BEGIN CHEDEX NATIVE AGENTS';
+export const legacyConfigMarkerEnd = '# END CHEDEX NATIVE AGENTS';
 export const uninstallFileName = 'CHEDEX_UNINSTALL.md';
 export const uninstallStateFileName = 'CHEDEX_UNINSTALL.json';
 export const backupsDirName = '.chedex-backups';
-export const chedexHooksFeature = 'hooks';
-export const chedexLegacyHooksFeature = 'codex_hooks';
-export const chedexHooksFeatureAliases = [chedexLegacyHooksFeature];
-export const chedexMultiAgentFeature = 'multi_agent';
-export const chedexGoalsFeature = 'goals';
-export const chedexRequiredFeatureStage = 'stable';
-export const chedexManagedFeatureKeys = [
-  chedexGoalsFeature,
-  chedexMultiAgentFeature,
-  chedexLegacyHooksFeature,
+export const chedexMinimumCodexVersion = '0.145.0';
+export const chedexLatestVerifiedCodexVersion = '0.145.0';
+
+export const chedexSkills = [
+  'cdx-ai-slop-cleaner',
+  'cdx-analyze',
+  'cdx-autopilot',
+  'cdx-autoresearch-loop',
+  'cdx-autoresearch-plan',
+  'cdx-best-practice-research',
+  'cdx-clarify',
+  'cdx-deep-interview',
+  'cdx-design',
+  'cdx-execute',
+  'cdx-plan',
+  'cdx-ralph',
+  'cdx-review',
+  'cdx-tdd',
+  'cdx-ultraqa',
+  'cdx-ultrawork',
+  'cdx-visual-ralph',
 ];
-export const chedexMinimumCodexVersion = '0.129.0';
-export const chedexLatestVerifiedCodexVersion = '0.130.0';
-export const chedexHookStatusPrefix = 'Chedex governor:';
-export const chedexManagedHookMarkerPrefix = `${chedexHookStatusPrefix} managed:v1:`;
-export const chedexLegacySessionStartStatusMessage = `${chedexHookStatusPrefix} restore governed workflow context`;
-export const chedexLegacyUserPromptSubmitStatusMessage = `${chedexHookStatusPrefix} guard governed prompt submission`;
-export const chedexLegacyStopStatusMessage = `${chedexHookStatusPrefix} enforce terminal workflow state`;
-export const chedexSessionStartStatusMessage = `${chedexManagedHookMarkerPrefix}SessionStart restore governed workflow context`;
-export const chedexUserPromptSubmitStatusMessage = `${chedexManagedHookMarkerPrefix}UserPromptSubmit guard governed prompt submission`;
-export const chedexStopStatusMessage = `${chedexManagedHookMarkerPrefix}Stop enforce terminal workflow state`;
+
+export function repoPath(...parts) {
+  return join(repoRoot, ...parts);
+}
 
 export function codexHome() {
   return process.env.CODEX_HOME || join(homedir(), '.codex');
 }
 
+export function agentsHome() {
+  return process.env.CHEDEX_AGENTS_HOME || join(homedir(), '.agents');
+}
+
 export function installTargets() {
-  const home = codexHome();
-  const hookAssetsDir = join(home, 'hooks', 'chedex');
+  const codexRoot = codexHome();
+  const agentsRoot = agentsHome();
   return {
-    codexHome: home,
-    backupsDir: join(home, backupsDirName),
-    promptsDir: join(home, 'prompts'),
-    skillsDir: join(home, 'skills'),
-    agentsDir: join(home, 'agents'),
-    hooksDir: join(home, 'hooks'),
-    hookAssetsDir,
-    hookRuntimePath: join(hookAssetsDir, 'chedex-governor.mjs'),
-    hooksConfigPath: join(home, 'hooks.json'),
-    workflowsDir: join(home, 'workflows'),
-    activeWorkflowIndexPath: join(home, 'workflows', '_active.json'),
-    agentsMdPath: join(home, 'AGENTS.md'),
-    configPath: join(home, 'config.toml'),
-    uninstallPath: join(home, uninstallFileName),
-    uninstallStatePath: join(home, uninstallStateFileName),
+    codexHome: codexRoot,
+    agentsHome: agentsRoot,
+    backupsDir: join(codexRoot, backupsDirName),
+    agentsDir: join(codexRoot, 'agents'),
+    skillsDir: join(agentsRoot, 'skills'),
+    agentsMdPath: join(codexRoot, 'AGENTS.md'),
+    configPath: join(codexRoot, 'config.toml'),
+    hooksConfigPath: join(codexRoot, 'hooks.json'),
+    legacyHookAssetsDir: join(codexRoot, 'hooks', 'chedex'),
+    uninstallPath: join(codexRoot, uninstallFileName),
+    uninstallStatePath: join(codexRoot, uninstallStateFileName),
+  };
+}
+
+export function installManifestPaths() {
+  return {
+    templateAgents: repoPath('AGENTS.template.md'),
+    promptsDir: repoPath('prompts'),
+    skillsDir: repoPath('.agents', 'skills'),
+    agentsDir: repoPath('.codex', 'agents'),
   };
 }
 
 export function roleNames() {
   return Object.keys(ROLE_DEFINITIONS);
+}
+
+export function listSkills() {
+  return [...chedexSkills];
 }
 
 export async function ensureDir(path) {
@@ -88,6 +107,68 @@ export async function readTextIfExists(path) {
   }
 }
 
+export async function readJsonIfExists(path, fallback = null) {
+  const content = await readTextIfExists(path);
+  return content ? JSON.parse(content) : fallback;
+}
+
+export async function writeFileIfChanged(path, content) {
+  const current = await readTextIfExists(path);
+  if (current === content) return false;
+  await ensureDir(dirname(path));
+  await writeFile(path, content);
+  return true;
+}
+
+export async function writeJsonIfChanged(path, value) {
+  return writeFileIfChanged(path, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+export async function removeTree(path) {
+  await rm(path, { recursive: true, force: true });
+}
+
+export async function removeDirIfEmpty(path) {
+  try {
+    if ((await readdir(path)).length > 0) return false;
+    await rm(path, { recursive: true, force: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function copyTree(sourceDir, destDir) {
+  await ensureDir(destDir);
+  for (const entry of await readdir(sourceDir, { withFileTypes: true })) {
+    const sourcePath = join(sourceDir, entry.name);
+    const destPath = join(destDir, entry.name);
+    if (entry.isDirectory()) await copyTree(sourcePath, destPath);
+    if (entry.isFile()) await copyFile(sourcePath, destPath);
+  }
+}
+
+export async function copyPath(sourcePath, destPath) {
+  const sourceStat = await stat(sourcePath);
+  if (sourceStat.isDirectory()) {
+    await copyTree(sourcePath, destPath);
+    return 'directory';
+  }
+  await ensureDir(dirname(destPath));
+  await copyFile(sourcePath, destPath);
+  return 'file';
+}
+
+export async function listRelativeFiles(root, prefix = '') {
+  const files = [];
+  for (const entry of await readdir(join(root, prefix), { withFileTypes: true })) {
+    const relativePath = join(prefix, entry.name);
+    if (entry.isDirectory()) files.push(...await listRelativeFiles(root, relativePath));
+    if (entry.isFile()) files.push(relativePath);
+  }
+  return files.sort();
+}
+
 export function stripFrontmatter(content) {
   const match = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
   return match ? content.slice(match[0].length).trim() : content.trim();
@@ -99,9 +180,9 @@ export function escapeTomlMultiline(value) {
 
 export function buildAgentToml(role, promptBody) {
   return [
-    `# Chedex native agent: ${role.id}`,
+    `# Generated from prompts/${role.id}.md and registry/agent-definitions.mjs`,
     `name = "${role.id}"`,
-    `model_reasoning_effort = "${role.default_effort}"`,
+    `description = "${role.summary}"`,
     'developer_instructions = """',
     escapeTomlMultiline([
       promptBody,
@@ -119,673 +200,174 @@ export function buildAgentToml(role, promptBody) {
   ].join('\n');
 }
 
+export function generatedAgentPath(name) {
+  return repoPath('.codex', 'agents', `${name}.toml`);
+}
+
+export function rolePromptPath(name) {
+  return repoPath('prompts', `${name}.md`);
+}
+
 export async function expectedGeneratedAgentToml(name) {
-  assertKnownRole(name);
-  const role = ROLE_DEFINITIONS[name];
   const prompt = await readFile(rolePromptPath(name), 'utf8');
-  return buildAgentToml(role, stripFrontmatter(prompt));
+  return buildAgentToml(ROLE_DEFINITIONS[name], stripFrontmatter(prompt));
 }
 
 export async function staleGeneratedAgents(names = roleNames()) {
   const stale = [];
-
   for (const name of names) {
-    const [expected, current] = await Promise.all([
-      expectedGeneratedAgentToml(name),
-      readTextIfExists(generatedAgentPath(name)),
-    ]);
-    if (expected !== current) {
+    if (await expectedGeneratedAgentToml(name) !== await readTextIfExists(generatedAgentPath(name))) {
       stale.push(name);
     }
   }
-
   return stale;
 }
 
-export async function copyTree(sourceDir, destDir) {
-  await ensureDir(destDir);
-  const entries = await readdir(sourceDir, { withFileTypes: true });
-  for (const entry of entries) {
-    const sourcePath = join(sourceDir, entry.name);
-    const destPath = join(destDir, entry.name);
-    if (entry.isDirectory()) {
-      await copyTree(sourcePath, destPath);
-    } else if (entry.isFile()) {
-      await copyFile(sourcePath, destPath);
-    }
-  }
+export function renderManagedAgentsBlock(template) {
+  return [chedexMarkerStart, template.trim(), chedexMarkerEnd].join('\n');
 }
 
-export async function listRelativeFiles(root, prefix = '') {
-  const entries = await readdir(join(root, prefix), { withFileTypes: true });
-  const files = [];
-
-  for (const entry of entries) {
-    const relativePath = join(prefix, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...await listRelativeFiles(root, relativePath));
-    } else if (entry.isFile()) {
-      files.push(relativePath);
-    }
-  }
-
-  return files.sort();
+export function stripManagedAgentsBlock(content) {
+  const escapedStart = chedexMarkerStart.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escapedEnd = chedexMarkerEnd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return String(content || '')
+    .replace(new RegExp(`(?:^|\\n)${escapedStart}[\\s\\S]*?${escapedEnd}(?:\\n|$)`, 'g'), '\n')
+    .replace(/^\s+|\s+$/g, '')
+    .replace(/\n{3,}/g, '\n\n');
 }
 
-export async function copyPath(sourcePath, destPath) {
-  const sourceStat = await stat(sourcePath);
-  if (sourceStat.isDirectory()) {
-    await copyTree(sourcePath, destPath);
-    return 'directory';
-  }
-
-  await ensureDir(dirname(destPath));
-  await copyFile(sourcePath, destPath);
-  return 'file';
+export function mergeManagedAgentsBlock(existing, template) {
+  const base = stripManagedAgentsBlock(existing);
+  const block = renderManagedAgentsBlock(template);
+  return `${base ? `${base}\n\n` : ''}${block}\n`;
 }
 
-export async function ensureExecutable(path) {
-  await chmod(path, 0o755);
-}
-
-export async function removeTree(path) {
-  await rm(path, { recursive: true, force: true });
-}
-
-export async function removeDirIfEmpty(path) {
-  try {
-    const entries = await readdir(path);
-    if (entries.length > 0) return false;
-    await rm(path, { recursive: true, force: true });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function buildAgentConfigBlock(agentsDir) {
-  const lines = [chedexMarkerStart];
-  for (const name of roleNames()) {
-    const role = ROLE_DEFINITIONS[name];
-    const tableKey = name.includes('-') ? `agents."${name}"` : `agents.${name}`;
-    lines.push(`[${tableKey}]`);
-    lines.push(`description = "${role.summary}"`);
-    lines.push(`config_file = "${join(agentsDir, `${name}.toml`)}"`);
-    lines.push('');
-  }
-  lines.push(chedexMarkerEnd);
-  return lines.join('\n');
-}
-
-export function stripChedexBlock(config) {
-  const pattern = new RegExp(`${chedexMarkerStart}[\\s\\S]*?${chedexMarkerEnd}\\n?`, 'g');
-  return config.replace(pattern, '').replace(/\n{3,}/g, '\n\n');
-}
-
-export function stripManagedFeaturesSection(config) {
-  const lines = config.split(/\r?\n/);
-  const featuresStart = lines.findIndex((line) => /^\s*\[features\]\s*(?:#.*)?$/.test(line));
-
-  if (featuresStart < 0) {
-    return config;
-  }
-
-  let sectionEnd = lines.length;
-  for (let i = featuresStart + 1; i < lines.length; i += 1) {
-    if (/^\s*\[/.test(lines[i]) || lines[i].includes(chedexMarkerStart)) {
-      sectionEnd = i;
-      break;
-    }
-  }
-
-  const featurePattern = new RegExp(`^\\s*(${chedexManagedFeatureKeys.map(escapeRegExp).join('|')})\\s*=\\s*true\\s*(?:#.*)?$`);
-  const nextSectionLines = lines.slice(featuresStart + 1, sectionEnd).filter((line) => !featurePattern.test(line));
-  const hasMeaningfulFeatureLines = nextSectionLines.some((line) => line.trim().length > 0);
-
-  if (hasMeaningfulFeatureLines) {
-    lines.splice(featuresStart + 1, sectionEnd - featuresStart - 1, ...nextSectionLines);
-  } else {
-    lines.splice(featuresStart, sectionEnd - featuresStart);
-  }
-
-  return lines.join('\n').replace(/\n{3,}/g, '\n\n');
-}
-
-export function upsertFeatureFlag(config, featureName, enabled = true) {
-  const flagLine = `${featureName} = ${enabled ? 'true' : 'false'}`;
-  const normalizedConfig = String(config || '').trimEnd();
-
-  if (!normalizedConfig) {
-    return `[features]\n${flagLine}`;
-  }
-
-  const lines = normalizedConfig.split(/\r?\n/);
-  const featuresStart = lines.findIndex((line) => /^\s*\[features\]\s*(?:#.*)?$/.test(line));
-
-  if (featuresStart < 0) {
-    return `${normalizedConfig}\n\n[features]\n${flagLine}`;
-  }
-
-  let sectionEnd = lines.length;
-  for (let i = featuresStart + 1; i < lines.length; i += 1) {
-    if (/^\s*\[/.test(lines[i]) || lines[i].includes(chedexMarkerStart)) {
-      sectionEnd = i;
-      break;
-    }
-  }
-
-  const featurePattern = new RegExp(`^\\s*(?:"${escapeRegExp(featureName)}"|${escapeRegExp(featureName)})\\s*=`);
-  for (let i = featuresStart + 1; i < sectionEnd; i += 1) {
-    if (!featurePattern.test(lines[i])) continue;
-    const indent = lines[i].match(/^\s*/)?.[0] || '';
-    lines[i] = `${indent}${flagLine}`;
-    return lines.join('\n');
-  }
-
-  lines.splice(sectionEnd, 0, flagLine);
-  return lines.join('\n');
-}
-
-export function renderUninstallNote(targets, options = {}) {
-  const backupPaths = Array.isArray(options.backups) ? options.backups : [];
-  const promptFiles = roleNames().map((name) => `${targets.promptsDir}/${name}.md`);
-  const agentFiles = roleNames().map((name) => `${targets.agentsDir}/${name}.toml`);
-  const skillDirs = listSkills().map((name) => `${targets.skillsDir}/${name}`);
-  const sections = [
-    '# Chedex Uninstall Notes',
-    '',
-    'This installation was created by the Chedex repo install script.',
-    '',
-    '## Installed Paths',
-    '',
-    `- ${targets.agentsMdPath}`,
-    ...promptFiles.map((path) => `- ${path}`),
-    ...skillDirs.map((path) => `- ${path}`),
-    ...agentFiles.map((path) => `- ${path}`),
-    `- ${targets.hookAssetsDir}/*`,
-    `- ${targets.hooksConfigPath}`,
-    `- ${targets.uninstallStatePath}`,
-    '',
-    '## Config Changes',
-    '',
-    `- ${targets.configPath}`,
-    `- managed block markers: ${chedexMarkerStart} / ${chedexMarkerEnd}`,
-    '- Chedex writes `goals = true`; older managed `multi_agent = true` and `codex_hooks = true` entries are cleaned up by uninstall',
-    '',
-    '## Backup Root',
-    '',
-    `- ${targets.backupsDir}`,
-  ];
-
-  if (backupPaths.length > 0) {
-    sections.push('', '## Backup', '', ...backupPaths.map((path) => `- ${path}`));
-  }
-
-  sections.push(
-    '',
-    '## Workflow State',
-    '',
-    `- ${targets.activeWorkflowIndexPath} is created later, on the first governed workflow sync`,
-    '',
-    '## Clean Uninstall',
-    '',
-    '1. Run `npm run uninstall:user` to restore backed-up managed files and remove install-created ones',
-    '2. Remove any later-created workflow state such as workflows/_active.json if you no longer want it',
-    '3. Remove any additional user-managed files you no longer want',
+export function stripLegacyChedexConfig(config, { stripFeatureFlags = false } = {}) {
+  const markerPattern = new RegExp(
+    `${legacyConfigMarkerStart.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]*?${legacyConfigMarkerEnd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\n?`,
+    'g',
   );
+  const lines = String(config || '').replace(markerPattern, '').split(/\r?\n/);
+  const featuresStart = stripFeatureFlags
+    ? lines.findIndex((line) => /^\s*\[features\]\s*(?:#.*)?$/.test(line))
+    : -1;
+  if (featuresStart >= 0) {
+    let end = lines.length;
+    for (let index = featuresStart + 1; index < lines.length; index += 1) {
+      if (/^\s*\[/.test(lines[index])) { end = index; break; }
+    }
+    const legacyTrue = /^\s*(?:goals|multi_agent|codex_hooks)\s*=\s*true\s*(?:#.*)?$/;
+    const retained = lines.slice(featuresStart + 1, end).filter((line) => !legacyTrue.test(line));
+    if (retained.some((line) => line.trim())) {
+      lines.splice(featuresStart + 1, end - featuresStart - 1, ...retained);
+    } else {
+      lines.splice(featuresStart, end - featuresStart);
+    }
+  }
+  return lines.join('\n').trim().replace(/\n{3,}/g, '\n\n');
+}
 
-  return sections.join('\n');
+function isLegacyChedexHook(hook) {
+  const command = String(hook?.command || '');
+  const status = String(hook?.statusMessage || hook?.status_message || '');
+  return status.startsWith('Chedex governor:') || /hooks[\\/]chedex[\\/]chedex-governor\.mjs/.test(command);
+}
+
+export function stripLegacyChedexHooks(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+  const next = structuredClone(raw);
+  if (!next.hooks || typeof next.hooks !== 'object' || Array.isArray(next.hooks)) return next;
+  for (const [event, groups] of Object.entries(next.hooks)) {
+    if (!Array.isArray(groups)) continue;
+    const retainedGroups = groups
+      .map((group) => {
+        if (!group || !Array.isArray(group.hooks)) return group;
+        const hooks = group.hooks.filter((hook) => !isLegacyChedexHook(hook));
+        return hooks.length > 0 ? { ...group, hooks } : null;
+      })
+      .filter(Boolean);
+    if (retainedGroups.length > 0) next.hooks[event] = retainedGroups;
+    else delete next.hooks[event];
+  }
+  return next;
+}
+
+export function isEffectivelyEmptyHooksConfig(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return true;
+  const keys = Object.keys(raw).filter((key) => key !== 'hooks');
+  return keys.length === 0 && (!raw.hooks || Object.keys(raw.hooks).length === 0);
 }
 
 export function timestampSlug(date = new Date()) {
   return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
 }
 
-export function repoPath(...parts) {
-  return join(repoRoot, ...parts);
-}
-
-export function installManifestPaths() {
-  return {
-    templateAgents: repoPath('AGENTS.template.md'),
-    promptsDir: repoPath('prompts'),
-    skillsDir: repoPath('skills'),
-    agentsDir: repoPath('agents'),
-    hooksDir: repoPath('hooks'),
-  };
-}
-
-export function listSkills() {
-  return ['cdx-clarify', 'cdx-deep-interview', 'cdx-autoresearch-plan', 'cdx-autoresearch-loop', 'cdx-plan', 'cdx-review', 'cdx-execute', 'cdx-tdd', 'cdx-ultrawork', 'cdx-ralph', 'cdx-autopilot'];
-}
-
-export function legacySkillNames() {
-  return ['clarify', 'deep-interview', 'autoresearch-plan', 'autoresearch-loop', 'plan', 'review', 'execute', 'tdd', 'ultrawork', 'ralph', 'autopilot'];
-}
-
-export async function writeFileIfChanged(path, content) {
-  const current = await readTextIfExists(path);
-  if (current === content) return false;
-  await ensureDir(dirname(path));
-  await writeFile(path, content);
-  return true;
-}
-
-export async function readJsonIfExists(path, fallback = null) {
-  const text = await readTextIfExists(path);
-  if (!text) {
-    return fallback;
-  }
-  return JSON.parse(text);
-}
-
-export async function writeJsonIfChanged(path, value) {
-  const content = `${JSON.stringify(value, null, 2)}\n`;
-  return writeFileIfChanged(path, content);
-}
-
-export function normalizeManagedHooksConfig(raw) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    return { hooks: {} };
-  }
-
-  const hooks = raw.hooks && typeof raw.hooks === 'object' && !Array.isArray(raw.hooks)
-    ? raw.hooks
-    : {};
-
-  return { ...raw, hooks };
-}
-
-export function isManagedHookHandler(handler) {
-  if (!handler || typeof handler !== 'object' || Array.isArray(handler)) {
-    return false;
-  }
-
-  const command = typeof handler.command === 'string' ? handler.command : '';
-  const statusMessage = typeof handler.statusMessage === 'string' ? handler.statusMessage : '';
-  if (!command.includes('chedex-governor.mjs')) {
-    return false;
-  }
-
-  if (
-    statusMessage === chedexSessionStartStatusMessage
-    || statusMessage === chedexLegacySessionStartStatusMessage
-  ) {
-    return handler.type === 'command' && command.includes(' session-start');
-  }
-
-  if (
-    statusMessage === chedexUserPromptSubmitStatusMessage
-    || statusMessage === chedexLegacyUserPromptSubmitStatusMessage
-  ) {
-    return handler.type === 'command' && command.includes(' user-prompt-submit');
-  }
-
-  if (
-    statusMessage === chedexStopStatusMessage
-    || statusMessage === chedexLegacyStopStatusMessage
-  ) {
-    return handler.type === 'command' && command.includes(' stop');
-  }
-
-  return false;
-}
-
-export function detectInlineManagedHookDuplicates(configText, options = {}) {
-  const supportedHookEvents = Array.isArray(options.supportedHookEvents) && options.supportedHookEvents.length > 0
-    ? options.supportedHookEvents
-    : ['SessionStart', 'UserPromptSubmit', 'Stop'];
-  const text = String(configText || '');
-  if (!text.trim()) {
-    return [];
-  }
-
-  const results = [];
-  for (const eventName of supportedHookEvents) {
-    const commandName = eventName === 'SessionStart'
-      ? 'session-start'
-      : eventName === 'UserPromptSubmit'
-        ? 'user-prompt-submit'
-        : 'stop';
-    const eventPattern = new RegExp(`\\[\\[?\\s*hooks\\.${eventName}(?:\\.|\\]|\\s)`, 'i');
-    const hasEventTable = eventPattern.test(text);
-    const hasGovernorCommand = text.includes('chedex-governor.mjs') && text.includes(` ${commandName}`);
-    const hasManagedMarker = text.includes(`${chedexManagedHookMarkerPrefix}${eventName}`)
-      || (
-        eventName === 'SessionStart'
-        && text.includes(chedexLegacySessionStartStatusMessage)
-      )
-      || (
-        eventName === 'UserPromptSubmit'
-        && text.includes(chedexLegacyUserPromptSubmitStatusMessage)
-      )
-      || (
-        eventName === 'Stop'
-        && text.includes(chedexLegacyStopStatusMessage)
-      );
-
-    if (hasEventTable && hasGovernorCommand && hasManagedMarker) {
-      results.push({
-        event: eventName,
-        severity: 'error',
-        reason: `inline config.toml already defines the managed Chedex ${eventName} lifecycle hook`,
-      });
-    } else if (hasEventTable && (hasGovernorCommand || hasManagedMarker)) {
-      results.push({
-        event: eventName,
-        severity: 'warning',
-        reason: `inline config.toml appears to reference a Chedex ${eventName} hook; check for duplicate lifecycle execution`,
-      });
-    }
-  }
-
-  return results;
-}
-
-export function stripManagedHooksConfig(raw) {
-  const config = normalizeManagedHooksConfig(raw);
-  const nextHooks = {};
-
-  for (const [eventName, groups] of Object.entries(config.hooks)) {
-    if (!Array.isArray(groups)) continue;
-    const nextGroups = [];
-
-    for (const group of groups) {
-      if (!group || typeof group !== 'object' || Array.isArray(group)) continue;
-      const handlers = Array.isArray(group.hooks) ? group.hooks.filter((handler) => !isManagedHookHandler(handler)) : [];
-      if (handlers.length === 0) continue;
-      nextGroups.push({
-        ...group,
-        hooks: handlers,
-      });
-    }
-
-    if (nextGroups.length > 0) {
-      nextHooks[eventName] = nextGroups;
-    }
-  }
-
-  return {
-    ...config,
-    hooks: nextHooks,
-  };
-}
-
-export function isEffectivelyEmptyHooksConfig(raw) {
-  const config = normalizeManagedHooksConfig(raw);
-  const nonHookKeys = Object.keys(config).filter((key) => key !== 'hooks' && config[key] != null);
-  return nonHookKeys.length === 0 && Object.keys(config.hooks).length === 0;
-}
-
-export function shellQuote(value) {
-  return `'${String(value).replace(/'/g, `'\"'\"'`)}'`;
-}
-
-export function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-export function managedHookEventsForCodexVersion() {
+export function renderUninstallNote(targets) {
   return [
-    'SessionStart',
-    'UserPromptSubmit',
-    'Stop',
-  ];
+    '# Chedex Uninstall',
+    '',
+    'Run the following command from the Chedex repository:',
+    '',
+    '```bash',
+    'npm run uninstall:user',
+    '```',
+    '',
+    `Installed agents: ${targets.agentsDir}`,
+    `Installed skills: ${targets.skillsDir}`,
+    `Rollback state: ${targets.uninstallStatePath}`,
+    '',
+  ].join('\n');
 }
 
-export function buildManagedHooksConfig(targets, options = {}) {
-  const nodeCommand = shellQuote(process.execPath);
-  const governorCommand = shellQuote(targets.hookRuntimePath);
-  const supportedHookEvents = new Set(
-    Array.isArray(options.supportedHookEvents) && options.supportedHookEvents.length > 0
-      ? options.supportedHookEvents
-      : ['SessionStart', 'UserPromptSubmit', 'Stop'],
-  );
-  const hooks = {};
-
-  if (supportedHookEvents.has('SessionStart')) {
-    hooks.SessionStart = [
-      {
-        matcher: '^(startup|resume|clear)$',
-        hooks: [
-          {
-            type: 'command',
-            command: `${nodeCommand} ${governorCommand} session-start`,
-            timeout: 5,
-            statusMessage: chedexSessionStartStatusMessage,
-          },
-        ],
-      },
-    ];
-  }
-
-  if (supportedHookEvents.has('UserPromptSubmit')) {
-    hooks.UserPromptSubmit = [
-      {
-        hooks: [
-          {
-            type: 'command',
-            command: `${nodeCommand} ${governorCommand} user-prompt-submit`,
-            timeout: 5,
-            statusMessage: chedexUserPromptSubmitStatusMessage,
-          },
-        ],
-      },
-    ];
-  }
-
-  if (supportedHookEvents.has('Stop')) {
-    hooks.Stop = [
-      {
-        hooks: [
-          {
-            type: 'command',
-            command: `${nodeCommand} ${governorCommand} stop`,
-            timeout: 5,
-            statusMessage: chedexStopStatusMessage,
-          },
-        ],
-      },
-    ];
-  }
-
-  return { hooks };
-}
-
-export function mergeManagedHooksConfig(existing, targets, options = {}) {
-  const stripped = stripManagedHooksConfig(existing);
-  const managed = buildManagedHooksConfig(targets, options);
-  const merged = normalizeManagedHooksConfig(stripped);
-
-  for (const [eventName, groups] of Object.entries(managed.hooks)) {
-    if (!Array.isArray(merged.hooks[eventName])) {
-      merged.hooks[eventName] = [];
-    }
-    merged.hooks[eventName].push(...groups);
-  }
-
-  return merged;
-}
-
-export function parseSemver(text) {
-  const match = String(text).match(/(\d+)\.(\d+)\.(\d+)/);
-  if (!match) {
-    return null;
-  }
-  return match.slice(1).map((value) => Number.parseInt(value, 10));
+export function parseSemver(value) {
+  const match = String(value || '').match(/(\d+)\.(\d+)\.(\d+)/);
+  return match ? match.slice(1).map(Number) : null;
 }
 
 export function compareSemver(left, right) {
-  for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
-    const a = left[i] || 0;
-    const b = right[i] || 0;
-    if (a > b) return 1;
-    if (a < b) return -1;
+  const a = Array.isArray(left) ? left : parseSemver(left);
+  const b = Array.isArray(right) ? right : parseSemver(right);
+  if (!a || !b) return null;
+  for (let index = 0; index < 3; index += 1) {
+    if (a[index] !== b[index]) return a[index] < b[index] ? -1 : 1;
   }
   return 0;
 }
 
 export function readCodexVersion() {
-  const stdout = execFileSync('codex', ['--version'], { encoding: 'utf8' });
-  const version = parseSemver(stdout);
-  if (!version) {
-    throw new Error(`unable to parse codex version from: ${stdout.trim()}`);
+  try {
+    return execFileSync('codex', ['--version'], { encoding: 'utf8' }).trim();
+  } catch {
+    return '';
   }
-  return {
-    raw: stdout.trim(),
-    version,
-  };
 }
 
 export function parseCodexFeatures(output) {
-  const features = {};
-  for (const line of output.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    const parts = trimmed.split(/\s+/).filter(Boolean);
-    if (parts.length < 3) continue;
-    const enabled = parts.at(-1);
-    if (!/^(true|false)$/i.test(enabled)) continue;
-    const name = parts[0];
-    const stage = parts.slice(1, -1).join(' ');
-    if (!stage) continue;
-    features[name] = {
-      stage,
-      enabled: enabled.toLowerCase() === 'true',
-    };
+  const features = new Map();
+  for (const line of String(output || '').split(/\r?\n/)) {
+    const match = line.trim().match(/^(\S+)\s+(\S+)\s+(true|false)$/);
+    if (match) features.set(match[1], { name: match[1], stage: match[2], enabled: match[3] === 'true' });
   }
   return features;
 }
 
 export function readCodexFeatures() {
-  const stdout = execFileSync('codex', ['features', 'list'], { encoding: 'utf8' });
-  return parseCodexFeatures(stdout);
+  try {
+    return parseCodexFeatures(execFileSync('codex', ['features', 'list'], { encoding: 'utf8' }));
+  } catch {
+    return new Map();
+  }
 }
 
-export function resolveCodexFeature(features, canonicalName, aliases = []) {
-  const names = [canonicalName, ...aliases].filter(Boolean);
-  for (const name of names) {
-    if (features[name]) {
-      return {
-        canonicalName,
-        name,
-        feature: features[name],
-        alias: name !== canonicalName,
-      };
-    }
+export function resolveCodexFeature(features, canonical, aliases = []) {
+  for (const name of [canonical, ...aliases]) {
+    if (features.has(name)) return features.get(name);
   }
   return null;
 }
 
-export function formatCodexFeatureStatus(features, canonicalName, aliases = []) {
-  const resolved = resolveCodexFeature(features, canonicalName, aliases);
-  if (!resolved) {
-    return `${canonicalName}:missing:false`;
-  }
-  const suffix = resolved.alias ? `[${resolved.name}]` : '';
-  return `${canonicalName}${suffix}:${resolved.feature.stage}:${resolved.feature.enabled ? 'true' : 'false'}`;
-}
-
-export function probeCodexHooksSupport() {
-  const installed = readCodexVersion();
-  const minimum = parseSemver(chedexMinimumCodexVersion);
-
-  if (!minimum || compareSemver(installed.version, minimum) < 0) {
-    return {
-      ok: false,
-      reason: `codex ${installed.raw} is older than required ${chedexMinimumCodexVersion}`,
-      version: installed.raw,
-    };
-  }
-
-  const features = readCodexFeatures();
-  const hookFeature = resolveCodexFeature(features, chedexHooksFeature, chedexHooksFeatureAliases);
-  if (!hookFeature) {
-    return {
-      ok: false,
-      reason: `codex ${installed.raw} does not expose the ${chedexHooksFeature} feature flag`,
-      version: installed.raw,
-      features,
-    };
-  }
-  if (hookFeature.feature.stage !== chedexRequiredFeatureStage) {
-    return {
-      ok: false,
-      reason: `codex ${installed.raw} exposes ${chedexHooksFeature} as ${hookFeature.feature.stage}; Chedex requires ${chedexRequiredFeatureStage} native hooks`,
-      version: installed.raw,
-      feature: hookFeature.feature,
-      featureName: hookFeature.name,
-      features,
-    };
-  }
-  if (!hookFeature.feature.enabled) {
-    return {
-      ok: false,
-      reason: `codex ${installed.raw} has ${chedexHooksFeature} disabled; enable native hooks before installing Chedex`,
-      version: installed.raw,
-      feature: hookFeature.feature,
-      featureName: hookFeature.name,
-      features,
-    };
-  }
-
-  if (!(chedexMultiAgentFeature in features)) {
-    return {
-      ok: false,
-      reason: `codex ${installed.raw} does not expose the ${chedexMultiAgentFeature} feature flag`,
-      version: installed.raw,
-      feature: hookFeature.feature,
-      featureName: hookFeature.name,
-      features,
-    };
-  }
-  if (features[chedexMultiAgentFeature].stage !== chedexRequiredFeatureStage) {
-    return {
-      ok: false,
-      reason: `codex ${installed.raw} exposes ${chedexMultiAgentFeature} as ${features[chedexMultiAgentFeature].stage}; Chedex requires ${chedexRequiredFeatureStage} native agents`,
-      version: installed.raw,
-      feature: hookFeature.feature,
-      featureName: hookFeature.name,
-      multiAgentFeature: features[chedexMultiAgentFeature],
-      features,
-    };
-  }
-  if (!features[chedexMultiAgentFeature].enabled) {
-    return {
-      ok: false,
-      reason: `codex ${installed.raw} has ${chedexMultiAgentFeature} disabled; enable native agents before installing Chedex`,
-      version: installed.raw,
-      feature: hookFeature.feature,
-      featureName: hookFeature.name,
-      multiAgentFeature: features[chedexMultiAgentFeature],
-      features,
-    };
-  }
-
-  return {
-    ok: true,
-    version: installed.raw,
-    feature: hookFeature.feature,
-    featureName: hookFeature.name,
-    multiAgentFeature: features[chedexMultiAgentFeature],
-    supportedHookEvents: managedHookEventsForCodexVersion(),
-  };
-}
-
-export function assertKnownRole(name) {
-  if (!ROLE_DEFINITIONS[name]) {
-    throw new Error(`Unknown role: ${name}`);
-  }
-}
-
-export function rolePromptPath(name) {
-  assertKnownRole(name);
-  return repoPath('prompts', `${name}.md`);
-}
-
-export function generatedAgentPath(name) {
-  assertKnownRole(name);
-  return repoPath('agents', `${name}.toml`);
+export function formatCodexFeatureStatus(feature) {
+  return feature ? `${feature.name}:${feature.stage}:${feature.enabled}` : 'missing';
 }
 
 export function anyMissing(paths) {

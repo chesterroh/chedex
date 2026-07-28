@@ -1,103 +1,80 @@
-# Customizing
+# Customizing Chedex
 
-## Add a New Role
+Chedex keeps one canonical native location for each installable surface:
 
-1. Add the role metadata to `registry/agent-definitions.mjs`
-2. Ensure `registry/agent-definitions.ts` still typechecks
-3. Add the prompt file to `prompts/<role>.md`
-4. Run:
+- skills: `.agents/skills/`
+- generated project agents: `.codex/agents/`
+- agent prompt sources: `prompts/`
+- role metadata: `registry/agent-definitions.mjs`
+- global guidance source: `AGENTS.template.md`
+- project hooks: `.codex/hooks.json` routed through `hooks/chedex-native-hook.mjs`
 
-```bash
-npm run generate:agents
-npm run refresh:mirror
-npm run verify
-```
+## Add Or Change A Skill
 
-The checked-in mirror is limited to `.codex/AGENTS.md`, `.codex/prompts/`, `.codex/skills/`, `.codex/agents/`, and `.codex/hooks/chedex/`.
-Do not commit repo-local install byproducts such as `.codex/config.toml`, `.codex/hooks.json`, `.codex/CHEDEX_UNINSTALL.md`, `.codex/CHEDEX_UNINSTALL.json`, or workflow state.
+1. Create or edit `.agents/skills/cdx-<name>/SKILL.md`.
+2. Give frontmatter an exact `name` and a concrete trigger-oriented `description`.
+3. Keep the skill focused on one reusable method.
+4. Prefer native Goal mode, subagents, browser, image, and retrieval tools over helper runtimes.
+5. Add the name to `chedexSkills` in `scripts/lib.mjs`.
+6. Document it in `README.md`, `docs/install.md`, and `AGENTS.template.md`.
+7. Add or update verification expectations in `scripts/verify-repo.mjs` when the skill creates a new contract.
+8. Run `npm run verify`.
 
-## Add a New Skill
+New skills must use the `cdx-` prefix. Merge aliases or minor variants into an
+existing skill instead of expanding the public vocabulary.
 
-1. Create `skills/cdx-<name>/SKILL.md`
-2. Register it in `scripts/lib.mjs` inside `listSkills()`
-3. Decide invocation policy:
-   - Chedex-managed skills must use the `cdx-` prefix so plain native Codex names stay available
-   - default new skills to explicit invocation by name
-   - add trigger guidance in `AGENTS` only when the trigger is high-signal, low-ambiguity, and worth the extra routing complexity
-4. Update docs if the skill should be part of the default install set
-5. Keep the skill aligned with `docs/guidance-schema.md` and `docs/prompt-contract.md`
-6. If the skill creates persistent artifacts, document the `$CODEX_HOME` path it owns
-7. If the skill is a governed workflow, document its `progress.json` and `handoff.json` expectations and update the governor runtime plus `scripts/verify-governor.mjs`
-8. If the skill is a governed mode, update `hooks/workflow-mode-schemas.mjs`, `registry/workflow-mode-schemas.mjs`, and `registry/workflow-mode-schemas.ts` together with the runtime and docs
-9. If the skill is mirrored under `.codex/`, refresh the mirror before verifying
+## Add Or Change A Role
 
-A skill may exist as a concept-first contract before the governor admits it as a native governed mode. In that case, document the gap explicitly and avoid describing it as stop-gated or governor-restored until the runtime and tests actually support it.
+1. Edit `registry/agent-definitions.mjs`.
+2. Add or edit the corresponding `prompts/<role>.md`.
+3. Keep the role narrow, with an explicit posture, tool policy, done definition, and handoff targets.
+4. Run `npm run generate:agents`.
+5. Verify the generated `.codex/agents/<role>.toml` contains `name`, `description`, and `developer_instructions`.
+6. Update `AGENTS.template.md`, `README.md`, and install tests when adding a role.
+7. Run `npm run verify`.
 
-## Change Instruction Surfaces
-
-Update together when instruction behavior changes:
-
-- `docs/guidance-schema.md`
-- `docs/prompt-contract.md`
-- `AGENTS.template.md`
-- relevant files under `prompts/`
-- relevant files under `skills/`
-- generated files under `agents/` when prompts change
-- mirrored files under `.codex/` when mirrored source surfaces change
-- `README.md`
-- `scripts/verify-repo.mjs`
-
-Keep instruction changes small and coordinated. Structural rules belong in `docs/guidance-schema.md`; behavioral rules belong in `docs/prompt-contract.md`.
-
-If the change affects delegation or sub-agent behavior, update:
-
-- `AGENTS.template.md`
-- `docs/prompt-contract.md`
-- relevant files under `prompts/`
-- generated files under `agents/` when prompts change
-- mirrored files under `.codex/` when mirrored source surfaces change
-- `scripts/verify-repo.mjs`
-
-Explicit user model and reasoning requests should remain binding over inherited or default settings unless unavailable or incompatible.
-Built-in role defaults and generated agent defaults should remain fallback only.
-
-If prompt text changed, run `npm run generate:agents`, `npm run refresh:mirror`, and `npm run verify`.
+Do not pin model or reasoning effort in a generated role without an explicit
+product requirement; native caller choices and inheritance should remain in
+control.
 
 ## Change Install Paths
 
-Update:
+Update these together:
+
 - `scripts/lib.mjs`
-- `README.md`
-- `docs/install.md`
-- `docs/governor.md`
-- `scripts/refresh-repo-mirror.mjs`
-- `scripts/verify-repo.mjs`
-- any uninstall guidance produced by the install script
-
-If the changed paths are mirrored under `.codex/`, run `npm run refresh:mirror` before `npm run verify`.
-
-## Change Governor Behavior
-
-Update together:
-
-- `hooks/chedex-governor.mjs`
-- `hooks/codex-release-audit.mjs`
-- `hooks/workflow-mode-schemas.mjs`
-- `registry/workflow-mode-schemas.mjs`
-- `registry/workflow-mode-schemas.ts`
 - `scripts/install-user.mjs`
 - `scripts/uninstall-user.mjs`
-- `docs/governor.md`
-- `skills/cdx-autopilot/SKILL.md`
-- `skills/cdx-plan/SKILL.md`
-- `skills/cdx-ralph/SKILL.md`
-- `skills/cdx-ultrawork/SKILL.md`
-- `scripts/verify-governor.mjs`
-- `scripts/refresh-repo-mirror.mjs`
-
-If the change affects the operator-facing `cdx-autopilot` shell beyond governor-owned behavior, update:
-
-- `skills/cdx-autopilot/SKILL.md`
-- `README.md`
+- `scripts/verify-install.mjs`
 - `docs/install.md`
-- `scripts/verify-repo.mjs`
+- `README.md`
+
+Installation must remain reversible and must not overwrite unrelated user
+content. New hook events must enforce deterministic repository mechanics,
+remain project-local and dependency-free, and have focused regression coverage.
+Feature flags, daemons, workflow stores, user-global hooks, and hook-managed
+orchestration remain out of bounds unless a documented native capability gap
+justifies them.
+
+## Add Or Change A Hook
+
+1. Confirm that guidance, a skill, or a native permission rule cannot provide the same deterministic behavior.
+2. Register the smallest event and matcher in `.codex/hooks.json`.
+3. Route it through `hooks/chedex-native-hook.mjs`; do not add a second event runtime.
+4. Keep the handler inert outside the Chedex checkout and avoid transcript parsing or persistent hook state.
+5. Add a focused case to `scripts/verify-hooks.mjs`.
+6. Update `docs/hooks.md` and run `npm run verify`.
+
+Do not write `hooks.state.*.trusted_hash`. Non-managed hooks must remain subject
+to Codex's `/hooks` review and hash-based trust flow.
+
+## Verification
+
+```bash
+npm run generate:agents
+npm run audit:codex
+npm run install:user:dry
+npm run verify
+```
+
+Review the final diff for generated drift, duplicate native surfaces, hidden
+install behavior, and unnecessary dependencies.
