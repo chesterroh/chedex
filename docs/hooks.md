@@ -73,7 +73,14 @@ Rejected for Chedex:
 - installer-written `hooks.state.*.trusted_hash` entries
 - user-global hook installation for repository-specific policy
 
-OMX also documents several native gaps that no longer match Codex `0.145`—for
+OMX default-branch commit `57f8e682af899b5d0e28d05b238c903c2fdeb913`
+adds further hook trust, path, input-bound, and lifecycle-runtime hardening on
+top of the stable receipt. Those changes protect OMX state and orchestration,
+so they do not create a Chedex hook requirement. Codex `0.146` also preserves
+stdout from command hooks that exit before consuming stdin, keeping that
+process-level behavior in the native hook runner.
+
+OMX also documents several native gaps that no longer match Codex `0.146`—for
 example current Codex has `SessionEnd`, `SubagentStart`, and `SubagentStop`.
 Chedex therefore treats current Codex documentation as canonical and OMX only
 as a structural reference.

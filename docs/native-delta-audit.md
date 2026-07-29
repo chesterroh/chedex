@@ -1,13 +1,13 @@
 # Native Delta Audit
 
 This audit decides what Chedex should still own after the Codex `0.131` through
-`0.145` upgrade sequence.
+`0.146` upgrade sequence.
 
 ## Baseline
 
-- Minimum Codex CLI: `0.145.0`
-- Latest verified Codex CLI: `0.145.0`
-- Chedex: `0.145.0`
+- Minimum Codex CLI: `0.146.0`
+- Latest verified Codex CLI: `0.146.0`
+- Chedex: `0.146.0`
 - native goals are stable and on by default
 - native multi-agent support is stable and on by default
 - native hooks are stable; Chedex uses them only for bounded repository mechanics
@@ -18,12 +18,12 @@ This audit decides what Chedex should still own after the Codex `0.131` through
 The Chedex package version tracks this latest verified compatibility boundary.
 Evidence is checked locally by `npm run audit:codex`, against the current Codex
 manual at <https://developers.openai.com/codex/codex-manual.md>, and against the
-[official Codex 0.145.0 release](https://github.com/openai/codex/releases/tag/rust-v0.145.0).
+[official Codex 0.146.0 release](https://github.com/openai/codex/releases/tag/rust-v0.146.0).
 Every refresh follows [upstream-review.md](upstream-review.md) so release notes,
 source implementation, and the comparison upstream are retrieved before a
 retention or extraction decision is made.
 
-## 0.131-0.145 Relevant Delta
+## 0.131-0.146 Relevant Delta
 
 | Codex | Chedex-relevant change | Decision |
 | --- | --- | --- |
@@ -42,6 +42,21 @@ retention or extraction decision is made.
 | 0.143 | Remote plugins and tool search matured | Prefer bundled/native skill tooling over a Chedex skill manager. |
 | 0.144 | Auth elicitation and approval modes matured | Preserve native approval and authentication boundaries. |
 | 0.145 | Multi-Agent V2 is a stable opt-in; import/thread surfaces expanded | Verify schemas, but keep Chedex independent of experimental v2 enablement. |
+| 0.146 | Agent Plugin manifests, executor skills, session forks, and hook execution matured | Rely on native packaging, discovery, lifecycle, and hook execution; add no Chedex runtime. |
+
+The `rust-v0.145.0...rust-v0.146.0` review used immutable source commit
+`e363b08c9175ac1cbe5893615dd2cb9ddf95043b`. The relevant candidates were
+classified as follows:
+
+| Candidate | Decision | Chedex destination |
+| --- | --- | --- |
+| Agent Plugin manifests, workspace publishing, and extra marketplaces | NATIVE | Codex owns plugin packaging and distribution; Chedex adds no parallel plugin manager. |
+| Executor-provided skills, secure resource reads, and catalog pagination/budgets | NATIVE | Keep Chedex skills as method contracts under native discovery and authority. |
+| Named and pinned sessions, side conversations, paginated/ephemeral forks, and replay preservation | NATIVE | Native thread and goal lifecycle remains the only continuation layer. |
+| Early-exiting command-hook stdout preservation | NATIVE | Keep the bounded adapter simple and rely on the Codex hook runner. |
+| Remote Code Mode, proxy/auth fixes, MCP refresh, standalone web search, and managed-value requirements | DROP | Platform and enterprise runtime surfaces are outside the Chedex customization boundary. |
+
+There are no MERGE or PORT candidates in this release delta.
 
 ## Replacement Decisions
 
@@ -72,7 +87,7 @@ persist state, intercept Stop, or bypass Codex hook review and trust.
 
 See [hooks.md](hooks.md) for the boundary and upstream comparison.
 
-## Local 0.145 Evidence
+## Local 0.146 Evidence
 
 The verified local surface reports:
 

@@ -50,27 +50,47 @@ re-specifies behavior from first principles instead of copying skill files.
 
 ## Current Review Receipt
 
-The 2026-07-28 refresh resolved and retrieved both upstreams before evaluating
+The 2026-07-29 refresh resolved and retrieved both upstreams before evaluating
 the delta:
 
 | Evidence | Value |
 | --- | --- |
-| Codex stable package/tag | `0.145.0` / `rust-v0.145.0` |
-| Codex release commit | `25af12f7e61572b0bc18ddb1008be543b91519b0` |
+| Codex stable package/tag | `0.146.0` / `rust-v0.146.0` |
+| Codex release range | `rust-v0.145.0...rust-v0.146.0` |
+| Codex release commit | `e363b08c9175ac1cbe5893615dd2cb9ddf95043b` |
 | OMX stable package/tag | `0.20.3` / `v0.20.3` |
 | OMX stable commit | `6c970cc12da256bfc7667edd0a9183b158d4a7a7` |
-| OMX default-branch commit | `435d4a9cc982ffaf83fabbfbb8711ae6c178ffca` |
-| OMX stable-to-default delta | translated README invite links only; no skill or hook changes |
-| Result | no new extraction; the existing dispositions remain current |
+| OMX default-branch commit | `57f8e682af899b5d0e28d05b238c903c2fdeb913` (`0.20.4` development state) |
+| OMX stable-to-default delta | five lifecycle skills plus Herdr, state, team/tmux, hook, update, auth, and platform runtime changes |
+| Result | no MERGE or PORT candidates; the existing 17-skill surface remains current |
 
 Sources were retrieved into system temporary directories and were not added to
-the repository. Codex `0.145.0` release notes, its full changelog and source,
+the repository. Codex `0.146.0` release notes, its full changelog and source,
 the current Codex manual, OMX `CHANGELOG.md`, OMX `0.20.3` release notes, and
 the stable-to-default source diff were reviewed.
 
+## Current Delta Disposition
+
+The OMX stable package remains `v0.20.3`; the default branch is materially
+ahead of stable. The changed candidates were grouped by behavior rather than by
+duplicated source and generated-plugin paths:
+
+| Candidate | Decision | Chedex/native destination |
+| --- | --- | --- |
+| `autopilot`, `cancel`, `ralph`, `ralplan`, and `ultragoal` lifecycle receipts, cancellation, and goal-state gates | NATIVE | Native goals, interruption, in-thread plans, and subagent lifecycle already own these concerns; existing Chedex skills remain prompt-only. |
+| Herdr lifecycle/status bridge | DROP | External runtime adaptation and status transport are outside Chedex. |
+| Team startup rollback, pane authority, mailbox, HUD, and tmux coordination | DROP | Chedex ships no terminal coordinator; native subagents own delegation. |
+| Sidecar/cache/session state, aliases, recovery, and ownership guards | DROP | Chedex keeps no orchestration state or parallel lifecycle store. |
+| Hook trust/path validation, Stop-loop bounds, oversized stdin, and deep-interview cancellation hook | DROP | These harden OMX orchestration; Chedex retains only its bounded repository hook and native Codex execution behavior. |
+| Update/Bun/Windows process handling and authentication metadata validation | DROP | Installer, platform-runtime, and provider-auth compatibility code is outside the thin package. |
+| Standalone conductor, readonly classification, and plan bootstrap guards | NATIVE | Native permissions, planning, goal state, and subagent policy are authoritative. |
+
+There are no MERGE or PORT candidates above the extraction threshold. No skill,
+hook, state, or runtime implementation changed as a result of this review.
+
 ## Native Codex Boundary
 
-The local target is Codex CLI `0.145.0`. Current official Codex guidance says:
+The local target is Codex CLI `0.146.0`. Current official Codex guidance says:
 
 - persisted goals and automatic continuation are stable and on by default
 - native subagents provide parallel delegation and project-scoped custom agents
@@ -171,7 +191,7 @@ native subagents when delegation is permitted, and fresh verification evidence.
 
 1. Remove the Chedex workflow governor, release-start hook, custom
    progress/handoff schemas, and hook verifier.
-2. Stop writing `goals = true`; goals are stable and default-on in Codex 0.145.
+2. Stop writing `goals = true`; goals are stable and default-on in Codex 0.146.
 3. Stop installing project workflow caches or user-global hook configuration.
 4. Move canonical repository skills to `.agents/skills` and generated native
    agents to `.codex/agents`.
