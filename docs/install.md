@@ -1,7 +1,7 @@
 # Install And Uninstall
 
-Chedex `0.146.0` targets the stable
-[Codex CLI `0.146.0`](https://github.com/openai/codex/releases/tag/rust-v0.146.0)
+Chedex `0.146.1` targets the stable
+[Codex CLI `0.146.1`](https://github.com/openai/codex/releases/tag/rust-v0.146.1)
 or newer and Node.js 20 or newer. The Chedex package version identifies the
 latest Codex compatibility boundary verified by this repository.
 
@@ -24,7 +24,7 @@ npm run install:user
 Chedex writes only native content surfaces:
 
 - a marked guidance block in `~/.codex/AGENTS.md`
-- seven standalone custom agents in `~/.codex/agents/`
+- five standalone custom agents in `~/.codex/agents/`; Codex's built-in `explorer` and `worker` cover general search and implementation
 - 17 skills in `~/.agents/skills/`: `cdx-ai-slop-cleaner`, `cdx-analyze`, `cdx-autopilot`, `cdx-autoresearch-loop`, `cdx-autoresearch-plan`, `cdx-best-practice-research`, `cdx-clarify`, `cdx-deep-interview`, `cdx-design`, `cdx-execute`, `cdx-plan`, `cdx-ralph`, `cdx-review`, `cdx-tdd`, `cdx-ultraqa`, `cdx-ultrawork`, and `cdx-visual-ralph`
 - rollback metadata in `~/.codex/CHEDEX_UNINSTALL.json`
 - a short uninstall note in `~/.codex/CHEDEX_UNINSTALL.md`

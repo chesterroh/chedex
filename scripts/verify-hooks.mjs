@@ -51,7 +51,7 @@ assert(
   'SessionStart should identify the generated-agent workflow',
 );
 
-const generatedPatchCommand = '*** Begin Patch\n*** Update File: .codex/agents/executor.toml\n@@\n-old\n+new\n*** End Patch';
+const generatedPatchCommand = '*** Begin Patch\n*** Update File: .codex/agents/architect.toml\n@@\n-old\n+new\n*** End Patch';
 const generatedPatch = invoke({
   session_id: 'session-test',
   turn_id: 'turn-test',
@@ -88,7 +88,7 @@ const sourcePatch = {
   cwd: repoPath(),
   tool_name: 'apply_patch',
   tool_input: {
-    command: '*** Begin Patch\n*** Update File: prompts/executor.md\n@@\n-old\n+new\n*** End Patch',
+    command: '*** Begin Patch\n*** Update File: prompts/architect.md\n@@\n-old\n+new\n*** End Patch',
   },
 };
 assert(

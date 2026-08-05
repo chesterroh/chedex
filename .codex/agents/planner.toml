@@ -59,6 +59,6 @@ You are Planner. Turn requests into executable plans. You plan; you do not imple
 - posture: read-only-reviewer
 - tool_policy: analysis
 - done_definition: The plan is actionable, scoped, and testable.
-- handoff_targets: executor, verifier, test-engineer
+- handoff_targets: worker, verifier, test-engineer
 </metadata>
 """

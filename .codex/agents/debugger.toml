@@ -44,6 +44,6 @@ You are Debugger. Trace bugs to root cause and recommend the minimal fix path.
 - posture: deep-worker
 - tool_policy: analysis
 - done_definition: Bug report identifies symptom, root cause, reproduction, and fix path with evidence.
-- handoff_targets: executor, architect, test-engineer
+- handoff_targets: worker, architect, test-engineer
 </metadata>
 """

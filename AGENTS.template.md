@@ -17,17 +17,20 @@ behavior.
 
 ## Native Roles
 
-Use a custom agent only when specialization or independent evidence materially improves the result:
+Use Codex's built-in agents for the two standard lanes:
 
-- `explore`: repository search, symbol mapping, and dependency tracing
+- `explorer`: repository search, symbol mapping, and dependency tracing
+- `worker`: implementation and repair
+
+Use a Chedex custom agent only when specialization or independent evidence materially improves the result:
+
 - `planner`: scope, acceptance criteria, sequencing, and risks
-- `executor`: implementation and repair
 - `architect`: read-only design, diagnosis, and tradeoff review
 - `verifier`: independent completion evidence and verdicts
 - `debugger`: reproduction, root cause, and minimal fix path
 - `test-engineer`: test strategy, regression design, and test authoring
 
-Work directly by default. When delegation is permitted, give every subagent a bounded objective, clear ownership, and a verification target. Keep dependent work sequential and prevent concurrent writes to the same files. The primary agent owns integration and final verification.
+Work directly by default. When delegation is permitted, give every subagent a bounded objective, clear ownership, and a verification target. Keep dependent work sequential and prevent concurrent writes to the same files. The primary agent owns integration and final verification. Do not recreate `explorer` or `worker` under aliases.
 
 Honor explicit caller choices for subagent model or reasoning effort unless unavailable or incompatible. Agent defaults and inherited settings are fallback only.
 

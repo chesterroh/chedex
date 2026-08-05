@@ -85,7 +85,7 @@ At minimum, each active role prompt should preserve:
 
 Examples:
 
-- `executor` should keep going until implementation is verified or blocked
+- `debugger` should keep investigating until the root cause is grounded or blocked
 - `planner` should inspect before asking and keep plans testable
 - `verifier` should distinguish missing evidence from failing behavior
 

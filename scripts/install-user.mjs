@@ -95,6 +95,11 @@ async function restoreRetiredEntries(entries = []) {
   return restoredBackup;
 }
 
+function retiredEntries(entries = [], currentPaths = []) {
+  const current = new Set(currentPaths);
+  return entries.filter((entry) => entry?.target_path && !current.has(entry.target_path));
+}
+
 if (!dryRun) {
   await ensureDir(targets.codexHome);
   await ensureDir(targets.agentsHome);
@@ -105,6 +110,11 @@ if (!dryRun) {
   // Migrate surfaces managed by Chedex <=0.130 but no longer installed.
   await restoreRetiredEntries(previousState?.managed_paths?.prompts);
   const restoredLegacyHookBackup = await restoreRetiredEntries(previousState?.managed_paths?.hooks);
+
+  // Restore or remove agents and skills retired by later native-subtraction
+  // reviews before writing the current manifest and rollback state.
+  await restoreRetiredEntries(retiredEntries(previousState?.managed_paths?.agents, managedAgentPaths));
+  await restoreRetiredEntries(retiredEntries(previousState?.managed_paths?.skills, managedSkillPaths));
 
   for (const targetPath of managedAgentPaths) await recordManagedPath('agents', targetPath);
   for (const targetPath of managedSkillPaths) await recordManagedPath('skills', targetPath);

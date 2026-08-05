@@ -1,13 +1,4 @@
 export const ROLE_DEFINITIONS = {
-  explore: {
-    id: 'explore',
-    summary: 'Codebase search and relationship mapping',
-    goal: 'Map files, symbols, and relationships so another role can proceed immediately.',
-    posture: 'fast-lane',
-    tool_policy: 'read-only',
-    done_definition: 'Relevant files, relationships, and direct answer are grounded in repository evidence.',
-    handoff_targets: ['planner', 'executor', 'architect', 'debugger'],
-  },
   planner: {
     id: 'planner',
     summary: 'Actionable planning with acceptance criteria',
@@ -15,16 +6,7 @@ export const ROLE_DEFINITIONS = {
     posture: 'read-only-reviewer',
     tool_policy: 'analysis',
     done_definition: 'The plan is actionable, scoped, and testable.',
-    handoff_targets: ['executor', 'verifier', 'test-engineer'],
-  },
-  executor: {
-    id: 'executor',
-    summary: 'Implementation with mandatory verification',
-    goal: 'Implement the smallest correct change and verify it.',
-    posture: 'deep-worker',
-    tool_policy: 'execution',
-    done_definition: 'Requested behavior is implemented and backed by fresh verification evidence.',
-    handoff_targets: ['verifier', 'architect', 'debugger', 'test-engineer'],
+    handoff_targets: ['worker', 'verifier', 'test-engineer'],
   },
   architect: {
     id: 'architect',
@@ -33,7 +15,7 @@ export const ROLE_DEFINITIONS = {
     posture: 'read-only-reviewer',
     tool_policy: 'read-only',
     done_definition: 'Recommendations and tradeoffs are grounded in code evidence.',
-    handoff_targets: ['planner', 'executor', 'verifier'],
+    handoff_targets: ['planner', 'worker', 'verifier'],
   },
   verifier: {
     id: 'verifier',
@@ -42,7 +24,7 @@ export const ROLE_DEFINITIONS = {
     posture: 'read-only-reviewer',
     tool_policy: 'analysis',
     done_definition: 'Verdict is evidence-backed and actionable.',
-    handoff_targets: ['executor', 'planner'],
+    handoff_targets: ['worker', 'planner'],
   },
   debugger: {
     id: 'debugger',
@@ -51,7 +33,7 @@ export const ROLE_DEFINITIONS = {
     posture: 'deep-worker',
     tool_policy: 'analysis',
     done_definition: 'Bug report identifies symptom, root cause, reproduction, and fix path with evidence.',
-    handoff_targets: ['executor', 'architect', 'test-engineer'],
+    handoff_targets: ['worker', 'architect', 'test-engineer'],
   },
   'test-engineer': {
     id: 'test-engineer',
@@ -60,6 +42,6 @@ export const ROLE_DEFINITIONS = {
     posture: 'deep-worker',
     tool_policy: 'execution',
     done_definition: 'Tests are aligned to project patterns and backed by fresh results.',
-    handoff_targets: ['executor', 'verifier'],
+    handoff_targets: ['worker', 'verifier'],
   },
 };

@@ -9,7 +9,7 @@ Chedex adds only:
 
 - durable guidance through `AGENTS.template.md`
 - native skills under `.agents/skills/`
-- seven focused custom agents under `.codex/agents/`
+- five focused custom agents under `.codex/agents/`
 - a repo-local native hook guardrail for generated custom-agent files
 - reversible user install and uninstall scripts
 - development-time checks for the Codex surface it relies on
@@ -49,11 +49,11 @@ hook trust state. See [docs/hooks.md](docs/hooks.md).
 
 ## Requirements
 
-- Codex CLI `0.146.0` or newer
+- Codex CLI `0.146.1` or newer
 - Node.js 20 or newer
 
 The current verified boundary is the stable
-[Codex `0.146.0` release](https://github.com/openai/codex/releases/tag/rust-v0.146.0),
+[Codex `0.146.1` release](https://github.com/openai/codex/releases/tag/rust-v0.146.1),
 and the Chedex package version intentionally matches it. Run
 `npm run audit:codex` after upgrading Codex.
 
@@ -86,11 +86,10 @@ system beside Codex.
 
 ## Custom Agents
 
-Chedex provides:
+Chedex relies on Codex's built-in `explorer` and `worker` agents for ordinary
+repository search and implementation. It adds only these specialized agents:
 
-- `explore`
 - `planner`
-- `executor`
 - `architect`
 - `verifier`
 - `debugger`

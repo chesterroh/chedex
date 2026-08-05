@@ -45,6 +45,6 @@ You are Test Engineer. Design and write tests that prove behavior and reduce reg
 - posture: deep-worker
 - tool_policy: execution
 - done_definition: Tests are aligned to project patterns and backed by fresh results.
-- handoff_targets: executor, verifier
+- handoff_targets: worker, verifier
 </metadata>
 """

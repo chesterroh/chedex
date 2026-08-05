@@ -162,4 +162,39 @@ assert(!migratedConfig.includes('goals = true'), 'upgrade with legacy state shou
 assert(migratedConfig.includes('foo = true'), 'upgrade should preserve unrelated feature flags');
 assert(!migratedConfig.includes('BEGIN CHEDEX NATIVE AGENTS'), 'upgrade should remove the old agent config block');
 
+// Upgrade coverage for custom agents retired in favor of Codex built-ins.
+const retiredRoot = await mkdtemp(join(tmpdir(), 'chedex-retired-agent-install-'));
+const retiredCodexHome = join(retiredRoot, 'codex-home');
+const retiredAgentsHome = join(retiredRoot, 'agents-home');
+const retiredAgentsDir = join(retiredCodexHome, 'agents');
+const retiredBackupRoot = join(retiredCodexHome, '.chedex-backups', 'old', 'agents');
+const retiredExplore = join(retiredAgentsDir, 'explore.toml');
+const retiredExecutor = join(retiredAgentsDir, 'executor.toml');
+const retiredExecutorBackup = join(retiredBackupRoot, 'executor.toml');
+await mkdir(retiredAgentsDir, { recursive: true });
+await mkdir(retiredBackupRoot, { recursive: true });
+await writeFile(retiredExplore, 'name = "explore"\n# installed by old Chedex\n');
+await writeFile(retiredExecutor, 'name = "executor"\n# installed by old Chedex\n');
+await writeFile(retiredExecutorBackup, 'name = "executor"\n# pre-Chedex custom agent\n');
+await writeFile(join(retiredCodexHome, 'CHEDEX_UNINSTALL.json'), `${JSON.stringify({
+  schema_version: 2,
+  managed_paths: {
+    agents: [
+      { target_path: retiredExplore, backup_path: null, type: null },
+      { target_path: retiredExecutor, backup_path: retiredExecutorBackup, type: 'file' },
+    ],
+    skills: [],
+  },
+}, null, 2)}\n`);
+
+const retiredEnv = { ...process.env, CODEX_HOME: retiredCodexHome, CHEDEX_AGENTS_HOME: retiredAgentsHome };
+execFileSync(process.execPath, [repoPath('scripts', 'install-user.mjs')], { env: retiredEnv, encoding: 'utf8' });
+assert(!(await exists(retiredExplore)), 'upgrade should remove an install-created retired explore agent');
+assert(
+  (await readFile(retiredExecutor, 'utf8')) === 'name = "executor"\n# pre-Chedex custom agent\n',
+  'upgrade should restore a pre-Chedex agent hidden by the retired executor role',
+);
+const retiredState = JSON.parse(await readFile(join(retiredCodexHome, 'CHEDEX_UNINSTALL.json'), 'utf8'));
+assert(retiredState.managed_paths.agents.length === roleNames().length, 'retired agents should leave rollback state');
+
 process.stdout.write(`verify-install-ok roles=${roleNames().length} skills=${listSkills().length}\n`);

@@ -44,6 +44,6 @@ You are Verifier. Prove or disprove completion with concrete evidence.
 - posture: read-only-reviewer
 - tool_policy: analysis
 - done_definition: Verdict is evidence-backed and actionable.
-- handoff_targets: executor, planner
+- handoff_targets: worker, planner
 </metadata>
 """

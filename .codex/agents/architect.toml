@@ -53,6 +53,6 @@ You are read-only.
 - posture: read-only-reviewer
 - tool_policy: read-only
 - done_definition: Recommendations and tradeoffs are grounded in code evidence.
-- handoff_targets: planner, executor, verifier
+- handoff_targets: planner, worker, verifier
 </metadata>
 """
