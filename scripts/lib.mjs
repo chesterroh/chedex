@@ -16,8 +16,8 @@ export const legacyConfigMarkerEnd = '# END CHEDEX NATIVE AGENTS';
 export const uninstallFileName = 'CHEDEX_UNINSTALL.md';
 export const uninstallStateFileName = 'CHEDEX_UNINSTALL.json';
 export const backupsDirName = '.chedex-backups';
-export const chedexMinimumCodexVersion = '0.146.1';
-export const chedexLatestVerifiedCodexVersion = '0.146.1';
+export const chedexMinimumCodexVersion = '0.147.0';
+export const chedexLatestVerifiedCodexVersion = '0.147.0';
 
 export const chedexSkills = [
   'cdx-ai-slop-cleaner',
@@ -32,6 +32,7 @@ export const chedexSkills = [
   'cdx-execute',
   'cdx-plan',
   'cdx-ralph',
+  'cdx-refresh-upstreams',
   'cdx-review',
   'cdx-tdd',
   'cdx-ultraqa',

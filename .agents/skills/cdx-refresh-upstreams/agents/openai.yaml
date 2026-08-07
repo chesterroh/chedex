@@ -1,0 +1,4 @@
+interface:
+  display_name: "Chedex Upstream Refresh"
+  short_description: "Refresh Chedex from current upstreams"
+  default_prompt: "Use $cdx-refresh-upstreams to audit current Codex and comparison-upstream drift, update Chedex, verify it, and release only when authorized."

@@ -72,9 +72,9 @@ for (const snippet of [
   'NATIVE',
   'DROP',
   'no OMX command',
-  'Codex CLI `0.146.1`',
+  'Codex CLI `0.147.0`',
   'Current Review Receipt',
-  '79b4f03d35962b005b007a015113b38930711665',
+  'be6e8eac029b183056b7e4402879f15d2c85f61b',
   'a62d5bd77bef6d2bc7df467dcae68082b8616239',
   'no MERGE or PORT candidates',
 ]) {
@@ -91,7 +91,7 @@ for (const snippet of [
   '.agents/skills',
   'description',
   'Bounded Hook Delta',
-  'rust-v0.146.1',
+  'rust-v0.147.0',
   'Complete Chedex Subtraction Pass',
   'Codex built-in `explorer`',
   'Codex built-in `worker`',
@@ -100,7 +100,7 @@ for (const snippet of [
 }
 
 const readme = await readFile(repoPath('README.md'), 'utf8');
-for (const snippet of ['native Goal mode', 'native subagents', '.agents/skills', '.codex/agents', '.codex/hooks.json', 'npm run audit:codex', 'rust-v0.146.1', 'Product Direction', 'docs/upstream-review.md']) {
+for (const snippet of ['native Goal mode', 'native subagents', '.agents/skills', '.codex/agents', '.codex/hooks.json', 'npm run audit:codex', 'rust-v0.147.0', 'Product Direction', 'docs/upstream-review.md']) {
   assert(readme.includes(snippet), `README is missing ${snippet}`);
 }
 

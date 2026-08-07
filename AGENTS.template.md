@@ -51,6 +51,7 @@ Use the lightest workflow that fits:
 - `cdx-autoresearch-loop`: baseline/experiment/decide optimization
 - `cdx-ultrawork`: native parallel work across independent lanes
 - `cdx-ralph`: persistent implement/verify/repair work using native Goal mode when explicitly requested
+- `cdx-refresh-upstreams`: current Codex and comparison-upstream audit, extraction, release, and deployment workflow
 - `cdx-autopilot`: broad clarify/plan/execute/review/QA delivery
 - `cdx-design`: durable product, UI, UX, and frontend design decisions
 - `cdx-visual-ralph`: screenshot-driven visual implementation loop

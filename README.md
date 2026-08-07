@@ -49,11 +49,11 @@ hook trust state. See [docs/hooks.md](docs/hooks.md).
 
 ## Requirements
 
-- Codex CLI `0.146.1` or newer
+- Codex CLI `0.147.0` or newer
 - Node.js 20 or newer
 
 The current verified boundary is the stable
-[Codex `0.146.1` release](https://github.com/openai/codex/releases/tag/rust-v0.146.1),
+[Codex `0.147.0` release](https://github.com/openai/codex/releases/tag/rust-v0.147.0),
 and the Chedex package version intentionally matches it. Run
 `npm run audit:codex` after upgrading Codex.
 
@@ -76,6 +76,7 @@ Chedex uses a prefix so native and third-party names remain unambiguous:
 | `cdx-autoresearch-loop` | Run a baseline/experiment/decide loop with an honest ledger. |
 | `cdx-ultrawork` | Coordinate independent lanes through native subagents. |
 | `cdx-ralph` | Persist through implement/verify/repair using native Goal mode when explicitly requested. |
+| `cdx-refresh-upstreams` | Refresh current Codex and comparison-upstream evidence, update Chedex, verify, and optionally release. |
 | `cdx-autopilot` | Deliver broad work through clarify, plan, execute, review, and QA. |
 | `cdx-design` | Define product, UI, UX, or frontend decisions before implementation. |
 | `cdx-visual-ralph` | Iterate visually with native browser, image, screenshot, and vision tools. |
@@ -142,7 +143,7 @@ Important source surfaces:
 - `.codex/agents/` — generated project-scoped custom agents
 - `.codex/hooks.json` and `hooks/` — bounded project hook registration and adapter
 - `scripts/` — generation, compatibility audit, install, uninstall, verification
-- `docs/native-delta-audit.md` — Codex 0.146 replacement decisions
+- `docs/native-delta-audit.md` — Codex 0.147 replacement decisions
 - `docs/omx-skill-extraction.md` — comparison review ledger and native dispositions
 - `docs/upstream-review.md` — mandatory Codex-first comparison and extraction workflow
 

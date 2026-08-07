@@ -16,6 +16,7 @@ const expectedSkills = [
   'cdx-execute',
   'cdx-plan',
   'cdx-ralph',
+  'cdx-refresh-upstreams',
   'cdx-review',
   'cdx-tdd',
   'cdx-ultraqa',

@@ -1,13 +1,13 @@
 # Native Delta Audit
 
 This audit decides what Chedex should still own after the Codex `0.131` through
-`0.146.1` upgrade sequence.
+`0.147.0` upgrade sequence.
 
 ## Baseline
 
-- Minimum Codex CLI: `0.146.1`
-- Latest verified Codex CLI: `0.146.1`
-- Chedex: `0.146.1`
+- Minimum Codex CLI: `0.147.0`
+- Latest verified Codex CLI: `0.147.0`
+- Chedex: `0.147.0`
 - native goals are stable and on by default
 - native multi-agent support is stable and on by default
 - native hooks are stable; Chedex uses them only for bounded repository mechanics
@@ -18,12 +18,23 @@ This audit decides what Chedex should still own after the Codex `0.131` through
 The Chedex package version tracks this latest verified compatibility boundary.
 Evidence is checked locally by `npm run audit:codex`, against the current Codex
 manual at <https://developers.openai.com/codex/codex-manual.md>, and against the
-[official Codex 0.146.1 release](https://github.com/openai/codex/releases/tag/rust-v0.146.1).
+[official Codex 0.147.0 release](https://github.com/openai/codex/releases/tag/rust-v0.147.0).
 Every refresh follows [upstream-review.md](upstream-review.md) so release notes,
 source implementation, and the comparison upstream are retrieved before a
 retention or extraction decision is made.
 
-## 0.131-0.146.1 Relevant Delta
+## Current Review Receipt
+
+| Evidence | Value |
+| --- | --- |
+| Retrieval date | `2026-08-07` |
+| Stable package/tag | `0.147.0` / `rust-v0.147.0` |
+| Reviewed release range | `rust-v0.146.1...rust-v0.147.0` |
+| Immutable release commit | `be6e8eac029b183056b7e4402879f15d2c85f61b` |
+| Manual sections reviewed | skills and skill locations/metadata, plugins and marketplaces, hooks, goals/long-running work, subagents, approvals/permissions, external-agent import, MCP, and session lifecycle |
+| Initial local audit | `npm run audit:codex` passed against installed `codex-cli 0.147.0` before the boundary update |
+
+## 0.131-0.147.0 Relevant Delta
 
 | Codex | Chedex-relevant change | Decision |
 | --- | --- | --- |
@@ -44,23 +55,30 @@ retention or extraction decision is made.
 | 0.145 | Multi-Agent V2 is a stable opt-in; import/thread surfaces expanded | Verify schemas, but keep Chedex independent of experimental v2 enablement. |
 | 0.146 | Agent Plugin manifests, executor skills, session forks, and hook execution matured | Rely on native packaging, discovery, lifecycle, and hook execution; add no Chedex runtime. |
 | 0.146.1 | Cyber-specialty models gained safer automatic-review defaults and clearer terminal permission guidance | Rely on native model metadata, managed requirements, permission selection, and TUI warnings; add no Chedex routing or approval layer. |
+| 0.147.0 | Portable Agent Plugins/search, thread sections, auto-reviewed approvals, Cursor skill import, MCP 2026 support, Bedrock retrieval/compaction, and security hardening | Keep plugins, catalogs, conversations, approvals, migration, MCP, provider behavior, trust, and isolation native; retain the installer because plugins cannot carry Chedex custom agents or managed `AGENTS.md` guidance. |
 
-The `rust-v0.146.0...rust-v0.146.1` review used immutable source commit
-`79b4f03d35962b005b007a015113b38930711665`. The relevant candidates were
+The `rust-v0.146.1...rust-v0.147.0` review used immutable source commit
+`be6e8eac029b183056b7e4402879f15d2c85f61b`. The relevant candidates were
 classified as follows:
 
 | Candidate | Decision | Chedex destination |
 | --- | --- | --- |
-| Cyber-specialty model identification and defaults | NATIVE | Codex owns model metadata and selects the safer automatic-review posture. |
-| Workspace/on-request policy under managed requirements | NATIVE | Codex owns effective permissions and continues to honor administrator policy. |
-| Full-access warning and terminal permission explanation | NATIVE | Codex owns approval UX and terminal messaging. |
-| Explicit permission preservation across reasoning changes | NATIVE | Codex owns thread configuration and preserves caller intent. |
+| Portable Agent Plugins, local/personal/workspace/remote search, and isolation | NATIVE | Codex owns plugin packaging, catalogs, installation, policy, and isolation. Chedex's installer remains only because the plugin format does not package custom-agent TOMLs or managed `AGENTS.md` guidance. |
+| Persistent thread sections and incremental transcript browsing | NATIVE | Codex owns conversation storage, ordering, and history projection. |
+| `--approve-for-me` and approval hardening | NATIVE | Codex owns automatic review, effective permissions, and approval UX. |
+| Cursor-managed skill import and external-session synchronization | NATIVE | Codex owns migration and synchronization; Chedex does not add an importer. |
+| Opt-in MCP 2026-07-28 protocol support | NATIVE | Codex owns discovery, multi-round requests, startup, authentication, and transport. |
+| Bedrock cached web search and remote compaction | NATIVE | Codex owns provider-specific retrieval and session compaction. |
+| Secret redaction, project trust, managed-auth restrictions, and plugin network fail-closed behavior | NATIVE | Codex owns security and policy enforcement. |
+| Repeatable Chedex upstream refresh and release procedure | PORT | Add `cdx-refresh-upstreams` as a repository-specific method contract over the required evidence, disposition, verification, and authorized release gates. |
 
-There are no MERGE or PORT candidates in this release delta.
+There are no MERGE or PORT candidates derived from Codex or OMX behavior. The
+only PORT is the explicitly requested Chedex maintenance workflow above; it
+adds no runtime, hook, catalog, or native feature wrapper.
 
 ## Complete Chedex Subtraction Pass
 
-The `0.146.1` refresh re-read every Chedex skill, custom-agent prompt and
+The `0.147.0` refresh re-read every Chedex skill, custom-agent prompt and
 generated TOML, the project hook, installer, and guidance surface against the
 fresh Codex manual and source. Codex documents `explorer` and `worker` as
 built-ins, so the name-only Chedex `explore` and `executor` roles duplicated
@@ -82,6 +100,7 @@ restores the user's pre-Chedex backup.
 | `cdx-autoresearch-loop` | RETAIN | Adds validator-gated baseline/experiment/decision cycles and an honest ledger. |
 | `cdx-ultrawork` | RETAIN | Defines bounded lane ownership and integration using native subagents only. |
 | `cdx-ralph` | RETAIN | Defines persistent implement/verify/repair over native Goal mode only when explicitly requested. |
+| `cdx-refresh-upstreams` | RETAIN | Encodes Chedex's repository-specific fresh-snapshot, three-way disposition, verification, and authorized release method without owning lifecycle state. |
 | `cdx-autopilot` | RETAIN | Defines a broad ground/clarify/plan/execute/review/QA phase contract without runtime state. |
 | `cdx-design` | RETAIN | Establishes durable product, UI, UX, and frontend design decisions before implementation. |
 | `cdx-visual-ralph` | RETAIN | Defines a screenshot- and vision-driven visual comparison loop using native tools. |
@@ -129,7 +148,7 @@ persist state, intercept Stop, or bypass Codex hook review and trust.
 
 See [hooks.md](hooks.md) for the boundary and upstream comparison.
 
-## Local 0.146.1 Evidence
+## Local 0.147.0 Evidence
 
 The verified local surface reports:
 

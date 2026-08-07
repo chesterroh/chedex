@@ -50,32 +50,32 @@ re-specifies behavior from first principles instead of copying skill files.
 
 ## Current Review Receipt
 
-The 2026-08-06 refresh resolved and retrieved both upstreams before evaluating
+The 2026-08-07 refresh resolved and retrieved both upstreams before evaluating
 the delta:
 
 | Evidence | Value |
 | --- | --- |
-| Codex stable package/tag | `0.146.1` / `rust-v0.146.1` |
-| Codex release range | `rust-v0.146.0...rust-v0.146.1` |
-| Codex release commit | `79b4f03d35962b005b007a015113b38930711665` |
+| Codex stable package/tag | `0.147.0` / `rust-v0.147.0` |
+| Codex release range | `rust-v0.146.1...rust-v0.147.0` |
+| Codex release commit | `be6e8eac029b183056b7e4402879f15d2c85f61b` |
 | OMX stable package/tag | `0.20.3` / `v0.20.3` |
 | OMX stable commit | `6c970cc12da256bfc7667edd0a9183b158d4a7a7` |
 | OMX default-branch commit | `a62d5bd77bef6d2bc7df467dcae68082b8616239` (`0.20.4` development state) |
-| Previous reviewed default | `57f8e682af899b5d0e28d05b238c903c2fdeb913` |
-| OMX previous-to-current default delta | cancellation/admission, PATH and read-only transport, process/session ownership, platform compatibility, and smoke fixtures; no skill files changed |
-| Result | no MERGE or PORT candidates; all 17 method skills remain current, while two custom-agent aliases were subtracted in favor of Codex built-ins |
+| Previous reviewed default | `a62d5bd77bef6d2bc7df467dcae68082b8616239` |
+| OMX previous-to-current default delta | none; the freshly retrieved default branch exactly matches the previous immutable receipt |
+| Result | no MERGE or PORT candidates from Codex or OMX; all 17 pre-existing method skills remain current, and the user-requested `cdx-refresh-upstreams` repository-maintenance method is added without runtime machinery |
 
 Sources were retrieved into system temporary directories and were not added to
-the repository. Codex `0.146.1` release notes, its full changelog and source,
+the repository. Codex `0.147.0` release notes, its full changelog and source,
 the current Codex manual, OMX `CHANGELOG.md`, OMX `0.20.3` release notes, and
 the stable-to-default source diff were reviewed.
 
 ## Current Delta Disposition
 
-The OMX stable package remains `v0.20.3`; the default branch is materially
-ahead of stable. The previous-to-current default delta changed 23 files with no
-skill-file changes. Candidates were grouped by behavior rather than by
-duplicated source and fixture paths:
+The OMX stable package remains `v0.20.3`; its default branch remains materially
+ahead of stable but exactly matches the previous reviewed default commit. The
+stable-to-default candidates below therefore remain the complete current
+inventory, with no newly changed files to classify:
 
 | Candidate | Decision | Chedex/native destination |
 | --- | --- | --- |
@@ -85,18 +85,21 @@ duplicated source and fixture paths:
 | musl `SYS_renameat2` compatibility | DROP | Platform-specific runtime compatibility is outside the prompt/skill/custom-agent package. |
 | Smoke and CI fixture updates | DROP | Fixtures for omitted OMX runtime behavior do not create a Chedex product requirement. |
 
-There are no MERGE or PORT candidates above the extraction threshold. No skill,
-hook, state, or runtime implementation was imported as a result of this review.
+There are no MERGE or PORT candidates above the extraction threshold from OMX.
+No skill, hook, state, or runtime implementation was imported as a result of
+this review.
 
 ## Native Codex Boundary
 
-The local target is Codex CLI `0.146.1`. Current official Codex guidance says:
+The local target is Codex CLI `0.147.0`. Current official Codex guidance says:
 
 - persisted goals and automatic continuation are stable and on by default
 - native subagents provide parallel delegation and project-scoped custom agents
 - standalone agent TOMLs require `name`, `description`, and
   `developer_instructions`
 - repository skills belong under `.agents/skills`
+- portable plugins package skills, MCP/apps, and hooks, but do not replace
+  Chedex's custom-agent or managed-guidance installation
 - hooks are available for lifecycle enforcement, but a prompt-only workflow
   should not add hooks merely to emulate orchestration state
 
@@ -174,7 +177,8 @@ References:
 
 ## Target Chedex Surface
 
-Retain the existing workflow vocabulary and add only six high-value skills:
+Retain the existing workflow vocabulary and the six high-value skills from the
+original comparison extraction:
 
 - `cdx-analyze`
 - `cdx-best-practice-research`
@@ -183,7 +187,9 @@ Retain the existing workflow vocabulary and add only six high-value skills:
 - `cdx-ultraqa`
 - `cdx-visual-ralph`
 
-The resulting 17 skills are method prompts, not a runtime. Existing skills are
+Add `cdx-refresh-upstreams` for the explicitly requested, Chedex-specific
+fresh-snapshot, three-way disposition, verification, and authorized release
+procedure. The resulting 18 skills are method prompts, not a runtime. Existing skills are
 updated to use in-thread plans, native Goal mode when explicitly requested,
 native subagents when delegation is permitted, and fresh verification evidence.
 
@@ -191,7 +197,7 @@ native subagents when delegation is permitted, and fresh verification evidence.
 
 1. Remove the Chedex workflow governor, release-start hook, custom
    progress/handoff schemas, and hook verifier.
-2. Stop writing `goals = true`; goals are stable and default-on in Codex 0.146.1.
+2. Stop writing `goals = true`; goals are stable and default-on in Codex 0.147.0.
 3. Stop installing project workflow caches or user-global hook configuration.
 4. Move canonical repository skills to `.agents/skills` and generated native
    agents to `.codex/agents`.
@@ -217,7 +223,7 @@ fallbacks, an internal plugin event bus, or installer-written trust hashes.
 
 Before production edits, add a failing thin-native regression check that proves:
 
-- exactly the 17 intended skills are present
+- exactly the 18 intended skills are present
 - canonical skills live under `.agents/skills`
 - generated agent TOMLs contain all native required fields
 - tracked product surfaces contain no OMX runtime commands or `.omx` state paths
