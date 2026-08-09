@@ -50,23 +50,25 @@ re-specifies behavior from first principles instead of copying skill files.
 
 ## Current Review Receipt
 
-The 2026-08-07 refresh resolved and retrieved both upstreams before evaluating
+The 2026-08-09 refresh resolved and retrieved both upstreams before evaluating
 the delta:
 
 | Evidence | Value |
 | --- | --- |
 | Codex stable package/tag | `0.147.0` / `rust-v0.147.0` |
-| Codex release range | `rust-v0.146.1...rust-v0.147.0` |
+| Codex release range | `rust-v0.147.0` revalidated; no newer stable release |
 | Codex release commit | `be6e8eac029b183056b7e4402879f15d2c85f61b` |
 | OMX stable package/tag | `0.20.3` / `v0.20.3` |
 | OMX stable commit | `6c970cc12da256bfc7667edd0a9183b158d4a7a7` |
 | OMX default-branch commit | `a62d5bd77bef6d2bc7df467dcae68082b8616239` (`0.20.4` development state) |
 | Previous reviewed default | `a62d5bd77bef6d2bc7df467dcae68082b8616239` |
 | OMX previous-to-current default delta | none; the freshly retrieved default branch exactly matches the previous immutable receipt |
-| Result | no MERGE or PORT candidates from Codex or OMX; all 17 pre-existing method skills remain current, and the user-requested `cdx-refresh-upstreams` repository-maintenance method is added without runtime machinery |
+| Result | no new `MERGE` or `PORT` candidates from Codex or OMX; all 18 Chedex skills and the bounded project hook remain current, with no product change |
 
 Sources were retrieved into system temporary directories and were not added to
-the repository. Codex `0.147.0` release notes, its full changelog and source,
+the repository. The npm `latest` tag and installed Codex CLI both resolved to
+`0.147.0`; `0.148.0-alpha.5` was excluded as a prerelease. Codex `0.147.0`
+release notes, its full changelog and source,
 the current Codex manual, OMX `CHANGELOG.md`, OMX `0.20.3` release notes, and
 the stable-to-default source diff were reviewed.
 
