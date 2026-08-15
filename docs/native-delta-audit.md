@@ -27,7 +27,7 @@ retention or extraction decision is made.
 
 | Evidence | Value |
 | --- | --- |
-| Retrieval date | `2026-08-09` |
+| Retrieval date | `2026-08-15` |
 | Stable package/tag | `0.147.0` / `rust-v0.147.0` |
 | Reviewed release range | `rust-v0.147.0` revalidated; no newer stable release |
 | Immutable release commit | `be6e8eac029b183056b7e4402879f15d2c85f61b` |
@@ -35,7 +35,7 @@ retention or extraction decision is made.
 | Initial local audit | `npm run audit:codex` passed against installed `codex-cli 0.147.0`; no boundary update was required |
 
 The npm `latest` tag and the installed CLI both resolved to `0.147.0` on the
-retrieval date. The published `0.148.0-alpha.5` prerelease was excluded because
+retrieval date. The published `0.148.0-alpha.19` prerelease was excluded because
 the native baseline is the latest stable release with default-enabled features.
 The release notes, complete release changelog, current manual, and exact stable
 source were re-read. Revalidation of all 18 Chedex skills and the bounded

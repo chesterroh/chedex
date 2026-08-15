@@ -50,7 +50,7 @@ re-specifies behavior from first principles instead of copying skill files.
 
 ## Current Review Receipt
 
-The 2026-08-09 refresh resolved and retrieved both upstreams before evaluating
+The 2026-08-15 refresh resolved and retrieved both upstreams before evaluating
 the delta:
 
 | Evidence | Value |
@@ -58,34 +58,39 @@ the delta:
 | Codex stable package/tag | `0.147.0` / `rust-v0.147.0` |
 | Codex release range | `rust-v0.147.0` revalidated; no newer stable release |
 | Codex release commit | `be6e8eac029b183056b7e4402879f15d2c85f61b` |
-| OMX stable package/tag | `0.20.3` / `v0.20.3` |
-| OMX stable commit | `6c970cc12da256bfc7667edd0a9183b158d4a7a7` |
-| OMX default-branch commit | `a62d5bd77bef6d2bc7df467dcae68082b8616239` (`0.20.4` development state) |
+| OMX stable package/tag | `0.20.5` / `v0.20.5` |
+| OMX stable commit | `27b3a91c2ea630c2a82cdbcd45a1f1de30d9bb2a` |
+| OMX default-branch commit | `e94437fd141b4623d12a7c712d6f318e7aa47439` |
 | Previous reviewed default | `a62d5bd77bef6d2bc7df467dcae68082b8616239` |
-| OMX previous-to-current default delta | none; the freshly retrieved default branch exactly matches the previous immutable receipt |
+| OMX previous-to-current default delta | `a62d5bd77bef6d2bc7df467dcae68082b8616239..e94437fd141b4623d12a7c712d6f318e7aa47439`; reviewed through the current default branch |
 | Result | no new `MERGE` or `PORT` candidates from Codex or OMX; all 18 Chedex skills and the bounded project hook remain current, with no product change |
 
 Sources were retrieved into system temporary directories and were not added to
 the repository. The npm `latest` tag and installed Codex CLI both resolved to
-`0.147.0`; `0.148.0-alpha.5` was excluded as a prerelease. Codex `0.147.0`
-release notes, its full changelog and source,
-the current Codex manual, OMX `CHANGELOG.md`, OMX `0.20.3` release notes, and
-the stable-to-default source diff were reviewed.
+`0.147.0`; `0.148.0-alpha.19` was excluded as a prerelease. Codex `0.147.0`
+release notes, its full changelog and source, the current Codex manual, OMX
+`CHANGELOG.md`, OMX `0.20.4` and `0.20.5` release notes, the
+`v0.20.3..v0.20.5` source diff, and the stable-to-default source diff were
+reviewed.
 
 ## Current Delta Disposition
 
-The OMX stable package remains `v0.20.3`; its default branch remains materially
-ahead of stable but exactly matches the previous reviewed default commit. The
-stable-to-default candidates below therefore remain the complete current
-inventory, with no newly changed files to classify:
+OMX advanced from `v0.20.3` to `v0.20.5`. Its current default branch is four
+files ahead of the stable tag: one README callout plus native-hook and packed
+install adjustments. The following table classifies the complete new candidate
+inventory after subtracting native Codex and current Chedex coverage:
 
 | Candidate | Decision | Chedex/native destination |
 | --- | --- | --- |
-| `autopilot`, `ralplan`, and `ultragoal` self-cancellation, fresh admission, and hook-owned cancellation | NATIVE | Native goals, interruption, in-thread plans, and subagent lifecycle already own these concerns; existing Chedex skills remain prompt-only. |
-| Conductor read-only transport, shell classification, and hermetic PATH trust | DROP | These harden an OMX hook/control plane that Chedex does not ship; the bounded Chedex hook has no shell transport or orchestration state. |
-| Cross-platform process identity, session pointers, lock ownership, and team runtime | DROP | Chedex keeps no process registry, session alias store, lock protocol, or terminal coordinator. |
-| musl `SYS_renameat2` compatibility | DROP | Platform-specific runtime compatibility is outside the prompt/skill/custom-agent package. |
-| Smoke and CI fixture updates | DROP | Fixtures for omitted OMX runtime behavior do not create a Chedex product requirement. |
+| Herdr lifecycle/status bridge and external adaptation transport | DROP | This is an OMX-specific adapter and runtime integration; Chedex does not own an external lifecycle bus. |
+| Autopilot host-receipt preflight, Ralplan leader proof, typed consensus lifecycle, and execution handoff gate | NATIVE | Native typed subagents, in-thread plans, user direction, permissions, and ordinary execution ownership cover the useful behavior. Chedex does not add receipt-shaped workflow authority. |
+| Ultragoal blocked-status mapping, aggregate checkpoints, session aliases, and cancellation ownership | NATIVE | Native Goal mode owns blocked/completed state, interruption, and continuation; Chedex's goal-using skills remain prompt-only. |
+| Session pointers, reversible lock recovery, process identity, launch authority, and detached finalization | DROP | These harden OMX's persistent runtime. Chedex keeps no process registry, session-pointer store, lock protocol, or detached launcher. |
+| Team pane ownership, tmux separator boundaries, HUD teardown, and notice delivery | DROP | Terminal multiplexing, pane topology, worker runtime state, and HUD behavior are outside Chedex's native-first boundary. |
+| Native-hook trust, Stop-loop handling, state-root binding, and authorization reinjection fixes | DROP | These protect OMX's orchestration hook. Chedex's bounded hook only enforces generated-agent repository mechanics and has no Stop or workflow-state path. |
+| Native cache integrity, packed-runtime provisioning, updater ownership, Doctor, auth switching, and cross-platform durability | DROP | Chedex ships no binary sidecar, package runtime, credential switcher, or parallel diagnostic/update control plane. Its reversible content installer already has repository-specific verification. |
+| Default-branch README callout and packed native-hook follow-up | DROP | The product callout is unrelated; the hook and smoke changes apply only to omitted OMX runtime packaging. |
+| Tests, release collateral, dependency bumps, and platform-specific compatibility fixes | DROP | Evidence and compatibility work for omitted OMX machinery do not create a Chedex capability gap. |
 
 There are no MERGE or PORT candidates above the extraction threshold from OMX.
 No skill, hook, state, or runtime implementation was imported as a result of
