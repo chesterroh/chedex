@@ -1,7 +1,6 @@
 ---
 name: cdx-ralph
 description: Run a persistent implement-verify-repair loop for substantial work, using native Codex Goal mode when explicitly requested.
-argument-hint: "<task, accepted plan, or goal>"
 ---
 
 # Ralph

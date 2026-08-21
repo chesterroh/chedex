@@ -1,7 +1,6 @@
 ---
 name: cdx-visual-ralph
 description: Iteratively implement a frontend against a generated image, static reference, or live URL using native browser, image, screenshot, and vision tools.
-argument-hint: "<reference image, URL, or visual brief>"
 ---
 
 # Visual Ralph

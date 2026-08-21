@@ -1,7 +1,6 @@
 ---
 name: cdx-review
 description: Perform a reviewer-only assessment of a plan, diff, or completion claim with severity-ranked findings and a clear verdict.
-argument-hint: "<plan, diff, branch, or claim>"
 ---
 
 # Review

@@ -1,13 +1,13 @@
 # Native Delta Audit
 
 This audit decides what Chedex should still own after the Codex `0.131` through
-`0.147.0` upgrade sequence.
+`0.149.0` upgrade sequence.
 
 ## Baseline
 
-- Minimum Codex CLI: `0.147.0`
-- Latest verified Codex CLI: `0.147.0`
-- Chedex: `0.147.0`
+- Minimum Codex CLI: `0.149.0`
+- Latest verified Codex CLI: `0.149.0`
+- Chedex: `0.149.0`
 - native goals are stable and on by default
 - native multi-agent support is stable and on by default
 - native hooks are stable; Chedex uses them only for bounded repository mechanics
@@ -18,7 +18,7 @@ This audit decides what Chedex should still own after the Codex `0.131` through
 The Chedex package version tracks this latest verified compatibility boundary.
 Evidence is checked locally by `npm run audit:codex`, against the current Codex
 manual at <https://developers.openai.com/codex/codex-manual.md>, and against the
-[official Codex 0.147.0 release](https://github.com/openai/codex/releases/tag/rust-v0.147.0).
+[official Codex 0.149.0 release](https://github.com/openai/codex/releases/tag/rust-v0.149.0).
 Every refresh follows [upstream-review.md](upstream-review.md) so release notes,
 source implementation, and the comparison upstream are retrieved before a
 retention or extraction decision is made.
@@ -27,21 +27,24 @@ retention or extraction decision is made.
 
 | Evidence | Value |
 | --- | --- |
-| Retrieval date | `2026-08-15` |
-| Stable package/tag | `0.147.0` / `rust-v0.147.0` |
-| Reviewed release range | `rust-v0.147.0` revalidated; no newer stable release |
-| Immutable release commit | `be6e8eac029b183056b7e4402879f15d2c85f61b` |
-| Manual sections reviewed | skills and skill locations/metadata, plugins and marketplaces, hooks, goals/long-running work, subagents, approvals/permissions, external-agent import, MCP, and session lifecycle |
-| Initial local audit | `npm run audit:codex` passed against installed `codex-cli 0.147.0`; no boundary update was required |
+| Retrieval date | `2026-08-21` |
+| Stable package/tag | `0.149.0` / `rust-v0.149.0` |
+| Reviewed release range | `rust-v0.147.0...rust-v0.149.0` |
+| Immutable release commit | `758ef40f50c1a458425c7cfbf1eb12cbc07af0b0` |
+| Manual sections reviewed | skills and skill metadata/locations, plugins, synchronous/background/MCP hooks, goals/long-running work, subagents/custom agents, permissions, threads/session queueing and forking, CLI commands, Doctor, and session lifecycle |
+| Initial local audit | `npm run audit:codex` passed against installed `codex-cli 0.149.0` while Chedex still declared the `0.147.0` boundary |
 
-The npm `latest` tag and the installed CLI both resolved to `0.147.0` on the
-retrieval date. The published `0.148.0-alpha.19` prerelease was excluded because
+The npm `latest` tag and the installed CLI both resolved to `0.149.0` on the
+retrieval date. The published `0.150.0-alpha.1` prerelease was excluded because
 the native baseline is the latest stable release with default-enabled features.
-The release notes, complete release changelog, current manual, and exact stable
-source were re-read. Revalidation of all 18 Chedex skills and the bounded
-project hook produced no new `MERGE` or `PORT` decision and no product change.
+The `0.148.0` and `0.149.0` release notes, complete release changelogs, current
+manual, and exact stable source were read. Revalidation of all 18 Chedex skills
+and the bounded project hook produced no product-surface addition or removal.
+The two implementation merges remove unsupported legacy skill frontmatter and
+correct multi-word feature-maturity parsing in the development-time audit; the
+audit also locks the new native command surfaces.
 
-## 0.131-0.147.0 Relevant Delta
+## 0.131-0.149.0 Relevant Delta
 
 | Codex | Chedex-relevant change | Decision |
 | --- | --- | --- |
@@ -63,6 +66,8 @@ project hook produced no new `MERGE` or `PORT` decision and no product change.
 | 0.146 | Agent Plugin manifests, executor skills, session forks, and hook execution matured | Rely on native packaging, discovery, lifecycle, and hook execution; add no Chedex runtime. |
 | 0.146.1 | Cyber-specialty models gained safer automatic-review defaults and clearer terminal permission guidance | Rely on native model metadata, managed requirements, permission selection, and TUI warnings; add no Chedex routing or approval layer. |
 | 0.147.0 | Portable Agent Plugins/search, thread sections, auto-reviewed approvals, Cursor skill import, MCP 2026 support, Bedrock retrieval/compaction, and security hardening | Keep plugins, catalogs, conversations, approvals, migration, MCP, provider behavior, trust, and isolation native; retain the installer because plugins cannot carry Chedex custom agents or managed `AGENTS.md` guidance. |
+| 0.148.0 | Conversation export, session fork/archive/restore, persisted cwd and approval recovery, async/MCP hooks, built-in Bedrock, skill validation, and sandbox hardening | Keep conversation lifecycle, provider integration, hook execution modes, skill tooling, and isolation native. Chedex's blocking repository guardrail remains a synchronous command hook. |
+| 0.149.0 | Interactive `codex agents`, `codex queue`, cwd commands, richer Doctor diagnostics, permission-profile restoration, subagent routing fixes, skill catalog controls, and security hardening | Use native agent/session discovery and messaging; add no status UI, mailbox, coordinator, diagnostic layer, model-routing skill metadata, or permission store. |
 
 The `rust-v0.146.1...rust-v0.147.0` review used immutable source commit
 `be6e8eac029b183056b7e4402879f15d2c85f61b`. The relevant candidates were
@@ -79,13 +84,31 @@ classified as follows:
 | Secret redaction, project trust, managed-auth restrictions, and plugin network fail-closed behavior | NATIVE | Codex owns security and policy enforcement. |
 | Repeatable Chedex upstream refresh and release procedure | PORT | Add `cdx-refresh-upstreams` as a repository-specific method contract over the required evidence, disposition, verification, and authorized release gates. |
 
-There are no MERGE or PORT candidates derived from Codex or OMX behavior. The
-only PORT is the explicitly requested Chedex maintenance workflow above; it
-adds no runtime, hook, catalog, or native feature wrapper.
+That `0.147.0` review produced no MERGE candidate from Codex or OMX behavior.
+Its only PORT was the explicitly requested Chedex maintenance workflow above;
+it added no runtime, hook, catalog, or native feature wrapper.
+
+The `rust-v0.147.0...rust-v0.149.0` review used immutable source commit
+`758ef40f50c1a458425c7cfbf1eb12cbc07af0b0`. The current candidates were
+classified as follows:
+
+| Candidate | Decision | Chedex destination |
+| --- | --- | --- |
+| Conversation export, `codex exec fork`, archive/restore, cwd commands, and persisted resume settings | NATIVE | Codex owns conversation branching, storage, working-directory state, and permission restoration. |
+| Interactive `codex agents`, `codex queue`, queued-message delivery, and subagent routing fixes | NATIVE | Codex owns agent discovery, status, session messaging, wake-up, navigation, approvals, and coordination. |
+| Background command hooks and MCP hook handlers | NATIVE | Codex owns hook execution modes and MCP invocation. Chedex keeps one synchronous command adapter because generated-file denial must complete before the edit. |
+| Skill catalog token budgets and selection plus removal of skill-level model delegation | NATIVE | Codex owns skill discovery, context budgeting, and model selection. Chedex skills contain no model-routing metadata and remain method contracts. |
+| Bundled skill validation rejects legacy `argument-hint` frontmatter | MERGE | Remove the unsupported key from 17 skills and enforce its absence in repository verification; names, descriptions, triggers, and method bodies are unchanged. |
+| Expanded Doctor, Bedrock, SDK, TUI, plugin, permission, sandbox, and credential hardening | NATIVE | Codex owns diagnostics, providers, clients, policy, trust, and isolation. |
+| Multi-word feature maturity reported as missing by Chedex's audit parser | MERGE | Repair `parseCodexFeatures`, add a focused regression, and report `under development` features accurately. |
+
+No new skill, agent, hook event, runtime, dependency, or installer behavior is
+justified by this delta. The two compatibility `MERGE` decisions do not expand
+the Chedex product surface.
 
 ## Complete Chedex Subtraction Pass
 
-The `0.147.0` refresh re-read every Chedex skill, custom-agent prompt and
+The `0.149.0` refresh re-read every Chedex skill, custom-agent prompt and
 generated TOML, the project hook, installer, and guidance surface against the
 fresh Codex manual and source. Codex documents `explorer` and `worker` as
 built-ins, so the name-only Chedex `explore` and `executor` roles duplicated
@@ -155,7 +178,7 @@ persist state, intercept Stop, or bypass Codex hook review and trust.
 
 See [hooks.md](hooks.md) for the boundary and upstream comparison.
 
-## Local 0.147.0 Evidence
+## Local 0.149.0 Evidence
 
 The verified local surface reports:
 
@@ -166,12 +189,15 @@ The verified local surface reports:
 - `remote_plugin stable true`
 - `remote_compaction_v2 stable true`
 - `auth_elicitation stable true`
+- `request_permissions_tool under development false`
+- `exec_permission_approvals under development false`
 
 The app-server schema exposes goal set/clear, hook metadata, skill discovery,
 permission profiles, external-agent migration, and thread start settings. The
-CLI permission help currently spells the profile placeholder
-`CONFIG_PROFILE_V2`; the audit accepts that current spelling and the previous
-`CONFIG_PROFILE` spelling to avoid a brittle non-semantic failure.
+CLI audit also proves `codex agents`, `codex queue`, and `codex exec fork`.
+Permission help currently spells the profile placeholder `CONFIG_PROFILE_V2`;
+the audit accepts that spelling and the previous `CONFIG_PROFILE` spelling to
+avoid a brittle non-semantic failure.
 
 ## Recheck Cadence And Triggers
 

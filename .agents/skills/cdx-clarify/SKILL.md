@@ -1,7 +1,6 @@
 ---
 name: cdx-clarify
 description: Clarify an ambiguous request one consequential question at a time before planning or execution.
-argument-hint: "<idea or vague request>"
 ---
 
 # Clarify

@@ -1,7 +1,6 @@
 ---
 name: cdx-tdd
 description: Apply a strict failing-test-first cycle to a behavior change that can be proved with automated tests.
-argument-hint: "<behavior change>"
 ---
 
 # Test-Driven Development

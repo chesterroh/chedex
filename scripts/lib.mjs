@@ -16,8 +16,8 @@ export const legacyConfigMarkerEnd = '# END CHEDEX NATIVE AGENTS';
 export const uninstallFileName = 'CHEDEX_UNINSTALL.md';
 export const uninstallStateFileName = 'CHEDEX_UNINSTALL.json';
 export const backupsDirName = '.chedex-backups';
-export const chedexMinimumCodexVersion = '0.147.0';
-export const chedexLatestVerifiedCodexVersion = '0.147.0';
+export const chedexMinimumCodexVersion = '0.149.0';
+export const chedexLatestVerifiedCodexVersion = '0.149.0';
 
 export const chedexSkills = [
   'cdx-ai-slop-cleaner',
@@ -346,7 +346,7 @@ export function readCodexVersion() {
 export function parseCodexFeatures(output) {
   const features = new Map();
   for (const line of String(output || '').split(/\r?\n/)) {
-    const match = line.trim().match(/^(\S+)\s+(\S+)\s+(true|false)$/);
+    const match = line.trim().match(/^(\S+)\s+(.+?)\s+(true|false)$/);
     if (match) features.set(match[1], { name: match[1], stage: match[2], enabled: match[3] === 'true' });
   }
   return features;

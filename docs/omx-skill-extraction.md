@@ -50,43 +50,46 @@ re-specifies behavior from first principles instead of copying skill files.
 
 ## Current Review Receipt
 
-The 2026-08-15 refresh resolved and retrieved both upstreams before evaluating
+The 2026-08-21 refresh resolved and retrieved both upstreams before evaluating
 the delta:
 
 | Evidence | Value |
 | --- | --- |
-| Codex stable package/tag | `0.147.0` / `rust-v0.147.0` |
-| Codex release range | `rust-v0.147.0` revalidated; no newer stable release |
-| Codex release commit | `be6e8eac029b183056b7e4402879f15d2c85f61b` |
+| Codex stable package/tag | `0.149.0` / `rust-v0.149.0` |
+| Codex release range | `rust-v0.147.0...rust-v0.149.0` |
+| Codex release commit | `758ef40f50c1a458425c7cfbf1eb12cbc07af0b0` |
 | OMX stable package/tag | `0.20.5` / `v0.20.5` |
 | OMX stable commit | `27b3a91c2ea630c2a82cdbcd45a1f1de30d9bb2a` |
 | OMX default-branch commit | `e94437fd141b4623d12a7c712d6f318e7aa47439` |
-| Previous reviewed default | `a62d5bd77bef6d2bc7df467dcae68082b8616239` |
-| OMX previous-to-current default delta | `a62d5bd77bef6d2bc7df467dcae68082b8616239..e94437fd141b4623d12a7c712d6f318e7aa47439`; reviewed through the current default branch |
-| Result | no new `MERGE` or `PORT` candidates from Codex or OMX; all 18 Chedex skills and the bounded project hook remain current, with no product change |
+| Previous reviewed default | `e94437fd141b4623d12a7c712d6f318e7aa47439` |
+| OMX previous-to-current default delta | `e94437fd141b4623d12a7c712d6f318e7aa47439..e94437fd141b4623d12a7c712d6f318e7aa47439`; no changes since the previous review |
+| Result | no new OMX `MERGE` or `PORT`; two Codex-driven compatibility `MERGE` decisions for skill frontmatter and audit parsing; all 18 Chedex skills and the bounded project hook remain current with no product-surface change |
 
 Sources were retrieved into system temporary directories and were not added to
 the repository. The npm `latest` tag and installed Codex CLI both resolved to
-`0.147.0`; `0.148.0-alpha.19` was excluded as a prerelease. Codex `0.147.0`
-release notes, its full changelog and source, the current Codex manual, OMX
-`CHANGELOG.md`, OMX `0.20.4` and `0.20.5` release notes, the
-`v0.20.3..v0.20.5` source diff, and the stable-to-default source diff were
-reviewed.
+`0.149.0`; `0.150.0-alpha.1` was excluded as a prerelease. Codex `0.148.0` and
+`0.149.0` release notes, their complete changelogs, the current Codex manual,
+and the exact `0.149.0` source were reviewed. OMX remained at `0.20.5`; its
+`CHANGELOG.md`, stable-to-default four-file diff, and unchanged default commit
+were revalidated.
 
 ## Current Delta Disposition
 
-OMX advanced from `v0.20.3` to `v0.20.5`. Its current default branch is four
-files ahead of the stable tag: one README callout plus native-hook and packed
-install adjustments. The following table classifies the complete new candidate
-inventory after subtracting native Codex and current Chedex coverage:
+OMX remains at `v0.20.5`, and its default commit is unchanged from the previous
+review. The default branch still differs from the stable tag in four files: one
+README callout plus native-hook and packed-install adjustments. The following
+table revalidates the complete current candidate inventory after subtracting
+Codex `0.149.0` and current Chedex coverage:
 
 | Candidate | Decision | Chedex/native destination |
 | --- | --- | --- |
 | Herdr lifecycle/status bridge and external adaptation transport | DROP | This is an OMX-specific adapter and runtime integration; Chedex does not own an external lifecycle bus. |
 | Autopilot host-receipt preflight, Ralplan leader proof, typed consensus lifecycle, and execution handoff gate | NATIVE | Native typed subagents, in-thread plans, user direction, permissions, and ordinary execution ownership cover the useful behavior. Chedex does not add receipt-shaped workflow authority. |
 | Ultragoal blocked-status mapping, aggregate checkpoints, session aliases, and cancellation ownership | NATIVE | Native Goal mode owns blocked/completed state, interruption, and continuation; Chedex's goal-using skills remain prompt-only. |
+| Agent/session dashboard, queued messaging, forking, archive/restore, and cwd controls | NATIVE | `codex agents`, `codex queue`, `codex exec fork`, and native session controls own discovery, status, messaging, branching, and working-directory state. |
+| Legacy Chedex `argument-hint` skill frontmatter | MERGE | Current bundled skill validation rejects the key, so remove it from 17 skills without changing their triggers or method contracts. |
 | Session pointers, reversible lock recovery, process identity, launch authority, and detached finalization | DROP | These harden OMX's persistent runtime. Chedex keeps no process registry, session-pointer store, lock protocol, or detached launcher. |
-| Team pane ownership, tmux separator boundaries, HUD teardown, and notice delivery | DROP | Terminal multiplexing, pane topology, worker runtime state, and HUD behavior are outside Chedex's native-first boundary. |
+| Team pane ownership, tmux separator boundaries, HUD teardown, and runtime notice transport | DROP | Terminal multiplexing, pane topology, worker runtime state, HUD behavior, and product-specific delivery fallbacks are outside Chedex's native-first boundary. |
 | Native-hook trust, Stop-loop handling, state-root binding, and authorization reinjection fixes | DROP | These protect OMX's orchestration hook. Chedex's bounded hook only enforces generated-agent repository mechanics and has no Stop or workflow-state path. |
 | Native cache integrity, packed-runtime provisioning, updater ownership, Doctor, auth switching, and cross-platform durability | DROP | Chedex ships no binary sidecar, package runtime, credential switcher, or parallel diagnostic/update control plane. Its reversible content installer already has repository-specific verification. |
 | Default-branch README callout and packed native-hook follow-up | DROP | The product callout is unrelated; the hook and smoke changes apply only to omitted OMX runtime packaging. |
@@ -98,17 +101,19 @@ this review.
 
 ## Native Codex Boundary
 
-The local target is Codex CLI `0.147.0`. Current official Codex guidance says:
+The local target is Codex CLI `0.149.0`. Current official Codex guidance says:
 
 - persisted goals and automatic continuation are stable and on by default
 - native subagents provide parallel delegation and project-scoped custom agents
+- `codex agents`, `codex queue`, session forking, and archive/restore provide native agent and conversation control surfaces
 - standalone agent TOMLs require `name`, `description`, and
   `developer_instructions`
 - repository skills belong under `.agents/skills`
 - portable plugins package skills, MCP/apps, and hooks, but do not replace
   Chedex's custom-agent or managed-guidance installation
-- hooks are available for lifecycle enforcement, but a prompt-only workflow
-  should not add hooks merely to emulate orchestration state
+- hooks support synchronous/background commands and MCP handlers, but a
+  prompt-only workflow should not add hooks merely to emulate orchestration
+  state
 
 References:
 
@@ -204,7 +209,7 @@ native subagents when delegation is permitted, and fresh verification evidence.
 
 1. Remove the Chedex workflow governor, release-start hook, custom
    progress/handoff schemas, and hook verifier.
-2. Stop writing `goals = true`; goals are stable and default-on in Codex 0.147.0.
+2. Stop writing `goals = true`; goals are stable and default-on in Codex 0.149.0.
 3. Stop installing project workflow caches or user-global hook configuration.
 4. Move canonical repository skills to `.agents/skills` and generated native
    agents to `.codex/agents`.
@@ -216,8 +221,9 @@ native subagents when delegation is permitted, and fresh verification evidence.
 
 ## Hook Structure Reassessment
 
-The later hook review used the same OMX `v0.20.3` snapshot and current Codex
-hook documentation. Chedex adopts the useful structural seam—native event
+The current hook reassessment used OMX `v0.20.5`, default commit
+`e94437fd141b4623d12a7c712d6f318e7aa47439`, and current Codex hook
+documentation. Chedex retains the useful structural seam—native event
 registration, one stdin/stdout adapter, event-specific handlers, and focused
 ownership tests—but not OMX's orchestration behavior.
 

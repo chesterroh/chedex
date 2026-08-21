@@ -1,7 +1,6 @@
 ---
 name: cdx-autopilot
 description: Execute a broad request autonomously through clarify, plan, implementation, review, adversarial QA, and verified closeout.
-argument-hint: "<broad task or evolving objective>"
 ---
 
 # Autopilot

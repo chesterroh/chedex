@@ -1,7 +1,6 @@
 ---
 name: cdx-ai-slop-cleaner
 description: Remove redundant, vague, over-abstracted, or generated-looking code while preserving behavior through regression-first cleanup.
-argument-hint: "<files, module, or cleanup scope>"
 ---
 
 # AI Slop Cleaner

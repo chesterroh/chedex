@@ -10,6 +10,7 @@ import {
   generatedAgentPath,
   installManifestPaths,
   listSkills,
+  parseCodexFeatures,
   repoPath,
   roleNames,
   rolePromptPath,
@@ -19,6 +20,16 @@ import {
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
+
+const parsedFeatures = parseCodexFeatures([
+  'goals                                    stable             true',
+  'request_permissions_tool                 under development  false',
+].join('\n'));
+assert(parsedFeatures.get('goals')?.stage === 'stable', 'feature parser should accept one-word stages');
+assert(
+  parsedFeatures.get('request_permissions_tool')?.stage === 'under development',
+  'feature parser should accept multi-word stages',
+);
 
 const expectedSkills = [...listSkills()].sort();
 const actualSkills = (await readdir(repoPath('.agents', 'skills'), { withFileTypes: true }))
@@ -39,6 +50,7 @@ for (const name of actualSkills) {
   assert(content.startsWith('---\n'), `skill ${name} is missing frontmatter`);
   assert(content.includes(`name: ${name}`), `skill ${name} has the wrong frontmatter name`);
   assert(/^description:\s*\S/m.test(content), `skill ${name} is missing a description`);
+  assert(!/^argument-hint:/m.test(content), `skill ${name} uses unsupported argument-hint frontmatter`);
 }
 
 for (const name of roleNames()) {
@@ -72,10 +84,10 @@ for (const snippet of [
   'NATIVE',
   'DROP',
   'no OMX command',
-  'Codex CLI `0.147.0`',
+  'Codex CLI `0.149.0`',
   'Current Review Receipt',
-  'be6e8eac029b183056b7e4402879f15d2c85f61b',
-  'a62d5bd77bef6d2bc7df467dcae68082b8616239',
+  '758ef40f50c1a458425c7cfbf1eb12cbc07af0b0',
+  'e94437fd141b4623d12a7c712d6f318e7aa47439',
   'no MERGE or PORT candidates',
 ]) {
   assert(extraction.includes(snippet), `extraction audit is missing ${snippet}`);
@@ -91,7 +103,7 @@ for (const snippet of [
   '.agents/skills',
   'description',
   'Bounded Hook Delta',
-  'rust-v0.147.0',
+  'rust-v0.149.0',
   'Complete Chedex Subtraction Pass',
   'Codex built-in `explorer`',
   'Codex built-in `worker`',
@@ -100,7 +112,7 @@ for (const snippet of [
 }
 
 const readme = await readFile(repoPath('README.md'), 'utf8');
-for (const snippet of ['native Goal mode', 'native subagents', '.agents/skills', '.codex/agents', '.codex/hooks.json', 'npm run audit:codex', 'rust-v0.147.0', 'Product Direction', 'docs/upstream-review.md']) {
+for (const snippet of ['native Goal mode', 'native subagents', '.agents/skills', '.codex/agents', '.codex/hooks.json', 'npm run audit:codex', 'rust-v0.149.0', 'Product Direction', 'docs/upstream-review.md']) {
   assert(readme.includes(snippet), `README is missing ${snippet}`);
 }
 
@@ -127,7 +139,7 @@ for (const snippet of ['Default Upstream Workflow', 'docs/upstream-review.md', '
 }
 
 const hookDocs = await readFile(repoPath('docs', 'hooks.md'), 'utf8');
-for (const snippet of ['Codex discovers', 'PreToolUse', 'PostToolUse', 'hash-based review', 'v0.20.3']) {
+for (const snippet of ['Codex discovers', 'PreToolUse', 'PostToolUse', 'hash-based review', 'v0.20.5']) {
   assert(hookDocs.includes(snippet), `hook docs are missing ${snippet}`);
 }
 

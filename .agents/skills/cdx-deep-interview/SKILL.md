@@ -1,7 +1,6 @@
 ---
 name: cdx-deep-interview
 description: Run a high-rigor Socratic requirements interview when intent, scope, or decision rights are too ambiguous for safe execution.
-argument-hint: "<idea, problem, or under-specified request>"
 ---
 
 # Deep Interview

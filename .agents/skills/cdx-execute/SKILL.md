@@ -1,7 +1,6 @@
 ---
 name: cdx-execute
 description: Implement a clear task directly and continue through fresh verification or a genuine blocker.
-argument-hint: "<scoped task>"
 ---
 
 # Execute

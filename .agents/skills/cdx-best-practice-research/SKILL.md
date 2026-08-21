@@ -1,7 +1,6 @@
 ---
 name: cdx-best-practice-research
 description: Research current best practices from authoritative primary sources and map them to the repository without implementing changes.
-argument-hint: "<technology, decision, or practice question>"
 ---
 
 # Best-Practice Research

@@ -1,7 +1,6 @@
 ---
 name: cdx-design
 description: Create or refine a repository design source of truth for product, UI, UX, or frontend work before implementation.
-argument-hint: "<product surface, workflow, or design problem>"
 ---
 
 # Design

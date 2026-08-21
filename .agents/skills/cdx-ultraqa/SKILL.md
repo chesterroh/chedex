@@ -1,7 +1,6 @@
 ---
 name: cdx-ultraqa
 description: Run adversarial end-to-end QA, repair reproducible failures, and repeat until the requested flows are proven or genuinely blocked.
-argument-hint: "<feature, command, workflow, or acceptance criteria>"
 ---
 
 # Ultra QA

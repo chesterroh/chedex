@@ -1,7 +1,6 @@
 ---
 name: cdx-plan
 description: Turn a grounded request into a concise, dependency-aware, testable implementation plan; supports an explicit consensus review pass.
-argument-hint: "<task or requirements>"
 ---
 
 # Plan

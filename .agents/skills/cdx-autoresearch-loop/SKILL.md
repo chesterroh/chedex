@@ -1,7 +1,6 @@
 ---
 name: cdx-autoresearch-loop
 description: Run a validator-gated baseline-experiment-decide loop for measurable optimization and keep an honest experiment ledger.
-argument-hint: "<accepted research spec or optimization task>"
 ---
 
 # Autoresearch Loop

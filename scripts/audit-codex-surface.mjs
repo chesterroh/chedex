@@ -50,8 +50,11 @@ function commandOutput(args) {
 const commandChecks = [
   { id: 'update', args: ['update', '--help'], all: ['Usage: codex update'] },
   { id: 'doctor', args: ['doctor', '--help'], all: ['Usage: codex doctor'] },
+  { id: 'agents', args: ['agents', '--help'], all: ['Usage: codex agents'] },
+  { id: 'queue', args: ['queue', '--help'], all: ['Usage: codex queue', '--thread <THREAD>', '--message <TEXT>'] },
   { id: 'schema', args: ['app-server', 'generate-json-schema', '--help'], all: ['--out <DIR>', '--experimental'] },
   { id: 'exec_json', args: ['exec', '--help'], all: ['--json'] },
+  { id: 'exec_fork', args: ['exec', 'fork', '--help'], all: ['Usage: codex exec fork'] },
   {
     id: 'permission_profile',
     args: ['--help'],

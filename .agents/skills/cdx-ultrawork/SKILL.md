@@ -1,7 +1,6 @@
 ---
 name: cdx-ultrawork
 description: Coordinate multiple independent work lanes through native Codex subagents, then integrate and verify the combined result.
-argument-hint: "<multi-lane task>"
 ---
 
 # Ultrawork

@@ -1,7 +1,6 @@
 ---
 name: cdx-autoresearch-plan
 description: Turn a metric-driven optimization request into a fair, bounded, reproducible experiment specification.
-argument-hint: "<optimization target or experiment brief>"
 ---
 
 # Autoresearch Plan

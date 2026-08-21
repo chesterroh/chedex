@@ -49,11 +49,11 @@ hook trust state. See [docs/hooks.md](docs/hooks.md).
 
 ## Requirements
 
-- Codex CLI `0.147.0` or newer
+- Codex CLI `0.149.0` or newer
 - Node.js 20 or newer
 
 The current verified boundary is the stable
-[Codex `0.147.0` release](https://github.com/openai/codex/releases/tag/rust-v0.147.0),
+[Codex `0.149.0` release](https://github.com/openai/codex/releases/tag/rust-v0.149.0),
 and the Chedex package version intentionally matches it. Run
 `npm run audit:codex` after upgrading Codex.
 
@@ -143,7 +143,7 @@ Important source surfaces:
 - `.codex/agents/` — generated project-scoped custom agents
 - `.codex/hooks.json` and `hooks/` — bounded project hook registration and adapter
 - `scripts/` — generation, compatibility audit, install, uninstall, verification
-- `docs/native-delta-audit.md` — Codex 0.147 replacement decisions
+- `docs/native-delta-audit.md` — Codex 0.149 replacement decisions
 - `docs/omx-skill-extraction.md` — comparison review ledger and native dispositions
 - `docs/upstream-review.md` — mandatory Codex-first comparison and extraction workflow
 

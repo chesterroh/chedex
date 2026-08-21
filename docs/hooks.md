@@ -13,9 +13,10 @@ concurrently, and non-managed definitions require hash-based review through
 `/hooks`.
 
 The current native surface includes session, prompt, tool, permission,
-compaction, subagent, stop, and session-end events. Only command handlers run
-today; tool hooks do not cover every hosted or specialized tool path. Those
-limits make hooks useful guardrails, not a complete security boundary.
+compaction, subagent, stop, and session-end events. Command handlers can run
+synchronously or in the background, and hooks can invoke MCP tools. Tool hooks
+still do not cover every hosted or specialized tool path. Those limits make
+hooks useful guardrails, not a complete security boundary.
 
 Primary references:
 
@@ -51,9 +52,9 @@ npm run verify
 
 ## OMX Structure: Adopted And Rejected
 
-The reviewed upstream is Oh My Codex `v0.20.3` at commit
-`6c970cc12da256bfc7667edd0a9183b158d4a7a7`:
-<https://github.com/Yeachan-Heo/oh-my-codex/tree/v0.20.3>.
+The reviewed stable upstream is Oh My Codex `v0.20.5` at commit
+`27b3a91c2ea630c2a82cdbcd45a1f1de30d9bb2a`:
+<https://github.com/Yeachan-Heo/oh-my-codex/tree/v0.20.5>.
 This receipt is refreshed through [the default upstream workflow](upstream-review.md),
 not treated as a permanent current version.
 
@@ -73,15 +74,14 @@ Rejected for Chedex:
 - installer-written `hooks.state.*.trusted_hash` entries
 - user-global hook installation for repository-specific policy
 
-OMX default-branch commit `a62d5bd77bef6d2bc7df467dcae68082b8616239`
-adds further hermetic PATH trust, read-only transport, cancellation, process
-identity, session ownership, and platform-runtime hardening on top of the
-stable receipt. Those changes protect OMX state and orchestration, so they do
-not create a Chedex hook requirement. Codex `0.147.0` also preserves
-stdout from command hooks that exit before consuming stdin, keeping that
-process-level behavior in the native hook runner.
+OMX default-branch commit `e94437fd141b4623d12a7c712d6f318e7aa47439`
+differs from the stable tag only in a README callout and reductions to its
+native-hook and packed-install smoke surfaces. Those changes apply to omitted
+OMX runtime packaging and do not create a Chedex hook requirement. Codex
+`0.148.0` added background command hooks and MCP hook handlers, while Chedex
+keeps its blocking generated-file policy in one synchronous command adapter.
 
-OMX also documents several native gaps that no longer match Codex `0.147.0`—for
+OMX also documents several native gaps that no longer match Codex `0.149.0`—for
 example current Codex has `SessionEnd`, `SubagentStart`, and `SubagentStop`.
 Chedex therefore treats current Codex documentation as canonical and OMX only
 as a structural reference.

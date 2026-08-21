@@ -1,7 +1,6 @@
 ---
 name: cdx-analyze
 description: Perform read-only deep repository analysis and return a ranked synthesis with confidence, file evidence, and explicit unknowns.
-argument-hint: "<question, symptom, or architecture concern>"
 ---
 
 # Analyze
