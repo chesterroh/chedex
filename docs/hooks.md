@@ -13,8 +13,9 @@ concurrently, and non-managed definitions require hash-based review through
 `/hooks`.
 
 The current native surface includes session, prompt, tool, permission,
-compaction, subagent, stop, and session-end events. Command handlers can run
-synchronously or in the background, and hooks can invoke MCP tools. Tool hooks
+compaction, subagent, stop, interrupt, and session-end events. Command handlers
+can run synchronously or in the background, and hooks can invoke MCP tools. Tool
+hooks
 still do not cover every hosted or specialized tool path. Those limits make
 hooks useful guardrails, not a complete security boundary.
 
@@ -74,14 +75,16 @@ Rejected for Chedex:
 - installer-written `hooks.state.*.trusted_hash` entries
 - user-global hook installation for repository-specific policy
 
-OMX default-branch commit `e94437fd141b4623d12a7c712d6f318e7aa47439`
-differs from the stable tag only in a README callout and reductions to its
-native-hook and packed-install smoke surfaces. Those changes apply to omitted
-OMX runtime packaging and do not create a Chedex hook requirement. Codex
-`0.148.0` added background command hooks and MCP hook handlers, while Chedex
-keeps its blocking generated-file policy in one synchronous command adapter.
+OMX default-branch commit `3ad79a8a6fe6e95fdbb8c00e40716fffe4011ce2`
+contains an unpublished `0.21.0` consolidation candidate. It makes workflow
+`PreToolUse` guards advisory, removes hard workflow gates, and retains extensive
+state, session, tmux, and packed-runtime machinery. Those changes apply to
+omitted OMX orchestration and do not create a Chedex hook requirement. Codex
+`0.150.0` added native `Interrupt` hooks, while Chedex keeps its blocking
+generated-file policy in one synchronous command adapter and adds no interrupt
+or workflow event.
 
-OMX also documents several native gaps that no longer match Codex `0.149.0`—for
+OMX also documents several native gaps that no longer match Codex `0.150.1`—for
 example current Codex has `SessionEnd`, `SubagentStart`, and `SubagentStop`.
 Chedex therefore treats current Codex documentation as canonical and OMX only
 as a structural reference.

@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -75,7 +75,7 @@ for (const check of commandChecks) {
 const schemaChecks = [
   ['v2/ThreadGoalSetParams.json', 'native goal set API'],
   ['v2/ThreadGoalClearParams.json', 'native goal clear API'],
-  ['v2/HooksListResponse.json', 'native hook metadata'],
+  ['v2/HooksListResponse.json', 'native hook metadata', ['"interrupt"']],
   ['v2/ThreadStartParams.json', 'thread and collaboration settings'],
   ['v2/SkillsListResponse.json', 'native skill discovery'],
   ['v2/ExternalAgentConfigImportParams.json', 'external-agent migration'],
@@ -89,10 +89,13 @@ if (!skipSchema) {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    for (const [relativePath, surface] of schemaChecks) {
-      const ok = existsSync(join(schemaDir, relativePath));
+    for (const [relativePath, surface, markers = []] of schemaChecks) {
+      const path = join(schemaDir, relativePath);
+      const exists = existsSync(path);
+      const content = exists && markers.length > 0 ? await readFile(path, 'utf8') : '';
+      const ok = exists && markers.every((marker) => content.includes(marker));
       schemaResults.push({ relativePath, ok });
-      if (!ok) failures.push(`missing ${surface}: ${relativePath}`);
+      if (!ok) failures.push(`missing or incompatible ${surface}: ${relativePath}`);
     }
   } catch (error) {
     failures.push(`unable to generate app-server schema: ${error.message}`);
@@ -103,6 +106,8 @@ if (!skipSchema) {
 
 const optionalFeatures = [
   'auth_elicitation',
+  'compaction_image_budget',
+  'mentions_v2',
   'multi_agent_v2',
   'remote_plugin',
   'remote_compaction_v2',

@@ -84,10 +84,11 @@ for (const snippet of [
   'NATIVE',
   'DROP',
   'no OMX command',
-  'Codex CLI `0.149.0`',
+  'Codex CLI `0.150.1`',
   'Current Review Receipt',
-  '758ef40f50c1a458425c7cfbf1eb12cbc07af0b0',
-  'e94437fd141b4623d12a7c712d6f318e7aa47439',
+  '90854393966b21e9ebfd21b122334eb09a20c93d',
+  '3ad79a8a6fe6e95fdbb8c00e40716fffe4011ce2',
+  'v0.21.0',
   'no MERGE or PORT candidates',
 ]) {
   assert(extraction.includes(snippet), `extraction audit is missing ${snippet}`);
@@ -103,7 +104,8 @@ for (const snippet of [
   '.agents/skills',
   'description',
   'Bounded Hook Delta',
-  'rust-v0.149.0',
+  'rust-v0.150.1',
+  '`interrupt` event',
   'Complete Chedex Subtraction Pass',
   'Codex built-in `explorer`',
   'Codex built-in `worker`',
@@ -112,7 +114,7 @@ for (const snippet of [
 }
 
 const readme = await readFile(repoPath('README.md'), 'utf8');
-for (const snippet of ['native Goal mode', 'native subagents', '.agents/skills', '.codex/agents', '.codex/hooks.json', 'npm run audit:codex', 'rust-v0.149.0', 'Product Direction', 'docs/upstream-review.md']) {
+for (const snippet of ['native Goal mode', 'native subagents', '.agents/skills', '.codex/agents', '.codex/hooks.json', 'npm run audit:codex', 'rust-v0.150.1', 'Product Direction', 'docs/upstream-review.md']) {
   assert(readme.includes(snippet), `README is missing ${snippet}`);
 }
 
@@ -139,7 +141,15 @@ for (const snippet of ['Default Upstream Workflow', 'docs/upstream-review.md', '
 }
 
 const hookDocs = await readFile(repoPath('docs', 'hooks.md'), 'utf8');
-for (const snippet of ['Codex discovers', 'PreToolUse', 'PostToolUse', 'hash-based review', 'v0.20.5']) {
+for (const snippet of [
+  'Codex discovers',
+  'PreToolUse',
+  'PostToolUse',
+  'Interrupt',
+  'hash-based review',
+  'v0.20.5',
+  '3ad79a8a6fe6e95fdbb8c00e40716fffe4011ce2',
+]) {
   assert(hookDocs.includes(snippet), `hook docs are missing ${snippet}`);
 }
 

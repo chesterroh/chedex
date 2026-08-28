@@ -1,7 +1,7 @@
 # Install And Uninstall
 
-Chedex `0.149.0` targets the stable
-[Codex CLI `0.149.0`](https://github.com/openai/codex/releases/tag/rust-v0.149.0)
+Chedex `0.150.1` targets the stable
+[Codex CLI `0.150.1`](https://github.com/openai/codex/releases/tag/rust-v0.150.1)
 or newer and Node.js 20 or newer. The Chedex package version identifies the
 latest Codex compatibility boundary verified by this repository.
 
