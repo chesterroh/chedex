@@ -53,9 +53,9 @@ npm run verify
 
 ## OMX Structure: Adopted And Rejected
 
-The reviewed stable upstream is Oh My Codex `v0.20.5` at commit
-`27b3a91c2ea630c2a82cdbcd45a1f1de30d9bb2a`:
-<https://github.com/Yeachan-Heo/oh-my-codex/tree/v0.20.5>.
+The reviewed stable/default upstream is Oh My Codex `v0.21.3` at commit
+`2da36489cfa07ef1df802f01865e7d959d36f236`, retrieved on `2026-09-05`:
+<https://github.com/Yeachan-Heo/oh-my-codex/tree/v0.21.3>.
 This receipt is refreshed through [the default upstream workflow](upstream-review.md),
 not treated as a permanent current version.
 
@@ -75,16 +75,16 @@ Rejected for Chedex:
 - installer-written `hooks.state.*.trusted_hash` entries
 - user-global hook installation for repository-specific policy
 
-OMX default-branch commit `3ad79a8a6fe6e95fdbb8c00e40716fffe4011ce2`
-contains an unpublished `0.21.0` consolidation candidate. It makes workflow
-`PreToolUse` guards advisory, removes hard workflow gates, and retains extensive
-state, session, tmux, and packed-runtime machinery. Those changes apply to
-omitted OMX orchestration and do not create a Chedex hook requirement. Codex
+Since the previous `v0.21.0` review, OMX added cooperative advisory planning,
+repaired Windows cancellation identity, and fixed Team wake and detached/HUD
+lifecycle behavior. Its advisory evidence still uses journals, locks, and
+session state; none creates a Chedex hook requirement. Stable and default
+sources are now identical at `v0.21.3`. Codex
 `0.150.0` added native `Interrupt` hooks, while Chedex keeps its blocking
 generated-file policy in one synchronous command adapter and adds no interrupt
 or workflow event.
 
-OMX also documents several native gaps that no longer match Codex `0.150.1`—for
+OMX also documents several native gaps that no longer match Codex `0.153.4`—for
 example current Codex has `SessionEnd`, `SubagentStart`, and `SubagentStop`.
 Chedex therefore treats current Codex documentation as canonical and OMX only
 as a structural reference.

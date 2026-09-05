@@ -1,13 +1,13 @@
 # Native Delta Audit
 
 This audit decides what Chedex should still own after the Codex `0.131` through
-`0.150.1` upgrade sequence.
+`0.153.4` upgrade sequence.
 
 ## Baseline
 
-- Minimum Codex CLI: `0.150.1`
-- Latest verified Codex CLI: `0.150.1`
-- Chedex: `0.150.1`
+- Minimum Codex CLI: `0.153.4`
+- Latest verified Codex CLI: `0.153.4`
+- Chedex: `0.153.4`
 - native goals are stable and on by default
 - native multi-agent support is stable and on by default
 - native hooks are stable; Chedex uses them only for bounded repository mechanics
@@ -18,7 +18,7 @@ This audit decides what Chedex should still own after the Codex `0.131` through
 The Chedex package version tracks this latest verified compatibility boundary.
 Evidence is checked locally by `npm run audit:codex`, against the current Codex
 manual at <https://developers.openai.com/codex/codex-manual.md>, and against the
-[official Codex 0.150.1 release](https://github.com/openai/codex/releases/tag/rust-v0.150.1).
+[official Codex 0.153.4 release](https://github.com/openai/codex/releases/tag/rust-v0.153.4).
 Every refresh follows [upstream-review.md](upstream-review.md) so release notes,
 source implementation, and the comparison upstream are retrieved before a
 retention or extraction decision is made.
@@ -27,24 +27,26 @@ retention or extraction decision is made.
 
 | Evidence | Value |
 | --- | --- |
-| Retrieval date | `2026-08-28` |
-| Stable package/tag | `0.150.1` / `rust-v0.150.1` |
-| Reviewed release range | `rust-v0.149.0...rust-v0.150.1` |
-| Immutable release commit | `90854393966b21e9ebfd21b122334eb09a20c93d` |
-| Manual sections reviewed | skills and skill metadata/locations, plugins, synchronous/background/MCP hooks, goals/long-running work, subagents/custom agents, permissions, threads/tasks/session messaging and forking, CLI commands, Doctor, and session lifecycle |
-| Initial local audit | `npm run audit:codex` passed against installed `codex-cli 0.150.1` while Chedex still declared the `0.149.0` boundary |
+| Retrieval date | `2026-09-05` |
+| Stable package/tag | `0.153.4` / `rust-v0.153.4` |
+| Reviewed release range | `rust-v0.150.1...rust-v0.153.4`; 353 source commits |
+| Immutable release commit | `3d2ee51ca2d5db578f328aa75e20aa22c0197c9a` |
+| Manual sections reviewed | build skills and local discovery, hooks and trust, long-running work, subagents/custom agents and delegation, approvals/security, CLI commands, plugin packaging, and experimental context management |
+| Initial local audit | `npm run audit:codex` passed against installed `codex-cli 0.153.4` while Chedex still declared the `0.150.1` boundary |
 
-The npm `latest` tag and the installed CLI both resolved to `0.150.1` on the
-retrieval date. The published `0.151.0-alpha.8` prerelease was excluded because
-the native baseline is the latest stable release with default-enabled features.
-The `0.150.0` and `0.150.1` release notes, their complete 208-commit changelog,
-the current manual, and the exact stable source were read. Revalidation of all
-18 Chedex skills, five custom agents, and the bounded project hook produced no
-product-surface addition or removal. The compatibility merge advances the
-verified boundary and makes the development-time audit require the new native
-`Interrupt` hook metadata; Chedex adds no interrupt or workflow hook.
+The npm `latest` tag and installed CLI both resolved to `0.153.4`.
+`0.154.0-alpha.3` was excluded as a prerelease. All eight stable release notes
+from `0.151.0` through `0.153.4`, their full changelogs, the complete source
+commit range, the refreshed manual, and relevant stable implementation/tests
+were reviewed. The source range includes commits beyond the abbreviated
+`0.151.0` release-note list; it was not inferred from those highlights alone.
 
-## 0.131-0.150.1 Relevant Delta
+All 18 skills, five custom agents, guidance, installers, and the project hook
+remain compatible. The only MERGE is the verified compatibility boundary and
+its documentation/receipt checks. No skill, agent, hook, dependency, feature
+flag, or installer mechanism is added or removed.
+
+## 0.131-0.153.4 Relevant Delta
 
 | Codex | Chedex-relevant change | Decision |
 | --- | --- | --- |
@@ -70,6 +72,11 @@ verified boundary and makes the development-time audit require the new native
 | 0.149.0 | Interactive `codex agents`, `codex queue`, cwd commands, richer Doctor diagnostics, permission-profile restoration, subagent routing fixes, skill catalog controls, and security hardening | Use native agent/session discovery and messaging; add no status UI, mailbox, coordinator, diagnostic layer, model-routing skill metadata, or permission store. |
 | 0.150.0 | Cross-task `@` references and task tools, richer response copying/titles/links, permission-mode shortcuts, native `Interrupt` hooks, and trust, MCP, sandbox, Bedrock, and credential hardening | Keep task coordination, interruption, UI, permissions, providers, and security native; add no Chedex task bus or interrupt hook. |
 | 0.150.1 | Retained images now count toward remote-compaction token budgets | Keep compaction and image budgeting native; add no Chedex transcript or image-retention state. |
+| 0.151.0 | Root goals count descendant usage; model switching, permissions, remote executors, MCP discovery/results, and repository plugin configuration improve | Keep budgets, model/tool selection, isolation, and plugin discovery native. |
+| 0.152.0 | Planning tool becomes opt-in; clock tools and async questions depend on model capabilities; approval evidence, cwd restoration, MCP limits, and subagent service-tier inheritance improve | Keep plans in the conversation and use only available native tools; no feature flag or tool wrapper. |
+| 0.152.1 | Guardian respects model-provided Node REPL policy | Leave approval review and model policy to Codex. |
+| 0.153.0 | Remote marketplace CLI, structured async questions, reconnect/history recovery, approval persistence, and optional context management | Keep lifecycle and plugin operations native; exclude opt-in context management from the default baseline. |
+| 0.153.1–0.153.4 | Astra catalog/API/Bedrock support, picker/default updates, Fast-tier copy, and availability-qualified async-question guidance | Inherit native model choice and available tools; add no model pin or routing metadata. |
 
 The `rust-v0.146.1...rust-v0.147.0` review used immutable source commit
 `be6e8eac029b183056b7e4402879f15d2c85f61b`. The relevant candidates were
@@ -124,13 +131,29 @@ No new skill, agent, hook event, runtime, dependency, or installer behavior is
 justified by the `0.150.1` delta. The single compatibility `MERGE` strengthens
 the read-only audit without expanding Chedex's installed surface.
 
+## Current Three-Way Disposition
+
+The current [release range](https://github.com/openai/codex/compare/rust-v0.150.1...rust-v0.153.4)
+was compared with Chedex and OMX `v0.21.3` before editing:
+
+| Candidate / upstream change | Native evidence | Current Chedex coverage | Decision / destination |
+| --- | --- | --- | --- |
+| Root-goal descendant usage, continuation lineage, and model/service-tier inheritance | Release #41183/#41308/#41562; stable goals and multi-agent defaults in `codex-rs/features/src/lib.rs` | `cdx-ralph`, autoresearch, and `cdx-ultrawork` defer state and routing to Codex | NATIVE; no Chedex budget or lifecycle store |
+| Opt-in `update_plan` and model-gated async questions | `core/src/tools/spec_plan.rs` and `spec_plan_tests.rs::update_plan_tool_respects_config_gate` | Plans are conversational; no skill names or requires either tool | NATIVE; retain existing method prompts without enabling flags |
+| Experimental context management and searchable history | Manual configuration reference; release #42385 explicitly requires opt-in and eligible sessions | Chedex owns no compaction or memory runtime | DROP as a required baseline; leave optional native use to the session |
+| Plugin marketplace CLI, catalog layering, tool caches, and MCP result handling | Release #41202/#41208/#41396/#42150; manual plugin packaging | Reversible guidance/custom-agent installer still fills a packaging gap; no plugin bus | NATIVE; no Chedex plugin manager |
+| Guardian evidence, account-scoped approvals, executor permissions, TUI reconnect/recaps, and compressed/forked history | Release notes and source changes #41660/#41852/#41916/#42065/#42133/#42135 | Chedex defers permissions, trust, and session continuity to Codex | NATIVE; no approval or recovery layer |
+| Astra model catalog and async-question corrections | `0.153.1`–`0.153.4` release notes and bundled model metadata | Agent TOMLs have no model or reasoning pins | NATIVE; preserve caller/default inheritance |
+| OMX advisory planning, Team reasoning, wake fixes, HUD, state, release/cache, and hydration changes | OMX `v0.21.3` at `2da36489cfa07ef1df802f01865e7d959d36f236` | Existing consensus plan/review methods; no OMX runtime | NATIVE or DROP by candidate in [the OMX ledger](omx-skill-extraction.md#current-delta-disposition); no extraction |
+| Verified compatibility boundary | Installed stable CLI passes the existing command, feature, and schema audit | Package, version constants, docs, and receipt assertions previously target `0.150.1` | MERGE into those existing surfaces; advance to `0.153.4` |
+
 ## Complete Chedex Subtraction Pass
 
-The `0.150.1` refresh re-read every Chedex skill, custom-agent prompt and
+The `0.153.4` refresh re-read every Chedex skill, custom-agent prompt and
 generated TOML, the project hook, installer, and guidance surface against the
 fresh Codex manual and source. Codex documents `explorer` and `worker` as
-built-ins, so the name-only Chedex `explore` and `executor` roles duplicated
-native lanes and were deleted. Reinstall removes an old Chedex-created copy or
+built-ins; the name-only Chedex `explore` and `executor` roles were already
+deleted in the prior subtraction pass. Reinstall removes an old Chedex-created copy or
 restores the user's pre-Chedex backup.
 
 | Chedex surface | Decision | Why it still earns a place or was removed |
@@ -196,7 +219,7 @@ persist state, intercept Stop, or bypass Codex hook review and trust.
 
 See [hooks.md](hooks.md) for the boundary and upstream comparison.
 
-## Local 0.150.1 Evidence
+## Local 0.153.4 Evidence
 
 The verified local surface reports:
 
@@ -219,6 +242,16 @@ migration, and thread start settings. The CLI audit also proves `codex agents`,
 Permission help currently spells the profile placeholder `CONFIG_PROFILE_V2`;
 the audit accepts that spelling and the previous `CONFIG_PROFILE` spelling to
 avoid a brittle non-semantic failure.
+
+The `2026-09-05` verification passed `npm run generate:agents` (five agents,
+zero generated changes), `npm run audit:codex` (no advisories),
+`npm run install:user:dry` (five agents, 18 skills, no runtime hooks or feature
+flags), `npm run verify`, and `git diff --check`. The install regression suite
+passed its isolated install/uninstall and migration scenarios. Codex emitted
+PATH-alias warnings for the temporary test homes; these did not prevent the
+checks from completing. Skill bodies were unchanged, so no changed-skill
+validator run was required. No user deployment, commit, or publication was
+performed as part of this repository refresh.
 
 ## Recheck Cadence And Triggers
 
